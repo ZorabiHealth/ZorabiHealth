@@ -16,6 +16,7 @@ import {
   ExternalLink,
   Sparkles,
   BookOpen,
+  Search,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -28,10 +29,29 @@ export default function DashboardOverview() {
   const [inputHR, setInputHR] = useState("72");
   const [inputSpO2, setInputSpO2] = useState("97");
 
-  // 2. Music Player state
+  // 2. Music Player & JioSaavn API states
+  const [currentSong, setCurrentSong] = useState<{
+    name: string;
+    artist: string;
+    image: string;
+    audioUrl: string;
+    duration: number;
+  }>({
+    name: "Rustle of petals",
+    artist: "Flower meditation",
+    image: "",
+    audioUrl: "",
+    duration: 300,
+  });
   const [isPlaying, setIsPlaying] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(206); // 3m 26s
-  const totalDuration = 300; // 5m total
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
   // 3. News Article details modal state
   const [activeArticle, setActiveArticle] = useState<{ title: string; content: string } | null>(
@@ -41,11 +61,12 @@ export default function DashboardOverview() {
   // 4. Clinical Valve details alert modal state
   const [isValveDetailOpen, setIsValveDetailOpen] = useState(false);
 
-  // 5. Calendar info state
+  // 5. Dynamic Time and Calendar state
+  const [currentTime, setCurrentTime] = useState("");
   const [currentDate, setCurrentDate] = useState({
-    day: "24",
-    weekday: "Wednesday",
-    month: "July",
+    day: "5",
+    weekday: "Friday",
+    month: "June",
   });
 
   useEffect(() => {
@@ -64,27 +85,151 @@ export default function DashboardOverview() {
       "November",
       "December",
     ];
-    const d = new Date();
-    setCurrentDate({
-      day: d.getDate().toString(),
-      weekday: days[d.getDay()],
-      month: months[d.getMonth()],
-    });
+
+    const updateDateTime = () => {
+      const d = new Date();
+      setCurrentDate({
+        day: d.getDate().toString(),
+        weekday: days[d.getDay()],
+        month: months[d.getMonth()],
+      });
+
+      let hours = d.getHours();
+      const minutes = d.getMinutes().toString().padStart(2, "0");
+      const seconds = d.getSeconds().toString().padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12;
+      hours = hours ? hours : 12; // 0 should be 12
+      setCurrentTime(`${hours.toString().padStart(2, "0")}:${minutes}:${seconds} ${ampm}`);
+    };
+
+    updateDateTime();
+    const interval = setInterval(updateDateTime, 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Music Player interval countdown
+  // Client-side HTML5 Audio event listeners
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0) {
-      setIsPlaying(false);
-      setTimeLeft(totalDuration);
+    if (typeof window !== "undefined") {
+      audioRef.current = new Audio();
     }
-    return () => clearInterval(interval);
-  }, [isPlaying, timeLeft]);
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleTimeUpdate = () => setAudioCurrentTime(audio.currentTime);
+    const handleLoadedMetadata = () => setAudioDuration(audio.duration);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setAudioCurrentTime(0);
+    };
+
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("ended", handleEnded);
+
+    return () => {
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("ended", handleEnded);
+      audio.pause();
+    };
+  }, []);
+
+  // Fetch a default meditation song from JioSaavn on mount
+  useEffect(() => {
+    fetch("/api/saavn/search?q=meditation")
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && res.data?.results?.length > 0) {
+          const first = res.data.results[0];
+          const name = first.name;
+          const artist = first.artists?.primary?.[0]?.name || "JioSaavn";
+          const image =
+            first.image?.[2]?.url || first.image?.[1]?.url || first.image?.[0]?.url || "";
+          const audioUrl =
+            first.downloadUrl?.[4]?.url ||
+            first.downloadUrl?.[3]?.url ||
+            first.downloadUrl?.[2]?.url ||
+            "";
+          const duration = parseInt(first.duration) || 300;
+          setCurrentSong({ name, artist, image, audioUrl, duration });
+        }
+      })
+      .catch((err) => console.error("Error fetching default JioSaavn song:", err));
+  }, []);
+
+  // Load and play song stream when audioUrl updates
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (currentSong.audioUrl && audio.src !== currentSong.audioUrl) {
+      audio.src = currentSong.audioUrl;
+      audio.load();
+      if (isPlaying) {
+        audio.play().catch((e) => console.warn("Failed to play audio stream:", e));
+      }
+    }
+  }, [currentSong.audioUrl]);
+
+  // Sync play/pause actions
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      if (audio.src) {
+        audio.play().catch((e) => {
+          console.warn("Failed to play audio stream:", e);
+          setIsPlaying(false);
+        });
+      }
+    } else {
+      audio.pause();
+    }
+  }, [isPlaying]);
+
+  // JioSaavn search triggers
+  const handleSearchSong = async (query: string) => {
+    if (!query.trim()) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/saavn/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      if (data.success && data.data?.results) {
+        setSearchResults(data.data.results);
+      } else {
+        setSearchResults([]);
+      }
+    } catch (e) {
+      console.error("Failed to search song from JioSaavn proxy:", e);
+      setSearchResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const selectSong = (song: any) => {
+    const name = song.name;
+    const artist = song.artists?.primary?.[0]?.name || "JioSaavn";
+    const image = song.image?.[2]?.url || song.image?.[1]?.url || song.image?.[0]?.url || "";
+    const audioUrl =
+      song.downloadUrl?.[4]?.url || song.downloadUrl?.[3]?.url || song.downloadUrl?.[2]?.url || "";
+    const duration = parseInt(song.duration) || 300;
+
+    setCurrentSong({ name, artist, image, audioUrl, duration });
+    setIsPlaying(true);
+    setShowSearch(false);
+    setSearchResults([]);
+    setSearchQuery("");
+  };
 
   // Form Submit Handler
   const handleVitalsSubmit = (e: React.FormEvent) => {
@@ -102,12 +247,13 @@ export default function DashboardOverview() {
   };
 
   const formatTime = (seconds: number) => {
+    if (isNaN(seconds) || seconds < 0) return "0:00";
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const progressPercent = ((totalDuration - timeLeft) / totalDuration) * 100;
+  const progressPercent = audioDuration ? (audioCurrentTime / audioDuration) * 100 : 0;
 
   return (
     <div
@@ -241,51 +387,153 @@ export default function DashboardOverview() {
         {/* END: Heart Health Card */}
 
         {/* BEGIN: Time/Music Card (Top Right - 3 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-3 bg-gradient-to-br from-[#1e40af] to-[#60a5fa] rounded-[32px] relative overflow-hidden p-6 text-white border border-white/10 shadow-md flex flex-col justify-between min-h-[350px]">
-          <div className="flex justify-between items-start">
-            <h1 className="text-3xl font-black tracking-tight font-mono">12:45</h1>
-            <div className="text-right">
-              <p className="text-[10px] opacity-80 font-bold uppercase tracking-wider">
-                {currentDate.weekday}
-              </p>
-              <p className="text-xs font-black">
-                {currentDate.day} {currentDate.month}
+        <section className="col-span-12 lg:col-span-3 rounded-[32px] relative overflow-hidden p-6 text-white border border-white/10 shadow-md flex flex-col justify-between min-h-[350px]">
+          {/* Background Video */}
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover z-0"
+          >
+            <source src="/video/try_do.mp4" type="video/mp4" />
+          </video>
+          {/* Overlay to ensure readability and glassmorphism style */}
+          <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[1px] z-[1]" />
+
+          {/* Clock & Date Header */}
+          <div className="relative z-10 flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl font-black tracking-tight font-mono leading-none drop-shadow-md">
+                {currentTime || "12:45:00 PM"}
+              </h1>
+              <p className="text-[10px] opacity-90 font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1.5 drop-shadow-sm">
+                <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                {currentDate.weekday}, {currentDate.day} {currentDate.month}
               </p>
             </div>
+            <button
+              onClick={() => setShowSearch(!showSearch)}
+              className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-sm"
+              title="Search JioSaavn Music"
+            >
+              {showSearch ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+            </button>
           </div>
 
-          <div className="mt-auto space-y-4">
-            <div className="bg-white/15 p-3 rounded-2xl flex items-center gap-3 border border-white/20">
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="w-10 h-10 bg-white text-blue-600 rounded-full flex items-center justify-center shadow-md hover:scale-105 transition-transform shrink-0 cursor-pointer"
-              >
-                {isPlaying ? (
-                  <Pause className="w-4 h-4 fill-current" />
+          {showSearch ? (
+            <div className="relative z-10 flex-grow flex flex-col mt-4 bg-black/50 backdrop-blur-md rounded-2xl border border-white/10 p-3 overflow-hidden">
+              <div className="flex gap-1.5">
+                <Input
+                  placeholder="Search JioSaavn..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSearchSong(searchQuery);
+                  }}
+                  className="h-8 text-[11px] bg-white/10 border-white/15 text-white placeholder-white/40 focus-visible:ring-white/20 rounded-lg py-1 px-2.5"
+                />
+                <Button
+                  onClick={() => handleSearchSong(searchQuery)}
+                  className="h-8 text-xs px-2.5 bg-white text-blue-600 hover:bg-white/90 rounded-lg font-bold cursor-pointer"
+                >
+                  Go
+                </Button>
+              </div>
+
+              <div className="flex-grow overflow-y-auto mt-2 space-y-1.5 pr-1 max-h-[140px] custom-scrollbar">
+                {isLoading ? (
+                  <div className="text-center py-6 text-xs opacity-75 animate-pulse">
+                    Searching JioSaavn...
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  searchResults.map((song: any) => {
+                    const songName = song.name;
+                    const artistName = song.artists?.primary?.[0]?.name || "JioSaavn";
+                    const imgUrl = song.image?.[1]?.url || song.image?.[0]?.url || "";
+                    return (
+                      <div
+                        key={song.id}
+                        onClick={() => selectSong(song)}
+                        className="flex items-center gap-2.5 p-1.5 hover:bg-white/15 rounded-lg cursor-pointer transition-all border border-transparent hover:border-white/5"
+                      >
+                        {imgUrl ? (
+                          <img
+                            src={imgUrl}
+                            alt={songName}
+                            className="w-8 h-8 rounded object-cover shadow-sm"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center text-[10px]">
+                            🎵
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-bold truncate leading-tight">{songName}</p>
+                          <p className="text-[9px] opacity-70 truncate leading-none mt-0.5">
+                            {artistName}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
                 ) : (
-                  <Play className="w-4 h-4 fill-current ml-0.5" />
+                  <div className="text-center py-6 text-xs opacity-50 font-medium">
+                    {searchQuery ? "No results found" : "Type above and press Go"}
+                  </div>
                 )}
-              </button>
-              <div className="flex-grow min-w-0">
-                <p className="text-[10px] font-bold leading-tight truncate">Rustle of petals</p>
-                <p className="text-[9px] opacity-70 truncate mt-0.5">Flower meditation</p>
-                {/* Progress bar */}
-                <div className="w-full bg-white/25 rounded-full h-1 mt-1.5 overflow-hidden">
-                  <div
-                    className="bg-white h-full transition-all duration-300"
-                    style={{ width: `${progressPercent}%` }}
-                  />
+              </div>
+            </div>
+          ) : (
+            <div className="relative z-10 mt-auto space-y-4">
+              <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl flex items-center gap-3.5 border border-white/15 shadow-md">
+                <button
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className="w-10 h-10 bg-white text-blue-600 rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform shrink-0 cursor-pointer"
+                >
+                  {isPlaying ? (
+                    <Pause className="w-4.5 h-4.5 fill-current text-blue-600" />
+                  ) : (
+                    <Play className="w-4.5 h-4.5 fill-current text-blue-600 ml-0.5" />
+                  )}
+                </button>
+                <div className="flex-grow min-w-0">
+                  <p className="text-[11px] font-bold leading-tight truncate">{currentSong.name}</p>
+                  <p className="text-[9px] opacity-80 truncate mt-0.5 font-medium">
+                    {currentSong.artist}
+                  </p>
+                  {/* Progress bar */}
+                  <div className="w-full bg-white/20 rounded-full h-1 mt-2 overflow-hidden">
+                    <div
+                      className="bg-white h-full transition-all duration-300"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col items-end shrink-0 gap-1">
+                  {currentSong.image ? (
+                    <img
+                      src={currentSong.image}
+                      alt={currentSong.name}
+                      className="w-8 h-8 rounded-lg object-cover shadow-sm border border-white/15"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-xs border border-white/10">
+                      🎵
+                    </div>
+                  )}
+                  <span className="text-[8px] opacity-75 font-mono">
+                    {formatTime(audioCurrentTime)} /{" "}
+                    {formatTime(audioDuration || currentSong.duration)}
+                  </span>
                 </div>
               </div>
-              <span className="text-[9px] opacity-80 font-mono shrink-0">
-                -{formatTime(timeLeft)}
-              </span>
+              <div className="flex justify-center gap-1.5">
+                <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                <div className="w-1.5 h-1.5 bg-white/30 rounded-full" />
+              </div>
             </div>
-            <div className="flex justify-center gap-1">
-              <div className="w-1.5 h-1.5 bg-white rounded-full" />
-              <div className="w-1.5 h-1.5 bg-white/30 rounded-full" />
-            </div>
-          </div>
+          )}
         </section>
         {/* END: Time/Music Card */}
 
