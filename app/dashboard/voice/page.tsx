@@ -15,9 +15,7 @@ import {
   X,
   Download,
   Database,
-  Wifi,
   WifiOff,
-  Volume1,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -33,7 +31,7 @@ const STT_PARAMS = new URLSearchParams({
   language: "en",
   punctuate: "true",
   interim_results: "true",
-  endpointing: "400", // ms of silence before finalizing
+  endpointing: "400",
   smart_format: "true",
   utterance_end_ms: "1500",
 }).toString();
@@ -71,17 +69,17 @@ function generateResponse(intent: string, text: string): string {
     case "greeting":
       return "Hello! I'm your ZorabiHealth assistant. How can I help you today? You can tell me about symptoms, medications you've taken, or ask about your vitals.";
     case "log_medication":
-      return `Got it! I've logged that you've taken your medication. Your medication log has been updated in the database. Is there anything else you'd like to record?`;
+      return "Got it! I've logged that you've taken your medication. Your medication log has been updated in the database. Is there anything else you'd like to record?";
     case "log_symptom":
-      return `I've noted your symptom. I recommend logging this in your Symptom Tracker for your doctor's review. If symptoms are severe, please seek immediate medical attention.`;
+      return "I've noted your symptom. I recommend logging this in your Symptom Tracker for your doctor's review. If symptoms are severe, please seek immediate medical attention.";
     case "query_vitals":
-      return `Based on your last reading, your heart rate was 72 bpm and SpO2 was 97%. Your vitals are within the normal range. Would you like to update a new reading?`;
+      return "Based on your last reading, your heart rate was 72 bpm and SpO2 was 97%. Your vitals are within the normal range. Would you like to update a new reading?";
     case "set_reminder":
-      return `I'll help you set that reminder. Please use the Medications section to configure SMS alerts via Vonage for precise scheduled reminders.`;
+      return "I'll help you set that reminder. Please use the Medications section to configure SMS alerts via Vonage for precise scheduled reminders.";
     case "refill_request":
-      return `I'll flag that medication for refill. Head to the Pharmacy section to request an automated refill — I'll find the nearest vendor and send you a tracking ID.`;
+      return "I'll flag that medication for refill. Head to the Pharmacy section to request an automated refill — I'll find the nearest vendor and send you a tracking ID.";
     case "help":
-      return `I can help you: log symptoms, record medications taken, check your vitals, set medication reminders, or request a pharmacy refill. Just speak naturally!`;
+      return "I can help you: log symptoms, record medications taken, check your vitals, set medication reminders, or request a pharmacy refill. Just speak naturally!";
     default:
       return `I heard: "${text}". As your health assistant, I can help with medication logging, symptom tracking, vitals queries, and pharmacy refills. What would you like to do?`;
   }
@@ -94,7 +92,6 @@ function speakText(text: string, onEnd?: () => void) {
   u.rate = 1.0;
   u.pitch = 1.0;
   u.volume = 1.0;
-
   const voices = window.speechSynthesis.getVoices();
   const preferred = voices.find(
     (v) => v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Samantha")
@@ -102,6 +99,33 @@ function speakText(text: string, onEnd?: () => void) {
   if (preferred) u.voice = preferred;
   if (onEnd) u.onend = onEnd;
   window.speechSynthesis.speak(u);
+}
+
+// VOICE-002-UI: Audio player button
+function AudioPlayerButton({ audioUrl }: { audioUrl: string }) {
+  const [playing, setPlaying] = useState(false);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const toggle = () => {
+    if (!audioRef.current) {
+      audioRef.current = new Audio(audioUrl);
+      audioRef.current.onended = () => setPlaying(false);
+    }
+    if (playing) {
+      audioRef.current.pause();
+      setPlaying(false);
+    } else {
+      audioRef.current.play();
+      setPlaying(true);
+    }
+  };
+  return (
+    <button
+      onClick={toggle}
+      className="mt-1.5 text-[10px] px-2 py-1 rounded-lg border border-violet-200 text-violet-600 hover:bg-violet-50 transition-all"
+    >
+      {playing ? "⏸ Pause" : "▶ Play recording"}
+    </button>
+  );
 }
 
 export default function VoiceAgentPage() {
@@ -114,8 +138,7 @@ export default function VoiceAgentPage() {
   const [showTextMode, setShowTextMode] = useState(false);
   const [micAllowed, setMicAllowed] = useState<boolean | null>(null);
   const [waveformData, setWaveformData] = useState<number[]>(Array(30).fill(0));
-
-  // Sync state
+  const [searchQuery, setSearchQuery] = useState(""); // VOICE-003
   const [syncStatus, setSyncStatus] = useState<"connected" | "offline" | "syncing">("connected");
   const [isLoading, setIsLoading] = useState(true);
 
@@ -126,31 +149,26 @@ export default function VoiceAgentPage() {
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
+  const audioBlobsRef = useRef<Blob[]>([]); // VOICE-002-API
 
-  // Load conversational history from Supabase + Local Cache Fallback
   const loadHistory = async () => {
     setIsLoading(true);
     const isOnline = typeof window !== "undefined" && navigator.onLine;
-
     if (!isOnline) {
       setSyncStatus("offline");
       setMessages(loadFromStorage<VoiceMessage[]>(STORAGE_KEYS.VOICE_SESSIONS, []));
       setIsLoading(false);
       return;
     }
-
     try {
       setSyncStatus("syncing");
       await drainSyncQueue();
-
       const { data: dbMsgs, error } = await supabase
         .from("voice_messages")
         .select("*")
         .order("created_at", { ascending: true })
         .limit(20);
-
       if (error) throw error;
-
       const mappedMsgs: VoiceMessage[] = (dbMsgs || []).map((db) => ({
         id: db.id,
         sender: db.sender as "user" | "assistant",
@@ -158,8 +176,8 @@ export default function VoiceAgentPage() {
         timestamp: db.created_at,
         intent: db.intent || undefined,
         actionTaken: db.action_taken || undefined,
+        audio_url: db.audio_url || undefined,
       }));
-
       setMessages(mappedMsgs);
       saveToStorage(STORAGE_KEYS.VOICE_SESSIONS, mappedMsgs);
       setSyncStatus("connected");
@@ -174,13 +192,11 @@ export default function VoiceAgentPage() {
 
   useEffect(() => {
     loadHistory();
-
     const handleOnline = () => {
       setSyncStatus("syncing");
       loadHistory();
     };
     const handleOffline = () => setSyncStatus("offline");
-
     window.addEventListener("online", handleOnline);
     window.addEventListener("offline", handleOffline);
     return () => {
@@ -189,12 +205,11 @@ export default function VoiceAgentPage() {
     };
   }, []);
 
-  // Auto-scroll messages
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, interimText]);
 
-  // Waveform animation
+  // VOICE-001: Waveform animation with real audio data
   const animateWaveform = useCallback(function animate() {
     if (!analyserRef.current) return;
     const data = new Uint8Array(analyserRef.current.frequencyBinCount);
@@ -210,18 +225,10 @@ export default function VoiceAgentPage() {
   const addMessage = async (msg: Omit<VoiceMessage, "id" | "timestamp">) => {
     const messageId = generateUUID();
     const now = new Date().toISOString();
-    const full: VoiceMessage = {
-      ...msg,
-      id: messageId,
-      timestamp: now,
-    };
-
-    // Optimistic state updates
+    const full: VoiceMessage = { ...msg, id: messageId, timestamp: now };
     const updated = [...messages.slice(-19), full];
     setMessages(updated);
     saveToStorage(STORAGE_KEYS.VOICE_SESSIONS, updated);
-
-    // Save to database
     const dbPayload = {
       id: full.id,
       sender: full.sender,
@@ -229,14 +236,11 @@ export default function VoiceAgentPage() {
       intent: full.intent || null,
       action_taken: full.actionTaken || null,
     };
-
     if (navigator.onLine) {
       try {
         const { error } = await supabase.from("voice_messages").insert(dbPayload);
         if (error) throw error;
-        console.log("[Supabase] Saved message logs successfully.");
       } catch (err) {
-        console.error("[Supabase] Failed to save voice log, queuing offline:", err);
         queueSyncItem({ table: "voice_messages", action: "insert", payload: dbPayload });
         setSyncStatus("offline");
       }
@@ -244,27 +248,21 @@ export default function VoiceAgentPage() {
       queueSyncItem({ table: "voice_messages", action: "insert", payload: dbPayload });
       setSyncStatus("offline");
     }
-
-    return full;
+    return messageId;
   };
 
-  // ── Start Listening ────────────────────────────────────────
   const startListening = async () => {
     setErrorMsg("");
     setStatus("connecting");
-
     try {
-      // 1. Get temp API key from server-side proxy
       const tokenRes = await fetch("/api/deepgram/token");
       const { key } = await tokenRes.json();
       if (!key) throw new Error("Could not fetch Deepgram token");
 
-      // 2. Request mic
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
       streamRef.current = stream;
       setMicAllowed(true);
 
-      // 3. Set up Web Audio for visual wave representation
       const AudioCtx =
         window.AudioContext ||
         (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
@@ -277,19 +275,21 @@ export default function VoiceAgentPage() {
       analyserRef.current = analyser;
       animationRef.current = requestAnimationFrame(animateWaveform);
 
-      // 4. Open Deepgram Live WebSocket
       const ws = new WebSocket(`${DEEPGRAM_WS_URL}?${STT_PARAMS}`, ["token", key]);
       wsRef.current = ws;
 
       ws.onopen = () => {
         setStatus("listening");
-        // 5. Start MediaRecorder -> stream chunks
         const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
         mediaRecorderRef.current = recorder;
+        audioBlobsRef.current = []; // VOICE-002-API: reset blobs
 
         recorder.addEventListener("dataavailable", (e: BlobEvent) => {
-          if (ws.readyState === WebSocket.OPEN && e.data.size > 0) {
-            ws.send(e.data);
+          if (e.data.size > 0) {
+            // Send to Deepgram for STT
+            if (ws.readyState === WebSocket.OPEN) ws.send(e.data);
+            // Also collect for upload — VOICE-002-API
+            audioBlobsRef.current.push(e.data);
           }
         });
         recorder.start(250);
@@ -299,10 +299,8 @@ export default function VoiceAgentPage() {
         try {
           const data = JSON.parse(event.data);
           if (data.type !== "Results") return;
-
           const transcript = data.channel?.alternatives?.[0]?.transcript ?? "";
           const isFinal = data.is_final;
-
           if (!transcript) return;
 
           if (!isFinal) {
@@ -311,14 +309,30 @@ export default function VoiceAgentPage() {
             setInterimText("");
             if (transcript.trim().length < 2) return;
 
-            // Add user message
-            addMessage({ sender: "user", text: transcript });
+            // Save user message then upload audio — VOICE-002-API
+            addMessage({ sender: "user", text: transcript }).then(async (msgId) => {
+              if (audioBlobsRef.current.length > 0 && navigator.onLine) {
+                const blob = new Blob(audioBlobsRef.current, { type: "audio/webm" });
+                const fileName = `${msgId}.webm`;
+                const { error } = await supabase.storage
+                  .from("voicesessions")
+                  .upload(fileName, blob, { contentType: "audio/webm" });
+                if (!error) {
+                  const { data: urlData } = supabase.storage
+                    .from("voicesessions")
+                    .getPublicUrl(fileName);
+                  await supabase
+                    .from("voice_messages")
+                    .update({ audio_url: urlData.publicUrl })
+                    .eq("id", msgId);
+                }
+                audioBlobsRef.current = [];
+              }
+            });
 
-            // Process intent and respond
             setStatus("processing");
             const intent = detectIntent(transcript);
             const response = generateResponse(intent, transcript);
-
             setTimeout(() => {
               addMessage({ sender: "assistant", text: response, intent, actionTaken: intent });
               setStatus("speaking");
@@ -330,7 +344,7 @@ export default function VoiceAgentPage() {
             }, 500);
           }
         } catch {
-          // Keep-alive or frame parses
+          // keep-alive frames
         }
       };
 
@@ -338,7 +352,6 @@ export default function VoiceAgentPage() {
         setErrorMsg("WebSocket connection failed. Verify Deepgram key.");
         stopListening();
       };
-
       ws.onclose = () => {
         if (status === "listening") setStatus("idle");
       };
@@ -353,14 +366,11 @@ export default function VoiceAgentPage() {
     }
   };
 
-  // ── Stop Listening ─────────────────────────────────────────
   const stopListening = useCallback(() => {
     if (animationRef.current) cancelAnimationFrame(animationRef.current);
     if (mediaRecorderRef.current?.state !== "inactive") mediaRecorderRef.current?.stop();
     streamRef.current?.getTracks().forEach((t) => t.stop());
-    if (wsRef.current?.readyState === WebSocket.OPEN) {
-      wsRef.current.close();
-    }
+    if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.close();
     audioContextRef.current?.close();
     setWaveformData(Array(30).fill(0));
     setInterimText("");
@@ -370,7 +380,6 @@ export default function VoiceAgentPage() {
 
   useEffect(() => () => stopListening(), [stopListening]);
 
-  // ── Text Mode Form ─────────────────────────────────────────
   const handleTextSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!textInput.trim()) return;
@@ -406,15 +415,12 @@ export default function VoiceAgentPage() {
   const clearSession = async () => {
     setMessages([]);
     saveToStorage(STORAGE_KEYS.VOICE_SESSIONS, []);
-
-    // Hard delete logs for default mock user
     if (navigator.onLine) {
       try {
         await supabase
           .from("voice_messages")
           .delete()
           .eq("user_id", "00000000-0000-0000-0000-000000000000");
-        console.log("[Supabase] Voice logs cleared successfully.");
       } catch (err) {
         console.error("[Supabase] Failed to clear DB logs:", err);
       }
@@ -441,6 +447,11 @@ export default function VoiceAgentPage() {
     error: "Error",
   };
 
+  // VOICE-003: filtered messages
+  const filteredMessages = messages.filter(
+    (msg) => searchQuery.trim() === "" || msg.text.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
   return (
     <div className="w-full min-h-full bg-[#f0f5ff] p-6 md:p-8 flex flex-col gap-6">
       {/* Header */}
@@ -450,22 +461,17 @@ export default function VoiceAgentPage() {
             <h1 className="text-2xl font-black text-slate-800 flex items-center gap-2">
               <Sparkles className="w-6 h-6 text-violet-600" /> Voice Health Assistant
             </h1>
-
-            {/* Sync Badge */}
             <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-white border border-slate-100 shadow-sm">
               {syncStatus === "connected" && (
                 <>
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 absolute" />
                   <Database className="w-3.5 h-3.5 text-emerald-600 ml-1" />
                   <span className="text-emerald-700">Database Synced</span>
                 </>
               )}
               {syncStatus === "offline" && (
                 <>
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping" />
-                  <span className="w-2 h-2 rounded-full bg-amber-500 absolute" />
-                  <WifiOff className="w-3.5 h-3.5 text-amber-600 ml-1" />
+                  <WifiOff className="w-3.5 h-3.5 text-amber-600" />
                   <span className="text-amber-700">Offline Mode</span>
                 </>
               )}
@@ -486,14 +492,14 @@ export default function VoiceAgentPage() {
           <button
             onClick={() => setIsMuted(!isMuted)}
             className={`p-2.5 rounded-xl transition-all border border-slate-200 shadow-sm ${isMuted ? "bg-red-50 text-red-500 border-red-100" : "bg-white text-slate-500 hover:text-slate-800"}`}
-            title={isMuted ? "Unmute Assistant" : "Mute Assistant"}
+            title={isMuted ? "Unmute" : "Mute"}
           >
             {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
           </button>
           <button
             onClick={() => setShowTextMode(!showTextMode)}
             className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-slate-800 transition-all shadow-sm"
-            title="Toggle Text Input"
+            title="Text Input"
           >
             <Keyboard className="w-4 h-4" />
           </button>
@@ -501,7 +507,7 @@ export default function VoiceAgentPage() {
             <button
               onClick={exportSession}
               className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-slate-800 transition-all shadow-sm"
-              title="Export Log"
+              title="Export"
             >
               <Download className="w-4 h-4" />
             </button>
@@ -510,7 +516,7 @@ export default function VoiceAgentPage() {
             <button
               onClick={clearSession}
               className="p-2.5 rounded-xl border border-slate-200 bg-white text-slate-500 hover:text-red-500 transition-all shadow-sm"
-              title="Clear History"
+              title="Clear"
             >
               <X className="w-4 h-4" />
             </button>
@@ -519,9 +525,8 @@ export default function VoiceAgentPage() {
       </header>
 
       <div className="flex flex-col lg:flex-row gap-6 flex-1 min-h-0">
-        {/* Orb + Controls panel */}
+        {/* Orb + Controls */}
         <div className="lg:w-72 flex flex-col items-center gap-6 bg-white rounded-3xl border border-slate-100 shadow-sm p-6">
-          {/* Animated Orb */}
           <div className="relative flex items-center justify-center py-4">
             {status === "listening" && (
               <span className="absolute w-44 h-44 rounded-full bg-emerald-400/20 animate-ping" />
@@ -529,11 +534,8 @@ export default function VoiceAgentPage() {
             {status === "speaking" && (
               <span className="absolute w-44 h-44 rounded-full bg-violet-400/20 animate-ping" />
             )}
-            {/* Orb Circle */}
             <div
-              className={`
-              w-32 h-32 rounded-full flex items-center justify-center shadow-2xl transition-all duration-500
-              ${
+              className={`w-32 h-32 rounded-full flex items-center justify-center shadow-2xl transition-all duration-500 ${
                 status === "idle"
                   ? "bg-gradient-to-br from-slate-200 to-slate-300"
                   : status === "connecting"
@@ -545,8 +547,7 @@ export default function VoiceAgentPage() {
                         : status === "speaking"
                           ? "bg-gradient-to-br from-violet-500 to-purple-700 shadow-violet-400/30"
                           : "bg-gradient-to-br from-red-400 to-red-600"
-              }
-            `}
+              }`}
             >
               {status === "connecting" ? (
                 <Loader2 className="w-10 h-10 text-white animate-spin" />
@@ -566,21 +567,25 @@ export default function VoiceAgentPage() {
             {statusLabel[status]}
           </span>
 
-          {/* Waveform visual */}
+          {/* VOICE-001: HSL interpolated waveform violet→emerald */}
           <div className="flex items-end gap-0.5 h-10 w-full px-2">
             {waveformData.map((v, i) => (
               <div
                 key={i}
-                className={`flex-1 rounded-full transition-all duration-75 ${isActive ? "bg-emerald-400" : "bg-slate-200"}`}
                 style={{
+                  flex: 1,
                   height: `${Math.max(4, v * 100)}%`,
+                  borderRadius: 9999,
+                  transition: "height 0.075s ease",
+                  background: isActive
+                    ? `hsl(${Math.round(270 - (i / 29) * 110)}, ${Math.round(70 + (i / 29) * 20)}%, 55%)`
+                    : "#e2e8f0",
                   opacity: isActive ? 0.7 + v * 0.3 : 0.4,
                 }}
               />
             ))}
           </div>
 
-          {/* Microphone controls */}
           {!isActive ? (
             <button
               onClick={startListening}
@@ -591,21 +596,19 @@ export default function VoiceAgentPage() {
           ) : (
             <button
               onClick={stopListening}
-              className="w-full py-3.5 rounded-2xl bg-red-500 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-600 transition-all active:scale-[0.98] shadow-md shadow-red-500/10"
+              className="w-full py-3.5 rounded-2xl bg-red-500 text-white font-bold text-sm flex items-center justify-center gap-2 hover:bg-red-600 transition-all active:scale-[0.98] shadow-md"
             >
               <MicOff className="w-4 h-4" /> Stop
             </button>
           )}
 
-          {/* Mic permissions banner */}
           {micAllowed === false && (
             <div className="w-full bg-red-50 border border-red-100 rounded-2xl p-3.5 text-xs text-red-700 font-medium leading-relaxed">
               <AlertCircle className="w-4 h-4 inline mr-1 text-red-600" />
-              Microphone access blocked. Please enable mic permissions in browser settings.
+              Microphone access blocked. Enable mic permissions in browser settings.
             </div>
           )}
 
-          {/* Error description */}
           {errorMsg && (
             <div className="w-full bg-red-50 border border-red-100 rounded-2xl p-3.5 text-xs text-red-700 flex items-start gap-1.5 leading-relaxed font-medium">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-red-600" />
@@ -613,7 +616,6 @@ export default function VoiceAgentPage() {
             </div>
           )}
 
-          {/* Quick command helpers */}
           <div className="w-full">
             <p className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-2">
               Voice Shortcuts
@@ -649,36 +651,48 @@ export default function VoiceAgentPage() {
           </div>
         </div>
 
-        {/* Conversation transcript feed */}
+        {/* Conversation log */}
         <div className="flex-1 bg-white rounded-3xl border border-slate-100 shadow-sm flex flex-col overflow-hidden min-h-0">
-          <div className="flex items-center justify-between px-6 py-4.5 border-b border-slate-100">
+          {/* VOICE-003: Search header */}
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 gap-4">
             <h3 className="text-sm font-bold text-slate-700 flex items-center gap-2">
               <MessageSquare className="w-4 h-4 text-slate-400" /> Conversational Log
             </h3>
-            <span className="text-xs text-slate-400 font-semibold">
-              {messages.length} exchanges stored
-            </span>
+            <div className="flex items-center gap-3">
+              <input
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search transcripts..."
+                className="text-xs border border-slate-200 rounded-xl px-3 py-1.5 bg-slate-50 text-slate-600 outline-none focus:border-blue-300 w-44"
+              />
+              <span className="text-xs text-slate-400 font-semibold whitespace-nowrap">
+                {filteredMessages.length} / {messages.length} exchanges
+              </span>
+            </div>
           </div>
 
-          {/* Transcript rolling window */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4 min-h-0 bg-slate-50/20">
             {isLoading ? (
               <div className="h-full flex items-center justify-center">
                 <Loader2 className="w-8 h-8 text-blue-600 animate-spin" />
               </div>
-            ) : messages.length === 0 && !interimText ? (
+            ) : filteredMessages.length === 0 && !interimText ? (
               <div className="h-full flex flex-col items-center justify-center text-slate-300 text-center gap-3 py-20">
                 <Sparkles className="w-14 h-14 text-violet-500 animate-bounce" />
                 <p className="text-sm font-bold text-slate-500">
-                  How can I assist your health today?
+                  {searchQuery
+                    ? "No messages match your search."
+                    : "How can I assist your health today?"}
                 </p>
-                <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
-                  Try speaking: "I took my Metformin dose" or "Show me my SpO2 readings".
-                </p>
+                {!searchQuery && (
+                  <p className="text-xs text-slate-400 max-w-xs leading-relaxed">
+                    Try speaking: "I took my Metformin dose" or "Show me my SpO2 readings".
+                  </p>
+                )}
               </div>
             ) : (
               <div className="space-y-4">
-                {messages.map((msg) => (
+                {filteredMessages.map((msg) => (
                   <div
                     key={msg.id}
                     className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
@@ -698,11 +712,16 @@ export default function VoiceAgentPage() {
                           Parsed Intent: {msg.intent.replace(/_/g, " ")}
                         </div>
                       )}
+                      {/* VOICE-002-UI: audio playback button */}
+                      {(msg as VoiceMessage & { audio_url?: string }).audio_url && (
+                        <AudioPlayerButton
+                          audioUrl={(msg as VoiceMessage & { audio_url?: string }).audio_url!}
+                        />
+                      )}
                     </motion.div>
                   </div>
                 ))}
 
-                {/* Interim transcripts (grey text, finalized shortly) */}
                 {interimText && (
                   <div className="flex justify-end">
                     <div className="max-w-[75%] rounded-2xl px-4 py-3 text-sm bg-blue-200/50 text-blue-600 rounded-br-sm italic font-medium">
@@ -711,7 +730,6 @@ export default function VoiceAgentPage() {
                   </div>
                 )}
 
-                {/* Response generation bouncing dots */}
                 {status === "processing" && (
                   <div className="flex justify-start">
                     <div className="bg-slate-100 border border-slate-200 rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm">
@@ -728,7 +746,6 @@ export default function VoiceAgentPage() {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Keyboard input mode */}
           <AnimatePresence>
             {showTextMode && (
               <motion.form
@@ -759,9 +776,8 @@ export default function VoiceAgentPage() {
         </div>
       </div>
 
-      {/* Setup notification banner */}
       <div className="bg-blue-50 border border-blue-100 rounded-2xl px-4 py-3 flex items-start gap-2.5 text-xs text-blue-700 leading-relaxed font-medium">
-        <AlertCircle className="w-4.5 h-4.5 shrink-0 mt-0.5 text-blue-600 animate-pulse" />
+        <AlertCircle className="w-4 h-4 shrink-0 mt-0.5 text-blue-600 animate-pulse" />
         <div>
           <strong>Speech setup recommendation:</strong> Adding a valid <code>DEEPGRAM_API_KEY</code>{" "}
           within your local <code>.env.local</code> enables streaming STT via the Nova-3 websocket.
