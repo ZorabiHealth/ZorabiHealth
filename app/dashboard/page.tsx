@@ -398,8 +398,6 @@ export default function DashboardOverview() {
           >
             <source src="/video/try_do.mp4" type="video/mp4" />
           </video>
-          {/* Overlay to ensure readability and glassmorphism style */}
-          <div className="absolute inset-0 bg-slate-950/65 backdrop-blur-[1px] z-[1]" />
 
           {/* Clock & Date Header */}
           <div className="relative z-10 flex justify-between items-start">
