@@ -1,1 +1,27 @@
+#!/bin/sh
+. "$(dirname "$0")/_/husky.sh"
+
+# 1. Determine active branch dynamically
+CURRENT_BRANCH=$(git branch --show-current)
+
+echo "🔍 Checking remote sync status for origin/$CURRENT_BRANCH..."
+git fetch origin "$CURRENT_BRANCH" > /dev/null 2>&1
+
+LOCAL=$(git rev-parse @ 2>/dev/null)
+REMOTE=$(git rev-parse "origin/$CURRENT_BRANCH" 2>/dev/null)
+BASE=$(git merge-base @ "origin/$CURRENT_BRANCH" 2>/dev/null)
+
+# 2. Compare local, remote, and merge base hashes
+if [ -z "$REMOTE" ]; then
+    echo "⚠️ WARNING: Remote branch origin/$CURRENT_BRANCH not found. Proceeding with commit."
+elif [ "$LOCAL" = "$REMOTE" ]; then
+    echo "✅ Local branch is up to date."
+elif [ "$LOCAL" = "$BASE" ]; then
+    echo "❌ ERROR: Your branch is behind origin/$CURRENT_BRANCH. Please run 'git pull --rebase' before committing!"
+    exit 1
+else
+    echo "ℹ️ Local branch is ahead (ready to push)."
+fi
+
+# 3. Proceed with lint checks
 npx lint-staged
