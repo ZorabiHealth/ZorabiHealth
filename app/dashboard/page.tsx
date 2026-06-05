@@ -124,7 +124,7 @@ export default function DashboardOverview() {
               alt="Clinical Heart Visualization"
               src="/images/dashbaordheart.png"
               fill
-              className="object-cover opacity-60 mix-blend-screen"
+              className="object-cover opacity-50"
               sizes="(max-width: 1024px) 100vw, 800px"
               priority
             />
