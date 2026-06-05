@@ -117,12 +117,12 @@ export default function DashboardOverview() {
       {/* 4/3 Grid Core Layout */}
       <div className="grid grid-cols-12 gap-4 flex-grow shrink-0 min-h-full">
         {/* BEGIN: Heart Health Card (Top Left - 9 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-9 bg-gradient-to-r from-[#608ec4] via-[#a2bce0] to-[#c4d4eb] rounded-[32px] relative overflow-hidden p-8 flex flex-col justify-between text-white border border-white/20 shadow-md min-h-[350px]">
+        <section className="col-span-12 lg:col-span-9 bg-gradient-to-br from-[#7dd3fc] via-[#38bdf8] to-[#1d4ed8]/90 rounded-[32px] relative overflow-hidden p-8 flex flex-col justify-between text-white border border-white/20 shadow-md min-h-[350px]">
           {/* Background image overlay with mix blend screen */}
           <div className="absolute inset-0 z-0 select-none pointer-events-none">
             <Image
               alt="Clinical Heart Visualization"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBpvlRutqAv6FsbdYd8Xq0OUdzy8hI2yOlY3Ff3MHayPK1TCQMh6gDBIC6zDDqN8IMbQ0jCWeienQqbrGJoRYPEqPD2tYYYOc8EtX5IG5u-hfOL0nqqFg-_I-znFcGAKdlSBzLRRa6BWKH6-_n_snNh7c9dC_jHG-ikpFaVP7nHPPcr16PtUJ7NCHiMmoeFXns4D0bv26XEHyaAY-3XRp4M7NfeO17hxRyx3nmxhBu9aWLSZcfCGDy158ZWQEjRgj_aQ6KeQqREz78"
+              src="/images/dashbaordheart.png"
               fill
               className="object-cover opacity-60 mix-blend-screen"
               sizes="(max-width: 1024px) 100vw, 800px"
