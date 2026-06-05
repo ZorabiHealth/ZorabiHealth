@@ -1,7 +1,5 @@
-#!/bin/sh
-. "$(dirname "$0")/_/husky.sh"
-
 # 1. Determine active branch dynamically
+
 CURRENT_BRANCH=$(git branch --show-current)
 
 echo "🔍 Checking remote sync status for origin/$CURRENT_BRANCH..."
