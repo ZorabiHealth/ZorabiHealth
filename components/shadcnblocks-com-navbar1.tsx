@@ -1,4 +1,5 @@
 import React from "react";
+import Image from "next/image";
 import { Book, Menu, Sunset, Trees, Zap } from "lucide-react";
 
 import {
@@ -144,9 +145,15 @@ const Navbar1 = ({
       <div className="w-full px-10">
         <nav className="hidden justify-between lg:flex">
           <div className="flex items-center gap-6">
-            <a href={logo.url} className="flex items-center gap-2">
-              <img src={logo.src} className="w-8" alt={logo.alt} />
-              <span className="text-lg font-semibold">{logo.title}</span>
+            <a href={logo.url} className="flex items-center gap-2 shrink-0">
+              <Image
+                src={logo.src}
+                alt={logo.alt}
+                width={160}
+                height={45}
+                className="object-contain h-11 w-auto"
+                unoptimized
+              />
             </a>
             <div className="flex items-center">
               <NavigationMenu>
@@ -165,9 +172,15 @@ const Navbar1 = ({
         </nav>
         <div className="block lg:hidden">
           <div className="flex items-center justify-between">
-            <a href={logo.url} className="flex items-center gap-2">
-              <img src={logo.src} className="w-8" alt={logo.alt} />
-              <span className="text-lg font-semibold">{logo.title}</span>
+            <a href={logo.url} className="flex items-center gap-2 shrink-0">
+              <Image
+                src={logo.src}
+                alt={logo.alt}
+                width={160}
+                height={45}
+                className="object-contain h-11 w-auto"
+                unoptimized
+              />
             </a>
             <Sheet>
               <SheetTrigger asChild>
@@ -178,8 +191,15 @@ const Navbar1 = ({
               <SheetContent className="overflow-y-auto">
                 <SheetHeader>
                   <SheetTitle>
-                    <a href={logo.url} className="flex items-center gap-2">
-                      <img src={logo.src} className="w-8" alt={logo.alt} />
+                    <a href={logo.url} className="flex items-center gap-2 shrink-0">
+                      <Image
+                        src={logo.src}
+                        alt={logo.alt}
+                        width={140}
+                        height={40}
+                        className="object-contain h-10 w-auto"
+                        unoptimized
+                      />
                       <span className="text-lg font-semibold">{logo.title}</span>
                     </a>
                   </SheetTitle>
@@ -226,9 +246,9 @@ const renderMenuItem = (item: MenuItem) => {
         <NavigationMenuTrigger>{item.title}</NavigationMenuTrigger>
         <NavigationMenuContent>
           <ul className="w-80 p-3">
-            <NavigationMenuLink>
-              {item.items.map((subItem) => (
-                <li key={subItem.title}>
+            {item.items.map((subItem) => (
+              <li key={subItem.title}>
+                <NavigationMenuLink asChild>
                   <a
                     className="flex select-none gap-4 rounded-md p-3 leading-none no-underline outline-none transition-colors hover:bg-muted hover:text-accent-foreground"
                     href={subItem.url}
@@ -243,9 +263,9 @@ const renderMenuItem = (item: MenuItem) => {
                       )}
                     </div>
                   </a>
-                </li>
-              ))}
-            </NavigationMenuLink>
+                </NavigationMenuLink>
+              </li>
+            ))}
           </ul>
         </NavigationMenuContent>
       </NavigationMenuItem>

@@ -25,6 +25,7 @@ function AuthCallbackHandler() {
           data: { session },
         } = await supabase.auth.getSession();
         if (session) {
+          localStorage.setItem("zh_login_time", new Date().toISOString());
           setStatus("Success! Redirecting to dashboard...");
           router.push("/dashboard");
         } else {

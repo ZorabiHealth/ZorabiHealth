@@ -1,17 +1,16 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Facebook, Instagram, Linkedin, Moon, Send, Sun, Twitter } from "lucide-react";
 
 function Footerdemo() {
   const [isDarkMode, setIsDarkMode] = React.useState(false);
-  const [isChatOpen, setIsChatOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (isDarkMode) {
@@ -26,12 +25,25 @@ function Footerdemo() {
       <div className="container mx-auto px-4 py-12 md:px-6 lg:px-8 max-w-7xl">
         <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-4">
           <div className="relative">
+            <div className="flex items-center gap-3 mb-4">
+              <Image
+                src="/logo/image/logo.png"
+                alt="ZorabiHealth"
+                width={140}
+                height={40}
+                className="object-contain"
+              />
+            </div>
+            <p className="mb-4 text-slate-600 dark:text-slate-400 text-sm leading-relaxed">
+              Your personal AI-powered health companion. Track medications, get fitness advice,
+              monitor vitals, and stay on top of your wellness journey.
+            </p>
             <h2 className="mb-4 text-3xl font-bold tracking-tight text-brand-900 dark:text-brand-400">
               Stay Connected
             </h2>
             <p className="mb-6 text-slate-600 dark:text-slate-400 text-sm">
-              Join our clinical research newsletter for the latest updates in predictive health
-              intelligence.
+              Join our newsletter for the latest updates in health tips, medication reminders, and
+              wellness insights.
             </p>
             <form className="relative">
               <Input

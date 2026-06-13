@@ -3,11 +3,8 @@
 import React, { useState, useEffect } from "react";
 import {
   ShoppingBag,
-  Plus,
   Truck,
   Check,
-  Clock,
-  X,
   Package,
   Phone,
   Mail,
@@ -20,7 +17,6 @@ import {
   Pill,
   Search,
   Database,
-  Wifi,
   WifiOff,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -36,7 +32,6 @@ import {
   loadFromStorage,
   saveToStorage,
   generateTrackingId,
-  haversineDistance,
   OrderEvent,
 } from "@/lib/medications";
 import { supabase, queueSyncItem, drainSyncQueue } from "@/lib/supabase";
@@ -302,12 +297,12 @@ export default function PharmacyPage() {
   };
 
   useEffect(() => {
-    loadData();
+    queueMicrotask(() => loadData().catch(console.error));
 
     // Listen to network transitions
     const handleOnline = () => {
       setSyncStatus("syncing");
-      loadData();
+      loadData().catch(console.error);
     };
     const handleOffline = () => setSyncStatus("offline");
 
@@ -318,8 +313,7 @@ export default function PharmacyPage() {
     const channel = supabase
       .channel("realtime-refill-orders-channel")
       .on("postgres_changes", { event: "*", schema: "public", table: "refill_orders" }, () => {
-        console.log("[Realtime] Order status update received, refreshing...");
-        loadData();
+        loadData().catch(console.error);
       })
       .subscribe();
 
@@ -328,12 +322,9 @@ export default function PharmacyPage() {
       window.removeEventListener("offline", handleOffline);
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const urgentMeds = meds.filter((m) => m.isActive && m.currentStock <= m.refillAt);
-  const nearingMeds = meds.filter(
-    (m) => m.isActive && m.currentStock > m.refillAt && m.currentStock <= m.refillAt * 2
-  );
 
   // ─── Vendor Matching ─────────────────────────────────────
   const matchVendors = (med: Medication): Vendor[] => {
@@ -428,8 +419,6 @@ export default function PharmacyPage() {
           .from("refill_order_events")
           .insert(dbEventPayload);
         if (eventErr) throw eventErr;
-
-        console.log("[Supabase] Refill order placed successfully.");
       } else {
         queueSyncItem({ table: "refill_orders", action: "insert", payload: dbOrderPayload });
         queueSyncItem({ table: "refill_order_events", action: "insert", payload: dbEventPayload });
@@ -493,8 +482,6 @@ export default function PharmacyPage() {
           .from("refill_order_events")
           .insert(dbEventPayload);
         if (eventErr) throw eventErr;
-
-        console.log(`[Supabase] Updated status to ${newStatus}`);
       } catch (err) {
         console.error("[Supabase] Failed to update status, queuing offline:", err);
         queueSyncItem({
@@ -584,7 +571,6 @@ export default function PharmacyPage() {
           inventory: newVendor.inventory,
         });
         if (error) throw error;
-        console.log("[Supabase] Registered vendor successfully.");
       } catch (err) {
         console.error("[Supabase] Failed to register vendor, queuing:", err);
         queueSyncItem({

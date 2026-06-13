@@ -1,0 +1,114 @@
+<!DOCTYPE html><html class="h-full" lang="en"><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Health Dashboard - High Fidelity</title>
+<!-- Tailwind CSS CDN with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Inter & Hanken Grotesk -->
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet">
+<style data-purpose="custom-config">
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #eef2f8 0%, #d4e1f5 100%);
+    }
+    .font-hanken {
+      font-family: 'Hanken Grotesk', sans-serif;
+    }
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.4);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .glass-dark {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .main-card-bg {
+      background: linear-gradient(110deg, #608ec4 0%, #a2bce0 40%, #c4d4eb 100%);
+    }
+    .heart-placeholder {
+      background: radial-gradient(circle, rgba(140, 180, 255, 0.4) 0%, rgba(100, 140, 255, 0) 70%);
+    }
+    .flower-placeholder-dark {
+      background: linear-gradient(180deg, #1e3a8a 0%, #3b0764 100%);
+    }
+    .flower-placeholder-blue {
+      background: linear-gradient(45deg, #1e40af 0%, #60a5fa 100%);
+    }
+    .doctor-circle {
+      background: linear-gradient(180deg, #d1d5db 0%, #9ca3af 100%);
+    }
+    .pill-active {
+      background: rgba(255, 255, 255, 0.3);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+    .workout-bg {
+      background: #f8fafc;
+    }
+    /* Hide scrollbar */
+    ::-webkit-scrollbar { display: none; }
+  </style>
+</head>
+<body class="h-full flex items-center justify-center p-4">
+<!-- BEGIN: Main Dashboard Container -->
+<main class="w-full max-w-6xl aspect-[4/3] bg-[#f0f5ff] rounded-[40px] shadow-2xl overflow-hidden flex p-4 gap-4" data-purpose="dashboard-layout">
+<!-- BEGIN: Left Sidebar -->
+<aside class="w-16 flex flex-col items-center py-6 gap-8 shrink-0" data-purpose="sidebar">
+<!-- Logo -->
+<div class="mb-8">
+<svg class="w-10 h-10 text-blue-400" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
+</div>
+<!-- Navigation Icons -->
+<nav class="flex flex-col gap-6 items-center flex-grow text-slate-400"><div class="p-2 hover:bg-white/20 rounded-xl transition-colors" title="Home"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg></div><div class="p-2 bg-blue-50 text-blue-600 rounded-xl shadow-sm" title="Meditation"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M12 3L4 9v11a2 2 0 002 2h12a2 2 0 002-2V9l-8-6z"></path><path d="M9 22V12h6v10"></path></svg></div><div class="p-2 hover:bg-white/20 rounded-xl transition-colors" title="Workout"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg></div><div class="p-2 hover:bg-white/20 rounded-xl transition-colors" title="News"><svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z"></path></svg></div></nav>
+<!-- Bottom Profile -->
+<div class="mt-auto flex flex-col items-center gap-6">
+<svg class="w-5 h-5 text-slate-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+<div class="w-10 h-10 rounded-full border-2 border-white overflow-hidden bg-gray-300">
+<div class="w-full h-full doctor-circle"></div>
+</div>
+</div>
+</aside>
+<!-- END: Left Sidebar -->
+<!-- BEGIN: Dashboard Content Area -->
+<div class="flex-grow flex flex-col overflow-y-auto pb-4 pr-2 space-y-12" data-purpose="content-area"><div class="absolute top-8 right-12 z-10 glass-effect px-4 py-2 rounded-full border border-white/30 flex items-center gap-2 cursor-pointer hover:bg-white/30 transition-all"><span class="w-2 h-2 bg-[#0077b6] rounded-full"></span><span class="text-xs font-hanken font-bold text-slate-800 uppercase tracking-widest">Features</span></div><!-- Hero Section --><section class="relative h-[450px] rounded-[40px] overflow-hidden shrink-0 mb-8 mx-12"><video autoplay loop muted playsinline class="absolute inset-0 w-full h-full object-cover z-0"><source src="../../../public/video/yogaasset.mp4" type="video/mp4"></video><div class="absolute inset-0 bg-black/15 z-0 pointer-events-none"></div><div class="relative z-10 h-full flex flex-col justify-center px-12 text-white"><p class="text-sm font-bold tracking-widest uppercase mb-4">Daily Fitness Guide</p><h1 class="text-6xl font-bold leading-tight max-w-2xl mb-8">Meditations change your lifestyle</h1><button class="w-fit bg-white text-slate-900 px-8 py-4 rounded-full font-bold flex items-center gap-3 hover:bg-slate-100 transition-all">Get in touch <span class="text-xl">→</span></button></div><div class="absolute bottom-8 right-8 glass-dark p-6 rounded-3xl max-w-xs border border-white/30"><div class="flex items-center gap-2 mb-2"><div class="flex -space-x-2"><div class="w-8 h-8 rounded-full bg-slate-300 border-2 border-white"></div><div class="w-8 h-8 rounded-full bg-slate-400 border-2 border-white"></div><div class="w-8 h-8 rounded-full bg-slate-500 border-2 border-white"></div></div><span class="text-[10px] font-bold">Plus 2M+ Trusted!</span></div><p class="text-xs opacity-80 mb-4">The perfect organizer and developer for dream agency</p><div class="flex items-baseline gap-1"><span class="text-3xl font-bold">4.9</span><span class="text-yellow-400">★</span><span class="text-[10px] opacity-60 ml-2">( RATING )</span></div></div></section><!-- Mindful Thoughts Image Section -->
+<section class="px-4 mt-12 w-full">
+  <div class="mb-6">
+    <h2 class="text-xl font-bold text-slate-800 font-hanken">Mindful Thoughts</h2>
+    <div class="w-12 h-0.5 bg-[#0077b6] mt-2 rounded-full"></div>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="rounded-2xl overflow-hidden shadow-lg border border-white/20 bg-gradient-to-tr from-[#0f172a] via-[#0891b2] to-[#1e1b4b] aspect-video relative group">
+      <img src="../../../public/images/cinematic_meditation.png" alt="Cinematic Meditation" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onerror="this.style.display='none'">
+      <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-xl text-white text-xs font-bold">
+        Cinematic Meditation
+      </div>
+    </div>
+    <div class="rounded-2xl overflow-hidden shadow-lg border border-white/20 bg-gradient-to-tr from-[#1c1c1c] via-[#2d2d2d] to-[#111111] aspect-video relative group">
+      <img src="../../../public/images/medicine_replica.png" alt="Medicine Website Replica" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onerror="this.style.display='none'">
+      <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-xl text-white text-xs font-bold">
+        Medicine Website Replica
+      </div>
+    </div>
+    <div class="rounded-2xl overflow-hidden shadow-lg border border-white/20 bg-gradient-to-tr from-blue-600 via-indigo-950 to-indigo-900 aspect-video relative group">
+      <img src="../../../public/images/stitch_meditation.png" alt="Meditation & Mind Dashboard" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onerror="this.style.display='none'">
+      <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-xl text-white text-xs font-bold">
+        Meditation & Mind Dashboard
+      </div>
+    </div>
+    <div class="rounded-2xl overflow-hidden shadow-lg border border-white/20 bg-gradient-to-tr from-cyan-950 via-slate-900 to-blue-900 aspect-video relative group">
+      <img src="../../../public/images/stitch_sleep.png" alt="Sleep Intelligence Dashboard" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onerror="this.style.display='none'">
+      <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-xl text-white text-xs font-bold">
+        Sleep Intelligence Dashboard
+      </div>
+    </div>
+  </div>
+</section>
+<section class="px-4 mt-12"><div class="mb-8"><h2 class="text-4xl font-bold text-slate-800 font-hanken">Mindful Thoughts</h2><div class="w-16 h-1 bg-[#0077b6] mt-2"></div></div><div class="grid grid-cols-2 gap-8"><div class="relative h-[400px] rounded-[32px] overflow-hidden shadow-lg group"><img alt="Clinical Photography" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDEpoAPul_2qa2-ZOtSQNMhl3D4edFvKTPr2b334-mCQ97gF6HtXA3NrIxHOzgGvCvNMz_oAy7F34uBtiNR9NW-ZvWzyKoae_jsJX2f8v8r-MWXqcpZvVFNh0LepNoFQzjgRggK7WTN49O6nUsVmXarQ03kZEdmLXK6xnp-q_TMzhntazmBDvpgswnxUHZaw7FjpizXeXgoPnb97KI2dOSEHPf-9UTtRxoXKfsn6S0s4mdoIRJspkISi-hX0kE14h7AcAkpfnL6mhs"><div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div><div class="absolute bottom-8 left-8 right-8 glass-dark p-6 rounded-2xl border border-white/20"><h4 class="text-white font-hanken font-bold text-xl mb-2">Clinical Excellence</h4><p class="text-white/80 text-sm leading-relaxed">Evidence-based approaches to mental well-being and cognitive health.</p></div></div><div class="flex flex-col gap-6"><div class="bg-white p-8 rounded-[32px] shadow-sm border border-blue-50 flex-grow"><div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center mb-4"><svg class="w-6 h-6 text-[#0077b6]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg></div><h4 class="text-xl font-bold text-slate-800 font-hanken mb-2">Holistic Integration</h4><p class="text-slate-600 text-sm">Seamlessly connecting physical fitness with mental clarity for a complete health ecosystem.</p></div><div class="bg-[#0077b6] p-8 rounded-[32px] shadow-lg text-white"><h4 class="text-xl font-bold font-hanken mb-2">Expert Guidance</h4><p class="text-white/90 text-sm mb-4">Access our network of licensed therapists and wellness coaches.</p><button class="text-sm font-bold underline">Learn more about our process</button></div></div></div></section><!-- Journey Section --><section class="px-4"><div class="text-center mb-12"><h2 class="text-4xl font-bold text-slate-800">Start Your Journey Today</h2></div><div class="grid grid-cols-3 gap-8"><div class="group relative aspect-[4/5] rounded-[32px] overflow-hidden shadow-lg cursor-pointer"><img class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDcdHzJew_ogOwsWF7xRM3OEN0kT1sAFT1WO_SZht5sGaXgK2WDv9OMgr-_DvPIbdCP5PpKg4uj2K4GZJ6mC4lG2fZZ1rlBOHRQcOZcrfOgXSV7nQIkE3PjvLAyRCb2NlBOb6kQ11xVOA9QsRPCfuCbbX9OF_mAdjA7su9wy87NOjRu6MaA6M4Zw8aON2MJn4_7Zj9QwqyiX0bqHEfoxIop21GvdJannWyki2s-EkbauF4lM6D0ekGx-ZrLgTRYnmGn7uCWyA0Z6P0"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div><div class="absolute bottom-0 left-0 p-8 w-full"><h3 class="text-2xl font-bold text-white mb-2">Improved Flexibility</h3><p class="text-white/70 text-xs leading-relaxed">All the Lorem Ipsum generators on the Internet tend to repeat predefined</p></div></div><div class="group relative aspect-[4/5] rounded-[32px] overflow-hidden shadow-lg cursor-pointer"><img class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" src="https://lh3.googleusercontent.com/aida-public/AB6AXuA52X_AML8a826NkkWI9SLPYnkWC40e2AWCqr4lqcthf8HIg9osu3Ma3kQzR0r10wvVb4nmNdQd3gFa2ipAL7cIVDIz1noZhH9GdaaRiRDyWQoz1OcY3E6yFOpTIIo5suw4phTOjDJ2EhEauQ27F32CyOSfCxPfLxH619c9jmhbpU7pnQaN5LVqkP8DrhcJ5iI66YtEDkmvLQ2HhMpICm5LWmcts_IQVX9Rql7rbiPS53khu4lYZZJdrrmWU0Q8tMynydSDjOQ2O2c"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div><div class="absolute bottom-0 left-0 p-8 w-full"><h3 class="text-2xl font-bold text-white mb-2">Stress Reduction</h3><p class="text-white/70 text-xs leading-relaxed">All the Lorem Ipsum generators on the Internet tend to repeat predefined</p></div></div><div class="group relative aspect-[4/5] rounded-[32px] overflow-hidden shadow-lg cursor-pointer"><img class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDA3SgNTJAuGgEDMq-b66xWCEjRGmoPxG87zCIomt6uATWhkuovxd7V2ibzFn3rA_3EIh8Nxehu5uge4nW-H3fNTvPKNq7Pai9aJxietIfwWUW3S-csAvc45msJk6MVITGHLCRxBiZj6N0GR5R-po_51_0TXk9KW_nKXyl8gFsR2x4CcFgINv3jKqSZLW3c9ijkAu_L9vXrR06Ykn-8Z9eE37k9SvHKNKKpQELP_tb2CD8oVC52bGMsSk5ZPjJnUeWTGbFKOfZw_BY"><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent"></div><div class="absolute bottom-0 left-0 p-8 w-full"><h3 class="text-2xl font-bold text-white mb-2">Improved Flexibility</h3><p class="text-white/70 text-xs leading-relaxed">All the Lorem Ipsum generators on the Internet tend to repeat predefined</p></div></div></div></section></div>
+<!-- END: Dashboard Content Area -->
+</main>
+<!-- END: Main Dashboard Container -->
+
+
+</body></html>

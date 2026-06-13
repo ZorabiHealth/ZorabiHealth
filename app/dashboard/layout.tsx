@@ -5,6 +5,10 @@ import Link from "next/link";
 import Image from "next/image";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { MedicationAlarmAlerter } from "@/components/medication-alarm-alerter";
+import { useNotifications } from "@/hooks/useNotifications";
+import { NotificationToast } from "@/components/notification-toast";
+import { PairButton } from "@/components/pair-button";
 import {
   HeartPulse,
   LayoutDashboard,
@@ -16,9 +20,11 @@ import {
   LogOut,
   ChevronRight,
   Bell,
+  BellRing,
   Pill,
   Sparkles,
   ShoppingBag,
+  Moon,
 } from "lucide-react";
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -26,7 +32,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const [isMockMode, setIsMockMode] = useState(false);
+  const { permission, requestPermission, initialized, inAppNotifications, dismissNotification } =
+    useNotifications();
+  const [notifGranted, setNotifGranted] = useState(false);
+
+  useEffect(() => {
+    if (initialized && permission === "granted") {
+      setNotifGranted((prev) => prev || true);
+    }
+  }, [initialized, permission]);
 
   useEffect(() => {
     const checkUser = async () => {
@@ -35,11 +49,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder-url.supabase.co");
 
       if (isPlaceholder) {
-        setIsMockMode(true);
         setCheckingAuth(false);
-        console.warn(
-          "[ZorabiHealth Auth] Running in Mock Bypass Mode due to placeholder Supabase URL."
-        );
         return;
       }
 
@@ -102,6 +112,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       name: "Workout & Fitness",
       href: "/dashboard/workout",
       icon: Dumbbell,
+      group: "main",
+    },
+    {
+      name: "Sleep Companion",
+      href: "/dashboard/sleep",
+      icon: Moon,
       group: "main",
     },
     // ── AI & Health Features ──────────────────────────
@@ -171,13 +187,19 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         {/* Logo */}
         <div className="flex items-center gap-3 px-4 py-5 border-b border-white/30">
           <Link href="/dashboard" className="flex items-center gap-3 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-md shrink-0">
-              <HeartPulse className="w-5 h-5 text-white" />
-            </div>
-            {expanded && (
-              <span className="font-bold text-slate-800 text-sm whitespace-nowrap truncate">
-                ZorabiHealth
-              </span>
+            {expanded ? (
+              <Image
+                src="/logo/image/logo.png"
+                alt="ZorabiHealth"
+                width={140}
+                height={40}
+                className="object-contain"
+                unoptimized
+              />
+            ) : (
+              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-blue-500 to-blue-700 flex items-center justify-center shadow-md shrink-0">
+                <HeartPulse className="w-5 h-5 text-white" />
+              </div>
             )}
           </Link>
         </div>
@@ -315,14 +337,29 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             })}
         </nav>
 
-        {/* Bottom: Bell + Logout + Avatar */}
+        {/* Bottom: Pair + Bell + Logout + Avatar */}
         <div className="flex flex-col items-center gap-3 px-2 py-4 border-t border-white/30">
+          <PairButton />
           <button
+            onClick={async () => {
+              if (!notifGranted) {
+                const result = await requestPermission();
+                if (result === "granted") setNotifGranted(true);
+              }
+            }}
             className="flex items-center gap-3 w-full px-2.5 py-2.5 rounded-xl text-slate-500 hover:bg-white/70 hover:text-slate-800 transition-all duration-200"
             title={!expanded ? "Notifications" : undefined}
           >
-            <Bell className="w-5 h-5 shrink-0" />
-            {expanded && <span className="text-sm font-medium">Notifications</span>}
+            {notifGranted ? (
+              <BellRing className="w-5 h-5 shrink-0 text-blue-500" />
+            ) : (
+              <Bell className="w-5 h-5 shrink-0" />
+            )}
+            {expanded && (
+              <span className="text-sm font-medium">
+                {notifGranted ? "Notifications On" : "Enable Notifications"}
+              </span>
+            )}
           </button>
 
           <button
@@ -352,7 +389,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden">{children}</main>
+      <main id="dashboard-main" className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden">
+        {children}
+      </main>
+      <MedicationAlarmAlerter />
+      <NotificationToast notifications={inAppNotifications} onDismiss={dismissNotification} />
     </div>
   );
 }

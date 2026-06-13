@@ -147,3 +147,4 @@ create trigger update_medications_modtime
 create trigger update_refill_orders_modtime
     before update on refill_orders
     for each row execute function update_modified_column();
+

@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+
+<html class="h-full scroll-smooth" lang="en"><head>
+<meta charset="utf-8"/>
+<meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+<title>VitalPulse - Meditation &amp; Mind</title>
+<!-- Tailwind CSS CDN with Plugins -->
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<!-- Google Fonts: Inter & Hanken Grotesk -->
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700&amp;family=Inter:wght@300;400;500;600;700&amp;display=swap" rel="stylesheet"/>
+<!-- Material Symbols -->
+<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&amp;display=swap" rel="stylesheet"/>
+<style data-purpose="custom-config">
+    body {
+      font-family: 'Inter', sans-serif;
+      background: linear-gradient(135deg, #eef2f8 0%, #d4e1f5 100%);
+    }
+    .font-hanken {
+      font-family: 'Hanken Grotesk', sans-serif;
+    }
+    .glass-effect {
+      background: rgba(255, 255, 255, 0.4);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+    }
+    .glass-dark {
+      background: rgba(255, 255, 255, 0.15);
+      backdrop-filter: blur(8px);
+      border: 1px solid rgba(255, 255, 255, 0.2);
+    }
+    .hero-gradient {
+      background: linear-gradient(135deg, #0f172a 0%, #0891b2 100%);
+    }
+    .fade-up-enter {
+      opacity: 0;
+      transform: translateY(20px);
+      transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+    }
+    .fade-up-enter-active {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    /* Hide scrollbar */
+    ::-webkit-scrollbar { display: none; }
+  </style>
+<script>
+    document.addEventListener("DOMContentLoaded", () => {
+      const observer = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('fade-up-enter-active');
+          }
+        });
+      }, { threshold: 0.1 });
+
+      document.querySelectorAll('.fade-up-enter').forEach((el) => {
+        observer.observe(el);
+      });
+    });
+  </script>
+</head>
+<body class="h-full flex items-center justify-center p-4">
+<!-- BEGIN: Main Dashboard Container -->
+<main class="w-full max-w-6xl h-full max-h-[900px] aspect-[4/3] bg-[#f0f5ff] rounded-[40px] shadow-2xl overflow-hidden flex p-4 gap-4" data-purpose="dashboard-layout">
+<!-- BEGIN: Left Sidebar -->
+<aside class="w-20 flex flex-col items-center py-6 gap-8 shrink-0 bg-white/50 backdrop-blur-md rounded-3xl" data-purpose="sidebar">
+<!-- Logo -->
+<div class="mb-4">
+<span class="material-symbols-outlined text-4xl text-[#0077b6]">monitor_heart</span>
+</div>
+<!-- Navigation Icons -->
+<nav class="flex flex-col gap-4 items-center flex-grow w-full px-4"><a class="w-full aspect-square flex items-center justify-center hover:bg-[#0077b6]/10 text-slate-500 rounded-2xl transition-colors" href="#" title="Home"><span class="material-symbols-outlined">home</span></a><a class="w-full aspect-square flex items-center justify-center bg-[#0077b6]/10 text-[#0077b6] rounded-2xl transition-colors shadow-sm" href="#" title="Meditation"><span class="material-symbols-outlined text-fill">self_improvement</span></a><a class="w-full aspect-square flex items-center justify-center hover:bg-[#0077b6]/10 text-slate-500 rounded-2xl transition-colors" href="#" title="Activity"><span class="material-symbols-outlined">fitness_center</span></a><a class="w-full aspect-square flex items-center justify-center hover:bg-[#0077b6]/10 text-slate-500 rounded-2xl transition-colors" href="#" title="Insights"><span class="material-symbols-outlined">insights</span></a></nav>
+<!-- Bottom Profile -->
+<div class="mt-auto flex flex-col items-center gap-4">
+<a class="w-10 h-10 flex items-center justify-center hover:bg-black/5 text-slate-500 rounded-xl transition-colors" href="#"><span class="material-symbols-outlined">settings</span></a>
+<div class="w-10 h-10 rounded-full border-2 border-white overflow-hidden bg-gray-300">
+<img alt="Profile" class="w-full h-full object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAzqRKuEeBXPcwdIHb5Vw7UtDbroShmNHPik1AdVCNfbm-N16H9QJgD4PvWcVXvecbjNH0-VTfBX_u2-QF2Ql9sp9pR8rHFX_Tsek8_5bYuYsK2yArxHOLRMjCKya3_2zU7ziA--o3Ox1qThZ5IVdKVvDLIN2tUp6X77aWSsFfgrxvygkriATkcno1W_UfM5VpwD79pExXVVHBOkzLg7X5kGXomr-9308wvJ7ECyrGkXhpNl_imcdNM4TZpo_XCOilNwUcbPiLxAX4"/>
+</div>
+</div>
+</aside>
+<!-- END: Left Sidebar -->
+<!-- BEGIN: Dashboard Content Area -->
+<div class="flex-grow flex flex-col overflow-y-auto pb-4 pr-2 space-y-16 scroll-smooth" data-purpose="content-area"><div class="absolute top-8 right-12 z-10 glass-effect px-4 py-2 rounded-full border border-white/30 flex items-center gap-2 cursor-pointer hover:bg-white/30 transition-all shadow-sm"><span class="w-2 h-2 bg-[#0077b6] rounded-full"></span><span class="text-xs font-hanken font-bold text-slate-800 uppercase tracking-widest">VitalPulse</span></div><!-- Hero Section --><section class="relative h-[90vh] min-h-[600px] rounded-[40px] overflow-hidden shrink-0 mx-2 shadow-xl flex items-center"><video autoplay loop muted playsinline class="absolute inset-0 w-full h-full object-cover z-0"><source src="../../../public/video/yogaasset.mp4" type="video/mp4"></video><div class="absolute inset-0 bg-black/15 z-0 pointer-events-none"></div><div class="relative z-10 w-full flex flex-col px-16 text-white"><p class="text-sm font-bold tracking-widest uppercase mb-4 text-cyan-200">Daily Fitness Guide</p><h1 class="text-6xl md:text-7xl font-bold leading-tight max-w-3xl mb-8 font-hanken">Meditations change your lifestyle</h1><a class="w-fit bg-white text-[#0f172a] px-8 py-4 rounded-full font-bold flex items-center gap-3 hover:bg-cyan-50 transition-all shadow-lg" href="#start-journey">Get in touch <span class="material-symbols-outlined text-xl">arrow_forward</span></a></div><div class="absolute bottom-12 right-12 glass-dark p-6 rounded-3xl max-w-xs border border-white/20 backdrop-blur-xl"><div class="flex items-center gap-2 mb-2"><div class="flex -space-x-2"><img alt="User" class="w-8 h-8 rounded-full border-2 border-slate-800 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD3r98zgcSpagCXmu9S7c5CxSWcU1Rnu5tcM0XDHJHG1BbGEXtcD8RHNMlrNKCWM6vdK_GTwSjGA9fUiv2S3Wyl1rZdjIbLllwU8B5bPPk3-wAeQMKTikMEMbOHd3Cj17on436gfARFpRClZgWjGeTuSxEn16d3LPRJ9VhKRBavaH3f9G7R_bS2fLQh7Mv45BUVVWtc_WLr4zqoxWW5IkgcQ-Ss26Qi85j3SUGnMKgYFfiv-sB0_R9KWep9ahIW-QC_0z6LEFAunf4"/><img alt="User" class="w-8 h-8 rounded-full border-2 border-slate-800 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuBgA3Stv1ev2HzPJqC5GWZPdwtoJ67GsE91jPV86Zx8W-tVzx2_zPkqDmR7Pvw0T1lK5rLt1k3y5S7tpBKelDyHVEpHTB43A1ImIyEbUIUTpqE3zra1BhS4dfZuJkB63tKywnUpwlRbf_Blt3F61jZoBBU2DwipCg7A1z-UcnuT-FVgsNjail-uKY6SR_Q6Qv4sOnWdKQ4dmvdjNcDXTDKgmtEt8lpXtvWvxjHpQdLJ-BjrezoqfgrYJPd4gj4KdS27HVCWlJlEatE"/><img alt="User" class="w-8 h-8 rounded-full border-2 border-slate-800 object-cover" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCGrGlihBwDGW3gJI08yUrzJ-LA9g6-TBHWgI1V5QxrdHvxDaAgKVHkVxX9FgH6SggN9GtNCjcaDTFDl7n1vludrAMnYXYjQL-KQsM4PmvQrtY7RmuiPDJWxdRtNnR5o3ZIl2854CVgQcCgQ6l5CNbw-fZ-ezvXCR3QVGTxuBallQy9xsyQp-OKixYNWCQNmxziOICL--FmObovHiX0U0TB5h9_zBolvrgUEUMXpGgv5Sjqi2H2T0ABxYTgxByuTUnCyAyJ6kH3k9E"/></div><span class="text-[10px] font-bold text-white/90">Plus 2M+ Trusted!</span></div><p class="text-xs text-white/70 mb-4">The perfect organizer and developer for dream agency</p><div class="flex items-baseline gap-1"><span class="text-3xl font-bold text-white">4.9</span><span class="material-symbols-outlined text-yellow-400 text-lg">star</span><span class="text-[10px] text-white/50 ml-2">( RATING )</span></div></div></section><!-- Start Your Journey --><section class="px-8 pt-8" id="start-journey"><div class="mb-10"><h2 class="text-4xl font-bold text-slate-800 font-hanken mb-2">Start Your Journey Today</h2><p class="text-slate-500">Explore practices designed to elevate your mind and body.</p></div><div class="grid grid-cols-1 md:grid-cols-3 gap-6"><div class="group relative aspect-[3/4] rounded-[32px] overflow-hidden shadow-lg cursor-pointer bg-slate-200"><img class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCkN0VbSTlmJlqfUST1MpCMGTjH6D-WhFquVKDIi548sOfKbdEheYXb4VPOM24DOFZFwq3VyWwwNxIJRj-SqvBUs79hrjo3KzJg5o1KwnwW1DzPT2M2lBcXJ13jz03Tfv2XOqeCOCioG0je1vpjeGWRCUud43C7zElfIplIODm3J8XblzGCS8nXNxjjD15kwvVTAfrZ6K5mWY-eZOEfe2YbM7JR3HrOkuHkf1xTWk4aUg0K7lo06bblcWVmkcdABlbnAiehD4CxqYk"/><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div><div class="absolute bottom-0 left-0 p-8 w-full"><span class="bg-white/20 backdrop-blur-md text-white text-xs px-3 py-1 rounded-full mb-3 inline-block">15 MIN</span><h3 class="text-2xl font-bold text-white mb-2 font-hanken">Morning Clarity</h3><p class="text-white/80 text-sm leading-relaxed">Start your day with focused breathwork to align your intentions.</p></div></div><div class="group relative aspect-[3/4] rounded-[32px] overflow-hidden shadow-lg cursor-pointer bg-slate-200"><img class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuC1gK3G4DreqZlVrBJqRsynDtwQ7KqGFFiUvLURFsCbic0y8SSZdYCZPfKdreGZJaZUqPoTuX64pRksbBIBAKAzdRkJvsjtAhpdM-UyRqlUGO1YMyk8K5BEOJcRQJPmwHr55Vt-GUVweVEbVjGoOnUTmlHJ1VvIU1VnLGC65temYB4tKftDZTmNZGMnF6euuqAswb1VjU-iG2Vrygahc0FqJ5YDV1eGYlNn8IOETFYQjSwncQf3r-vg9JNjcgMmgqQm6hACVxwGfTs"/><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div><div class="absolute bottom-0 left-0 p-8 w-full"><span class="bg-white/20 backdrop-blur-md text-white text-xs px-3 py-1 rounded-full mb-3 inline-block">30 MIN</span><h3 class="text-2xl font-bold text-white mb-2 font-hanken">Deep Relaxation</h3><p class="text-white/80 text-sm leading-relaxed">A guided body scan to release tension and promote restful sleep.</p></div></div><div class="group relative aspect-[3/4] rounded-[32px] overflow-hidden shadow-lg cursor-pointer bg-slate-200"><img class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDXq38YPVXOrYrM5ZBBDKVMndngIlme7UNSZesPCta2A_lFw4pG2tgYVnA3cyE2L4nSq892XIonW6095jwrwo-Ru6sciCfRL7CZGjTek0oh4wY09vUpEbs3diMhYgN3lZOv88yONQvO3Y8Jrmgw6Lxi4B8shZmQt9xchGd_h-rXuTUAO87_OOHVlowFmGvosN31gfkjpKt7ecUxv4beD-0QjihByo8y0qX82XBIj91JrXVdRsuZ2WjKqPXu-AVAAMp8xPnxsxYdNgw"/><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div><div class="absolute bottom-0 left-0 p-8 w-full"><span class="bg-white/20 backdrop-blur-md text-white text-xs px-3 py-1 rounded-full mb-3 inline-block">10 MIN</span><h3 class="text-2xl font-bold text-white mb-2 font-hanken">Focus Reset</h3><p class="text-white/80 text-sm leading-relaxed">Quick mindful exercises to regain concentration during your workday.</p></div></div></div></section><!-- Suggested Practices (YouTube Style) --><section class="px-8"><div class="mb-8"><h2 class="text-3xl font-bold text-slate-800 font-hanken mb-2">Suggested Practices</h2><p class="text-slate-500 text-sm">Curated sessions based on your activity.</p></div><div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4"><div class="glass-effect rounded-2xl p-3 hover:bg-white/60 transition-colors cursor-pointer group"><div class="aspect-video bg-slate-200 rounded-xl mb-3 relative overflow-hidden"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform" src="https://lh3.googleusercontent.com/aida-public/AB6AXuCBUPFES3nZeGT5WtR73ER3iYyT-TlY7sxnLPakJ6Qv5fYFeldpOCULuTDJmsC8jANqqFUnFwfvl3nRbQ77d4lt3-V3XkhId1JNobbLKl26DnVQooExhknA_qHuEjkTqVOKtiIn43z6us4TssaiiMvSHgrVauKQGq8CjWfBFR1c7Iw0BNhE1BxbhxW6cMvRSmDWr5TT7liCK_A2dXJ_jYnBra0mp-ojwBmjTrzZ7LWN2qTvnIYqTq4Wjyg7EH2vP0ECrwHqSp87E50"/><div class="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded font-medium">12:04</div></div><h4 class="font-bold text-slate-800 text-sm mb-1 line-clamp-2 leading-tight">Overcoming Anxiety through Breath</h4><p class="text-slate-500 text-xs">VitalPulse Clinical</p><p class="text-slate-400 text-[10px]">14K views • 2 days ago</p></div><div class="glass-effect rounded-2xl p-3 hover:bg-white/60 transition-colors cursor-pointer group"><div class="aspect-video bg-slate-200 rounded-xl mb-3 relative overflow-hidden"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAdXODcH6XtB85CM36SpiNmM0DJyt2r3jBunPh6rT6qnA5p_mHj-QCvG8w4jksRGuXYqfGiBZUWo4ihvxrGz6fVfnW3pIoJ2HGIKVM026V5PfWGJnKduVi222MeIsJSH3nTzbHCNlcSVwGsW_ZORkK128A2cMhl_KQQiRM1EK_Fx2RMHWx3tqIIZZq5WHQh0e3VHqHuU0Tw4pJoBZubfGtdJiU6RIt5sh3IG8mH6Tec3S3x8r1CONn9NG0JE-lcLQLjqtM-POvC5M4"/><div class="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded font-medium">45:00</div></div><h4 class="font-bold text-slate-800 text-sm mb-1 line-clamp-2 leading-tight">Advanced Visualization Techniques</h4><p class="text-slate-500 text-xs">Dr. Sarah Jenkins</p><p class="text-slate-400 text-[10px]">8.2K views • 1 week ago</p></div><div class="glass-effect rounded-2xl p-3 hover:bg-white/60 transition-colors cursor-pointer group"><div class="aspect-video bg-slate-200 rounded-xl mb-3 relative overflow-hidden"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDpEoc-2YNz00vx8-4xQCuZHEUZiO93cGaIQQhmcIH3xA8HUGCgXx7ZhT7hkh4ET6x0RN_eDCRnbEfdltTFKxGaADe-co0Jb6tOR13mNL776oKjlCC6euls6_AoXM4jYtK5Dpx10YbekRkBo8Wo_WXo6rwCruyfhSuMIaevVeK_Umd_MbEF-A7-SddMT4wQrCHAGUzMijf8-MyqkvTcyllPybCM5uapqBqOML1dmYY1_ksdr0ujqozHs_Y1W9UawtiqMGWvKNKZblw"/><div class="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded font-medium">08:15</div></div><h4 class="font-bold text-slate-800 text-sm mb-1 line-clamp-2 leading-tight">Quick Grounding Exercise</h4><p class="text-slate-500 text-xs">VitalPulse Wellness</p><p class="text-slate-400 text-[10px]">32K views • 3 weeks ago</p></div><div class="glass-effect rounded-2xl p-3 hover:bg-white/60 transition-colors cursor-pointer group"><div class="aspect-video bg-slate-200 rounded-xl mb-3 relative overflow-hidden"><img class="w-full h-full object-cover group-hover:scale-105 transition-transform" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAjMiyiEFlj9SOw28J9r8H3hUSQt8Sg1eWhTCwIjJR5mAgQ0flAH7iths0x9A9qSgXV1Q3I5MoEg1RngwgIoEtbHVWvv76TeFHLlBCzGI1NFTpuVFWHUE2e-2Ujr28xPp3YfPvlC9mq3oDPiOZ1QqxHoXFsm9v-TbGxb26ulMEqoOMF2ceKR6paWGpchijOnhLuLgG_RIyd0mB-0kEqATCCwfIsa5pX2_SfORQt36vCSddHptCAA_YVX3vCiiCPd5Sb7Y5-WkLS6uE"/><div class="absolute bottom-2 right-2 bg-black/70 text-white text-[10px] px-2 py-0.5 rounded font-medium">22:30</div></div><h4 class="font-bold text-slate-800 text-sm mb-1 line-clamp-2 leading-tight">Yoga for Mental Clarity</h4><p class="text-slate-500 text-xs">VitalPulse Fitness</p><p class="text-slate-400 text-[10px]">5K views • 1 month ago</p></div></div></section><!-- Mindful Thoughts Image Section -->
+<section class="px-8 mt-16 w-full">
+  <div class="mb-6">
+    <h2 class="text-xl font-bold text-slate-800 font-hanken">Mindful Thoughts</h2>
+    <div class="w-12 h-0.5 bg-[#0077b6] mt-2 rounded-full"></div>
+  </div>
+  <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+    <div class="rounded-2xl overflow-hidden shadow-lg border border-white/20 bg-gradient-to-tr from-[#0f172a] via-[#0891b2] to-[#1e1b4b] aspect-video relative group">
+      <img src="../../../public/images/cinematic_meditation.png" alt="Cinematic Meditation" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onerror="this.style.display='none'">
+      <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-xl text-white text-xs font-bold">
+        Cinematic Meditation
+      </div>
+    </div>
+    <div class="rounded-2xl overflow-hidden shadow-lg border border-white/20 bg-gradient-to-tr from-[#1c1c1c] via-[#2d2d2d] to-[#111111] aspect-video relative group">
+      <img src="../../../public/images/medicine_replica.png" alt="Medicine Website Replica" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onerror="this.style.display='none'">
+      <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-xl text-white text-xs font-bold">
+        Medicine Website Replica
+      </div>
+    </div>
+    <div class="rounded-2xl overflow-hidden shadow-lg border border-white/20 bg-gradient-to-tr from-blue-600 via-indigo-950 to-indigo-900 aspect-video relative group">
+      <img src="../../../public/images/stitch_meditation.png" alt="Meditation & Mind Dashboard" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onerror="this.style.display='none'">
+      <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-xl text-white text-xs font-bold">
+        Meditation & Mind Dashboard
+      </div>
+    </div>
+    <div class="rounded-2xl overflow-hidden shadow-lg border border-white/20 bg-gradient-to-tr from-cyan-950 via-slate-900 to-blue-900 aspect-video relative group">
+      <img src="../../../public/images/stitch_sleep.png" alt="Sleep Intelligence Dashboard" class="w-full h-full object-cover opacity-90 group-hover:opacity-100 transition-opacity" onerror="this.style.display='none'">
+      <div class="absolute bottom-4 left-4 bg-black/60 backdrop-blur-md border border-white/10 px-3 py-1.5 rounded-xl text-white text-xs font-bold">
+        Sleep Intelligence Dashboard
+      </div>
+    </div>
+  </div>
+</section><!-- Mindful Thoughts (Animated Scroll) --><section class="px-8 pb-16"><div class="mb-10"><h2 class="text-4xl font-bold text-slate-800 font-hanken">Mindful Thoughts</h2><div class="w-16 h-1 bg-[#0077b6] mt-4 rounded-full"></div></div><div class="grid grid-cols-1 lg:grid-cols-2 gap-8"><div class="relative h-[500px] rounded-[32px] overflow-hidden shadow-lg group fade-up-enter"><img alt="Clinical Photography" class="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDjrkMip8A6qqMIBW5gokxe4iNHbNoKinm_pfny9r2o4Meoa-SUIF95oigxe2BNVmLLx8w_Dx-Qkk6T4x1-L5TpkDLYqYITV9IrlUROO-jCUgzlZQ1lIVr_t9B3n8x3tJyhVKeI9gXlLwhFTLl2diV6xvs5VW70OPyjxHN1xZ0Mab7tFD8viYhKNuSZRhg-raQn6vYBMQJ8mY5N52OJrVht25HadBO4-QzKDOJXgUJDsyWF0A1f9rLG1KZ0qvGhcxpo2BNlhZsbMKA"/><div class="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div><div class="absolute bottom-8 left-8 right-8 glass-dark p-8 rounded-3xl border border-white/20 backdrop-blur-xl"><h4 class="text-white font-hanken font-bold text-2xl mb-3">Clinical Excellence</h4><p class="text-white/80 text-sm leading-relaxed">Evidence-based approaches to mental well-being and cognitive health, validated by our network of medical professionals.</p></div></div><div class="flex flex-col gap-6"><div class="bg-white/60 backdrop-blur-md p-8 rounded-[32px] shadow-sm border border-white fade-up-enter flex-grow"><div class="w-12 h-12 bg-cyan-50 rounded-2xl flex items-center justify-center mb-6 shadow-sm"><span class="material-symbols-outlined text-[#0077b6]">psychology</span></div><h4 class="text-2xl font-bold text-slate-800 font-hanken mb-3">Holistic Integration</h4><p class="text-slate-600 leading-relaxed">Seamlessly connecting physical fitness with mental clarity for a complete health ecosystem. Our data-driven insights adapt to your unique physiological responses.</p></div><div class="bg-gradient-to-br from-[#0077b6] to-[#023e8a] p-8 rounded-[32px] shadow-xl text-white fade-up-enter"><div class="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center mb-6 backdrop-blur-sm"><span class="material-symbols-outlined text-white">medical_services</span></div><h4 class="text-2xl font-bold font-hanken mb-3">Expert Guidance</h4><p class="text-white/90 leading-relaxed mb-6">Access our network of licensed therapists and wellness coaches available for 1-on-1 virtual consultations.</p><button class="text-sm font-bold bg-white text-[#0077b6] px-6 py-3 rounded-full hover:bg-cyan-50 transition-colors">Learn more</button></div></div></div></section></div>
+<!-- END: Dashboard Content Area -->
+</main>
+<!-- END: Main Dashboard Container -->
+</body></html>

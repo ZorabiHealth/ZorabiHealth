@@ -1,0 +1,176 @@
+<!DOCTYPE html><html lang="en" style=""><head>
+<meta charset="utf-8">
+<meta content="width=device-width, initial-scale=1.0" name="viewport">
+<title>Wellthy - Mental Health Counseling</title>
+<script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+<link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@300;400;500;600;700;800;900&amp;display=swap" rel="stylesheet">
+<style data-purpose="typography">
+    body {
+      font-family: 'Hanken Grotesk', sans-serif;
+      background-color: #fafafa;
+    }
+    .letter-spacing-widest {
+      letter-spacing: 0.25em;
+    }
+    
+    .reveal-anim {
+      opacity: 0;
+      transform: scale(0.95);
+      transition: opacity 1s ease-out, transform 1s ease-out;
+    }
+    .reveal-anim.is-visible {
+      opacity: 1;
+      transform: scale(1);
+    }
+  </style>
+<script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              black: '#111111',
+              dark: '#1c1c1c',
+              gray: '#f5f5f5',
+              border: '#e5e5e5'
+            }
+          }
+        }
+      }
+    }
+  </script>
+</head>
+<body class="antialiased text-brand-black">
+<!-- BEGIN: MainHeader -->
+<header class="w-full bg-white border-b border-brand-border py-4 px-6 md:px-12 flex items-center justify-between sticky top-0 z-50">
+<div class="flex items-center gap-2">
+<!-- Logo placeholder -->
+<svg class="w-8 h-8" fill="none" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M4 12V20H8V12H4Z" fill="currentColor"></path>
+<path d="M10 4V20H14V4H10Z" fill="currentColor"></path>
+<path d="M16 8V20H20V8H16Z" fill="currentColor"></path>
+</svg>
+<span class="text-xl font-bold tracking-tight">Wellthy</span>
+</div>
+<nav class="hidden md:flex items-center gap-8 text-sm font-medium text-gray-600">
+<a class="text-brand-black font-semibold" href="#">Home</a>
+<a class="hover:text-brand-black transition-colors" href="#">About us</a>
+<a class="hover:text-brand-black transition-colors" href="#">Doctors</a>
+<a class="hover:text-brand-black transition-colors" href="#">Contact us</a>
+</nav>
+<div class="flex items-center gap-4 text-sm font-medium">
+<a class="px-4 py-2 border border-brand-border rounded hover:bg-gray-50 transition-colors" href="#">Register</a>
+<a class="px-4 py-2 bg-brand-black text-white rounded hover:bg-gray-800 transition-colors" href="#">Login</a>
+</div>
+</header>
+<!-- END: MainHeader -->
+<main>
+<!-- BEGIN: Hero Section -->
+<section class="max-w-7xl mx-auto px-6 md:px-12 pt-16 pb-8">
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center mb-16">
+<div>
+<h1 class="text-5xl md:text-6xl font-bold leading-tight mb-6 tracking-tight">
+            Find Peace of Mind<br>with Wellthy
+          </h1>
+</div>
+<div>
+<p class="text-gray-600 text-lg mb-8 max-w-md">
+            Experience a comprehensive holistic approach to mental health care, fostering balance, tranquility, resilience, and renewed vitality in every aspect of your life.
+          </p>
+<div class="flex flex-wrap items-center gap-6">
+<button class="bg-brand-black text-white px-6 py-3 rounded flex items-center gap-2 hover:bg-gray-800 transition-colors font-medium">
+              Start your journey
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path d="M9 5l7 7-7 7" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path></svg>
+</button>
+<button class="flex items-center gap-3 text-sm font-semibold hover:text-gray-600 transition-colors group">
+<span class="w-10 h-10 rounded-full border border-gray-300 flex items-center justify-center group-hover:border-gray-500 transition-colors">
+<svg class="w-4 h-4 ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+</span>
+<div class="text-left">
+<span class="block text-xs text-gray-500 font-normal">Play Video</span>
+<span class="">How can we help you start fresh?</span>
+</div>
+</button>
+</div>
+</div>
+</div>
+<!-- Hero Image -->
+<div class="relative w-[80%] mx-auto rounded-3xl overflow-hidden mb-12 h-full reveal-anim is-visible" id="hero-image-container">
+<img alt="A professional, high-fidelity clinical photograph of a person's hands held outward in a welcoming, supportive gesture." class="w-full object-contain" src="https://lh3.googleusercontent.com/aida-public/AB6AXuDFye1dJEVMoq1g1XKfvhIzUF348sRHxflZtn7p_JkVYimPA889XVl9lFTuDkoNlcQBgWW_MQlo24RO3g6uzYkV_j40e5WjmLcU0L8Ed3pAU_rt49RHj3qkUxXN9wfqG9KqaHjc6cCUl2S4UuI8rXqPqrauIuWE6unAQHageYW94c0KbKCXg4PaLyBmWjpQdS83TUx8-qpRmgiojq9Rib26qLeAb7c1jw1ZD-yAQ_7Bd_1GBYJAlGn01t0pe39Vg1EeeXKpf5m9VTCzkA">
+<div class="absolute top-8 right-8 z-10 backdrop-blur-sm bg-white/80 border border-white/50 rounded-2xl p-4 shadow-xl max-w-xs transition-transform hover:scale-105 duration-700">
+<div class="flex items-center gap-3 mb-2">
+<div class="flex items-center justify-center w-8 h-8 bg-brand-gray rounded-full">
+<svg class="w-5 h-5 text-brand-black animate-pulse" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+<path d="M2 12c.5.5 1.5.5 2 0s1.5-.5 2 0 1.5.5 2 0 1.5-.5 2 0 1.5.5 2 0 1.5-.5 2 0 1.5.5 2 0" stroke-linecap="round" stroke-linejoin="round" stroke-width="2"></path>
+</svg>
+</div>
+<span class="text-xs font-semibold tracking-widest uppercase text-brand-black">Live Pulse</span>
+</div>
+<div class="space-y-1">
+<h3 class="text-2xl font-bold text-brand-black">86% Calm</h3>
+<p class="text-sm text-gray-600 font-medium">Deep Focus Active</p>
+</div>
+<div class="mt-4 flex gap-1">
+<div class="h-1 w-full bg-brand-black rounded-full"></div>
+<div class="h-1 w-1/2 bg-gray-300 rounded-full"></div>
+</div>
+</div></div>
+<!-- Brand Wordmark -->
+<div class="text-center overflow-hidden">
+<h2 class="text-[12vw] md:text-[150px] font-black leading-none tracking-widest text-brand-black select-none">
+          WELLTHY
+        </h2>
+</div>
+</section>
+<!-- END: Hero Section -->
+<!-- BEGIN: Services Section -->
+<section class="bg-brand-dark text-white pt-24 pb-32 px-6 md:px-12 rounded-t-[3rem]">
+<div class="max-w-7xl mx-auto">
+<h2 class="text-3xl md:text-5xl font-medium leading-tight max-w-4xl mb-16">
+          At Wellthy, we provide personalized mental health counseling with licensed therapists focused on your unique needs.
+        </h2>
+<!-- Services Grid -->
+<div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+<!-- Grid Item 1 -->
+<div class="relative h-[400px] rounded-2xl overflow-hidden group cursor-pointer">
+<img alt="Child meditating" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuAj5mRIedgKi5uNJuFiqmU-fV2zYIIU-2dQj4Rb4006FZUOdGXAoJkl268LE4ODUuhwccaQ8ttJq95lfzmjMXgseD2V9CyLZ852XoqQfLne9wxdNj5BDvn6kFJqExnonEDvoDwZLSBTXzO_G50JFdLj4zzPideQ1b0-OvXEofGLHMFkDagPUDM34W5rrsGhXb8-ylNL4ObKZOd4UkSBgQlZUVkWZUdtsv6_COGDooz3JsNwDK9BvQXyuZ3VLgmxexFAAowx8czXW5U">
+<div class="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+</div>
+<!-- Grid Item 2 -->
+<div class="relative h-[400px] rounded-2xl overflow-hidden group cursor-pointer">
+<img alt="Abstract texture" class="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105" src="https://lh3.googleusercontent.com/aida-public/AB6AXuD8DfyrFZHDKb54DF8aRjY_XP0Wv4fWkaOKBuRFdOzlc1fqgf2ElSyLAc-gOe6OAoW7M8NPZIJgDijKc-Knt7i4Vgs3TR5mFUA6MuNwUUTXAwn_PE6vjxlB5tpPtks9ilHe81UcPDqw8ByiagleiCMH876SDAoC14K6M8-5CBsvttKGY6A6N4F2rpm2vWTvBgUZBwui8JRkNVf1tQSs20Fch4hr9K9WneHOT80B5OXpYw1xRkc1u1r2w9BKfMrSOJ20Hqr3xzOzKus">
+<div class="absolute inset-0 bg-black/20 group-hover:bg-black/10 transition-colors"></div>
+<!-- Play Button Overlay -->
+<div class="absolute inset-0 flex items-center justify-center">
+<span class="w-16 h-16 rounded-full border-2 border-white/50 backdrop-blur-sm flex items-center justify-center group-hover:border-white transition-colors">
+<svg class="w-6 h-6 text-white ml-1" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"></path></svg>
+</span>
+</div>
+</div>
+</div>
+</div>
+</section>
+<!-- END: Services Section -->
+</main>
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('is-visible');
+          observer.unobserve(entry.target);
+        }
+      });
+    }, {
+      threshold: 0.1
+    });
+
+    const heroImage = document.getElementById('hero-image-container');
+    if (heroImage) {
+      observer.observe(heroImage);
+    }
+  });
+</script>
+
+
+</body></html>

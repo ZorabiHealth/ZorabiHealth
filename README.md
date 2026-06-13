@@ -1,6 +1,6 @@
 # ZorabiHealth — Clinical Intelligence Dashboard & Sync Platform
 
-ZorabiHealth is a production-grade unified healthcare dashboard designed to manage prescriptions, automate pharmacy refills, provide conversational audio telemetry logs, and dispatch automated SMS alerts.
+ZorabiHealth is a production-grade unified healthcare dashboard designed to manage prescriptions, automate pharmacy refills, provide conversational audio telemetry logs, and trigger database-synchronized device alarms.
 
 ---
 
@@ -16,10 +16,10 @@ ZorabiHealth is a production-grade unified healthcare dashboard designed to mana
    - Real-time order tracking timeline backed by **Supabase Realtime PostgreSQL replication**.
    - Simulated pharmacy vendor registration dashboard.
 
-3. **🔔 Vonage SMS Medicine Reminders**
-   - Configurable SMS target and scheduling times.
-   - Inbound SMS webhook parsing (`TAKEN` / `SNOOZE` replies) to decrement stock and log patient adherence.
-   - Emergency notification escalation to designated contacts after consecutive misses.
+3. **🔔 Synchronized Device Alarm Reminders**
+   - Live visual and audio alarms triggered on all active companion app viewports.
+   - Synchronized database state: marking taken or snoozing on one device immediately silences the alarm on all other active devices.
+   - Emergency notification escalation context to designated contacts after consecutive misses.
 
 ---
 
@@ -27,7 +27,7 @@ ZorabiHealth is a production-grade unified healthcare dashboard designed to mana
 
 - **Frontend/Backend**: Next.js 16 (App Router + Turbopack), React 19, TypeScript
 - **Database**: Supabase (PostgreSQL, Realtime subscriptions, Row-Level Security)
-- **APIs**: Deepgram Nova-3 (STT), Vonage Messages SDK (SMS)
+- **APIs**: Deepgram Nova-3 (STT)
 - **Styling & Animation**: CSS, Framer Motion
 
 ---
@@ -62,9 +62,6 @@ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=sb_publishable_uh82pSDF5Pt42QAui6sJuw_IK7gX
 SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 
 DEEPGRAM_API_KEY=your_deepgram_api_key
-VONAGE_API_KEY=your_vonage_api_key
-VONAGE_API_SECRET=your_vonage_api_secret
-VONAGE_FROM_NUMBER=ZorabiHealth
 ```
 
 ### 4. Setup Database Schema

@@ -6,22 +6,138 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   HeartPulse,
-  Plus,
   Play,
   Pause,
   Activity,
   Calendar,
   X,
   AlertCircle,
-  ExternalLink,
   Sparkles,
   BookOpen,
   Search,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/lib/supabase";
 
 export default function DashboardOverview() {
+  // Missed Medication Alerts State
+  const [session, setSession] = useState<any>(null);
+  const [missedMeds, setMissedMeds] = useState<any[]>([]);
+  const [loginTime, setLoginTime] = useState<string | null>(null);
+
+  useEffect(() => {
+    const saved = localStorage.getItem("zh_login_time");
+    if (saved) setLoginTime(saved);
+
+    const fetchSessionAndMeds = async () => {
+      try {
+        const {
+          data: { session: s },
+        } = await supabase.auth.getSession();
+        if (!s) return;
+        setSession(s);
+
+        // Fetch medications
+        const { data: medications } = await supabase
+          .from("medications")
+          .select("*")
+          .eq("user_id", s.user.id)
+          .eq("is_active", true);
+
+        // Fetch today's logs
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const { data: logs } = await supabase
+          .from("medication_logs")
+          .select("*")
+          .eq("status", "taken")
+          .gte("scheduled_at", todayStart.toISOString());
+
+        // Find missed medications
+        const missed: any[] = [];
+        const now = new Date();
+
+        (medications || []).forEach((med) => {
+          const times = med.scheduled_times || [];
+          times.forEach((time: string) => {
+            const [hours, minutes] = time.split(":").map(Number);
+            const scheduledDate = new Date();
+            scheduledDate.setHours(hours, minutes, 0, 0);
+
+            if (now > scheduledDate) {
+              // Check if logged as taken for today
+              const hasLogged = (logs || []).some(
+                (log) =>
+                  log.medication_id === med.id &&
+                  new Date(log.scheduled_at).toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                  }) === time
+              );
+
+              if (!hasLogged) {
+                missed.push({
+                  id: med.id,
+                  name: med.name,
+                  dosage: med.dosage,
+                  time,
+                  currentStock: med.current_stock,
+                });
+              }
+            }
+          });
+        });
+
+        setMissedMeds(missed);
+      } catch (e) {
+        console.error("Failed to load dashboard sync logs:", e);
+      }
+    };
+
+    fetchSessionAndMeds();
+    const interval = setInterval(fetchSessionAndMeds, 10000); // Check every 10s for updates
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleTakeMissedMed = async (med: any) => {
+    if (!session?.user?.id) return;
+    const now = new Date();
+    const [hours, minutes] = med.time.split(":").map(Number);
+    const scheduledTime = new Date();
+    scheduledTime.setHours(hours, minutes, 0, 0);
+
+    try {
+      const { error: logError } = await supabase.from("medication_logs").insert({
+        medication_id: med.id,
+        medication_name: med.name,
+        scheduled_at: scheduledTime.toISOString(),
+        taken_at: now.toISOString(),
+        status: "taken",
+        dose: med.dosage,
+      });
+
+      if (logError) throw logError;
+
+      // Decrement stock
+      const newStock = Math.max(0, med.currentStock - 1);
+      const { error: stockError } = await supabase
+        .from("medications")
+        .update({ current_stock: newStock })
+        .eq("id", med.id);
+
+      if (stockError) throw stockError;
+
+      // Filter local state
+      setMissedMeds((prev) => prev.filter((m) => !(m.id === med.id && m.time === med.time)));
+      alert(`Dose logged successfully for ${med.name}!`);
+    } catch (e) {
+      console.error(e);
+      alert("Failed to log dose.");
+    }
+  };
+
   // 1. Vitals telemetry states
   const [heartRate, setHeartRate] = useState(72);
   const [spO2, setSpO2] = useState(97);
@@ -177,7 +293,7 @@ export default function DashboardOverview() {
         audio.play().catch((e) => console.warn("Failed to play audio stream:", e));
       }
     }
-  }, [currentSong.audioUrl]);
+  }, [currentSong.audioUrl, isPlaying]);
 
   // Sync play/pause actions
   useEffect(() => {
@@ -260,21 +376,60 @@ export default function DashboardOverview() {
       className="w-full min-h-full bg-[#f0f5ff] flex flex-col animate-slide-up p-6"
       data-purpose="overview-grid"
     >
+      {/* Dynamic Missed Medication Sync Alerts */}
+      <AnimatePresence>
+        {missedMeds.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="mb-6 bg-red-50 border border-red-200 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                <AlertCircle className="w-5 h-5 text-red-600 animate-bounce" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-red-950">Missed Medication Reminders</h3>
+                <p className="text-xs text-red-700 font-semibold mt-1">
+                  You have missed taking the following scheduled doses:
+                  <span className="block mt-1 font-bold text-red-800">
+                    {missedMeds
+                      .map((m) => `${m.name} ${m.dosage} (scheduled at ${m.time})`)
+                      .join(", ")}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              {missedMeds.map((med, index) => (
+                <Button
+                  key={index}
+                  onClick={() => handleTakeMissedMed(med)}
+                  className="bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold px-4 py-2 cursor-pointer shadow-sm"
+                >
+                  Take {med.name}
+                </Button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 4/3 Grid Core Layout */}
       <div className="grid grid-cols-12 gap-4 flex-grow shrink-0 min-h-full">
         {/* BEGIN: Heart Health Card (Top Left - 9 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-9 bg-gradient-to-r from-[#608ec4] via-[#a2bce0] to-[#c4d4eb] rounded-[32px] relative overflow-hidden p-8 flex flex-col justify-between text-white border border-white/20 shadow-md min-h-[350px]">
-          {/* Background image overlay with mix blend screen */}
-          <div className="absolute inset-0 z-0 select-none pointer-events-none">
-            <Image
-              alt="Clinical Heart Visualization"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBpvlRutqAv6FsbdYd8Xq0OUdzy8hI2yOlY3Ff3MHayPK1TCQMh6gDBIC6zDDqN8IMbQ0jCWeienQqbrGJoRYPEqPD2tYYYOc8EtX5IG5u-hfOL0nqqFg-_I-znFcGAKdlSBzLRRa6BWKH6-_n_snNh7c9dC_jHG-ikpFaVP7nHPPcr16PtUJ7NCHiMmoeFXns4D0bv26XEHyaAY-3XRp4M7NfeO17hxRyx3nmxhBu9aWLSZcfCGDy158ZWQEjRgj_aQ6KeQqREz78"
-              fill
-              className="object-cover opacity-60 mix-blend-screen"
-              sizes="(max-width: 1024px) 100vw, 800px"
-              priority
-            />
-          </div>
+        <section className="col-span-12 lg:col-span-9 bg-slate-950 rounded-[32px] relative overflow-hidden p-8 flex flex-col justify-between text-white border border-white/20 shadow-md min-h-[350px]">
+          {/* Loop background video */}
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover z-0 select-none pointer-events-none"
+          >
+            <source src="/video/in_first_image_you_create_your.mp4" type="video/mp4" />
+          </video>
 
           <header className="relative z-10">
             <h2 className="text-2xl font-bold tracking-tight leading-snug">
@@ -284,6 +439,11 @@ export default function DashboardOverview() {
                 Your personalized health summary
               </span>
             </h2>
+            {loginTime && (
+              <p className="text-[11px] text-white/70 font-semibold mt-2">
+                Last login: {new Date(loginTime).toLocaleString()}
+              </p>
+            )}
           </header>
 
           <div className="relative z-10 flex flex-col md:flex-row gap-6 mt-4 items-end justify-between">
@@ -456,10 +616,12 @@ export default function DashboardOverview() {
                         className="flex items-center gap-2.5 p-1.5 hover:bg-white/15 rounded-lg cursor-pointer transition-all border border-transparent hover:border-white/5"
                       >
                         {imgUrl ? (
-                          <img
+                          <Image
                             src={imgUrl}
                             alt={songName}
-                            className="w-8 h-8 rounded object-cover shadow-sm"
+                            width={32}
+                            height={32}
+                            className="rounded object-cover shadow-sm"
                           />
                         ) : (
                           <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center text-[10px]">
@@ -510,10 +672,12 @@ export default function DashboardOverview() {
                 </div>
                 <div className="flex flex-col items-end shrink-0 gap-1">
                   {currentSong.image ? (
-                    <img
+                    <Image
                       src={currentSong.image}
                       alt={currentSong.name}
-                      className="w-8 h-8 rounded-lg object-cover shadow-sm border border-white/15"
+                      width={32}
+                      height={32}
+                      className="rounded-lg object-cover shadow-sm border border-white/15"
                     />
                   ) : (
                     <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-xs border border-white/10">
@@ -548,13 +712,7 @@ export default function DashboardOverview() {
 
           <div className="flex gap-3 justify-center py-2">
             <div className="w-full h-32 rounded-2xl overflow-hidden border border-white/30 shadow-md relative group select-none pointer-events-none">
-              <Image
-                alt="Clinical Visualization"
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrhLgiDEyI1UaTgJAFjF3Iyyf80wU3MlQvgyOoccezi8YSUHql5QyLGZZgm5ycFhfPnroM-ndlGD4YCmQ7fsg3nebNQ9PMigW77ZZasPcI060kNgQZbmxuxYVrsJz44YOpqP_lXujKvN1w3V_JI2FLR6StVUJwd64wxUbn32BEpi2z0goBPtcrGFIlLeMWTzN-WyUoLewkR9zOjKZBFxbV09G5iFBI62PmhTC_OkrXi02W7qbEtnfFWIiYA9B2-xPlI4cUeqPcHMk"
-                fill
-                sizes="(max-width: 768px) 100vw, 300px"
-              />
+              <div className="w-full h-full bg-gradient-to-br from-brand-400 via-brand-600 to-purple-700 transition-transform duration-700 group-hover:scale-105"></div>
             </div>
           </div>
 
@@ -576,12 +734,12 @@ export default function DashboardOverview() {
         {/* END: Clinical Visualization Card */}
 
         {/* BEGIN: Sleep Tracking Card (Bottom Middle - 3 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-3 bg-gradient-to-b from-[#1e3a8a] to-[#3b0764] rounded-[32px] p-6 flex flex-col justify-between text-white relative overflow-hidden shadow-md min-h-[350px]">
+        <section className="col-span-12 lg:col-span-3 bg-slate-900 rounded-[32px] p-6 flex flex-col justify-between text-white relative overflow-hidden shadow-md min-h-[350px]">
           <div className="absolute inset-0 z-0 select-none pointer-events-none">
             <Image
               alt="Clinical Floral Background"
-              className="w-full h-full object-cover opacity-50"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFLBhzm-CgR-Ql3tBbf8b3HTOjSMk4AJ_oMii291DUZM7y_eJ5S2-NN2QioGaVQ_d0oAhO_eyZV3Qeai8UOJhQed3imQzBUQjIFZrrHBKTPUFkSpVXrrRr0G8YNH709Bw43-HJv9whVy0IonZXDLprBP4NXgkA60RSDJFqk8hMJMXHvAaFIPhruHX87ogQYrtq8hjAqW0HvpmDPuqj0nGkEF_hix0GsedOI4b55NKAebs3FQ5LRktpvMo1RkHJpCtI3kOy0iv75Q0"
+              className="w-full h-full object-cover"
+              src="/images/pngtree-flowers-pink-flowers-image_13248117.png"
               fill
               sizes="(max-width: 768px) 100vw, 250px"
             />
@@ -603,12 +761,15 @@ export default function DashboardOverview() {
             </div>
           </div>
 
-          <div className="mt-auto z-10 flex items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity p-2 rounded-xl bg-white/10 border border-white/10">
+          <Link
+            href="/dashboard/sleep"
+            className="mt-auto z-10 flex items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity p-2 rounded-xl bg-white/10 border border-white/10"
+          >
             <div className="w-8 h-8 rounded-lg border border-white/30 flex items-center justify-center bg-white/20">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <span className="text-[10px] font-bold">Download companion app</span>
-          </div>
+          </Link>
         </section>
         {/* END: Sleep Tracking Card */}
 

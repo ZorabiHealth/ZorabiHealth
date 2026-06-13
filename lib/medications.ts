@@ -63,7 +63,7 @@ export interface MedicationLog {
   status: LogStatus;
   dose: string;
   note?: string;
-  alertSent: boolean; // whether Vonage SMS was sent
+  alertSent: boolean;
   snoozedUntil?: string; // ISO timestamp if snoozed
 }
 
@@ -231,7 +231,10 @@ export interface MealSuggestion {
 }
 
 // Symptom-to-suggestion rule map
-const SYMPTOM_RULES: Record<SymptomClassification, Omit<MealSuggestion, "id" | "triggerSymptoms">> = {
+const SYMPTOM_RULES: Record<
+  SymptomClassification,
+  Omit<MealSuggestion, "id" | "triggerSymptoms">
+> = {
   fatigue: {
     title: "Energy Recovery Nutrition",
     description: "Your fatigue levels suggest a need for slow-release energy and iron-rich foods.",
@@ -269,7 +272,8 @@ const SYMPTOM_RULES: Record<SymptomClassification, Omit<MealSuggestion, "id" | "
   },
   muscle_soreness: {
     title: "Muscle Recovery Nutrition",
-    description: "Muscle soreness detected. Protein intake and anti-inflammatory foods are priority.",
+    description:
+      "Muscle soreness detected. Protein intake and anti-inflammatory foods are priority.",
     foods: ["Chicken breast", "Cottage cheese", "Tart cherry juice", "Sweet potato", "Eggs"],
     avoid: ["Alcohol", "High-sugar foods", "Excessive sodium"],
     severity: "info",
@@ -283,7 +287,8 @@ const SYMPTOM_RULES: Record<SymptomClassification, Omit<MealSuggestion, "id" | "
   },
   low_energy: {
     title: "Pre-Workout Energy Boost",
-    description: "Low energy levels. Optimise your carbohydrate and B-vitamin intake before workouts.",
+    description:
+      "Low energy levels. Optimise your carbohydrate and B-vitamin intake before workouts.",
     foods: ["Banana", "Oats", "Peanut butter", "Whole grain toast", "Dates", "Greek yogurt"],
     avoid: ["Heavy fatty meals", "High-fibre foods before exercise", "Alcohol"],
     severity: "info",
@@ -297,7 +302,8 @@ const SYMPTOM_RULES: Record<SymptomClassification, Omit<MealSuggestion, "id" | "
   },
   anxiety: {
     title: "Neuro-Calming Diet",
-    description: "Elevated stress or anxiety markers. Magnesium and omega-3 rich foods are recommended.",
+    description:
+      "Elevated stress or anxiety markers. Magnesium and omega-3 rich foods are recommended.",
     foods: ["Dark chocolate", "Chamomile tea", "Almonds", "Salmon", "Blueberries", "Avocado"],
     avoid: ["Caffeine", "Alcohol", "Refined sugar", "Energy drinks"],
     severity: "info",

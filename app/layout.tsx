@@ -1,9 +1,7 @@
 import type { Metadata } from "next";
-import { Hanken_Grotesk, Geist } from "next/font/google";
+import { Hanken_Grotesk } from "next/font/google";
 import "./globals.css";
 import { cn } from "@/lib/utils";
-
-const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 const hankenGrotesk = Hanken_Grotesk({
   variable: "--font-hanken-grotesk",
@@ -12,8 +10,9 @@ const hankenGrotesk = Hanken_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "zorabihealth - Predictive GenAI",
-  description: "Predictive GenAI turns analysts into predictive powerhouses",
+  title: "ZorabiHealth — Clinical Intelligence & Telemetry Sync Platform",
+  description:
+    "Manage prescriptions, automate pharmacy refills, log symptoms via AI voice assistant, and receive real-time push notifications.",
 };
 
 export default function RootLayout({
@@ -22,10 +21,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html
-      lang="en"
-      className={cn("h-full", "antialiased", hankenGrotesk.variable, "font-sans", geist.variable)}
-    >
+    <html lang="en" className={cn("h-full", "antialiased", hankenGrotesk.variable, "font-sans")}>
       <body className="min-h-full flex flex-col">{children}</body>
     </html>
   );

@@ -1,19 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  Activity,
-  Plus,
-  AlertTriangle,
-  Trash2,
-  CheckCircle2,
-  UserCheck,
-  Info,
-  CalendarDays,
-  ShieldAlert,
-} from "lucide-react";
+import Image from "next/image";
+import { Activity, Plus, Trash2, CheckCircle2, CalendarDays, ShieldAlert } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 
 interface SymptomLog {
@@ -266,10 +256,12 @@ export default function VitalsPage() {
             {/* Doctor Contact Box */}
             <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex items-center gap-3 text-left mb-6">
               <div className="w-10 h-10 rounded-full overflow-hidden relative flex-shrink-0">
-                <img
+                <Image
                   src="/images/doctor3.jpg"
                   alt="Dr. Sarah Jenkins"
-                  className="object-cover w-full h-full"
+                  fill
+                  className="object-cover"
+                  sizes="40px"
                 />
               </div>
               <div>

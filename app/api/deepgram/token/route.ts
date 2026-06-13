@@ -1,9 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { DeepgramClient } from "@deepgram/sdk";
 
 // GET /api/deepgram/token
 // Returns a short-lived Deepgram API key for browser-side WebSocket connections.
-export async function GET(req: NextRequest) {
+export async function GET() {
   const apiKey = process.env.DEEPGRAM_API_KEY;
 
   if (!apiKey) {
