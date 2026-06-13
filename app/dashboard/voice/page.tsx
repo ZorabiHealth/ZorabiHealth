@@ -221,6 +221,7 @@ export default function VoiceAgentPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [sessionTimer, setSessionTimer] = useState(0);
   const [userId, setUserId] = useState<string>("00000000-0000-0000-0000-000000000000");
+  const conversationIdRef = useRef<string>(generateUUID());
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -559,6 +560,13 @@ export default function VoiceAgentPage() {
             setInterimText("");
             if (transcript.trim().length < 2) return;
             setStatus("processing");
+            window.pendo?.trackAgent("prompt", {
+              agentId: "7Ju_TmHHiY3grn0YVk7UdhnePak",
+              conversationId: conversationIdRef.current,
+              messageId: generateUUID(),
+              content: transcript,
+              suggestedPrompt: false,
+            });
             addMessage({ sender: "user", text: transcript })
               .then(async (msgId) => {
                 if (audioBlobsRef.current.length > 0 && navigator.onLine) {
@@ -593,6 +601,12 @@ export default function VoiceAgentPage() {
                 setStatus("listening");
                 return;
               }
+              window.pendo?.trackAgent("agent_response", {
+                agentId: "7Ju_TmHHiY3grn0YVk7UdhnePak",
+                conversationId: conversationIdRef.current,
+                messageId: generateUUID(),
+                content: response,
+              });
               addMessage({
                 sender: "assistant",
                 text: response,
@@ -691,7 +705,20 @@ export default function VoiceAgentPage() {
       response = generateLocalResponse(intent, text);
     }
 
+    window.pendo?.trackAgent("prompt", {
+      agentId: "7Ju_TmHHiY3grn0YVk7UdhnePak",
+      conversationId: conversationIdRef.current,
+      messageId: generateUUID(),
+      content: text,
+      suggestedPrompt: false,
+    });
     await addMessage({ sender: "user", text }).catch(() => {});
+    window.pendo?.trackAgent("agent_response", {
+      agentId: "7Ju_TmHHiY3grn0YVk7UdhnePak",
+      conversationId: conversationIdRef.current,
+      messageId: generateUUID(),
+      content: response,
+    });
     await addMessage({ sender: "assistant", text: response, intent }).catch(() => {});
     if (!isMuted) speakText(response, () => setStatus("idle"));
     else setStatus("idle");
@@ -1018,7 +1045,20 @@ export default function VoiceAgentPage() {
                           : clinicalIntents.includes(intent)
                             ? await handleClinicalVoiceIntent(intent, cmd)
                             : generateLocalResponse(intent, cmd);
+                        window.pendo?.trackAgent("prompt", {
+                          agentId: "7Ju_TmHHiY3grn0YVk7UdhnePak",
+                          conversationId: conversationIdRef.current,
+                          messageId: generateUUID(),
+                          content: cmd,
+                          suggestedPrompt: true,
+                        });
                         await addMessage({ sender: "user", text: cmd }).catch(() => {});
+                        window.pendo?.trackAgent("agent_response", {
+                          agentId: "7Ju_TmHHiY3grn0YVk7UdhnePak",
+                          conversationId: conversationIdRef.current,
+                          messageId: generateUUID(),
+                          content: resp,
+                        });
                         await addMessage({ sender: "assistant", text: resp, intent }).catch(
                           () => {}
                         );
