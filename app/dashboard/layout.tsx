@@ -61,6 +61,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           router.push("/login");
         } else {
           setCheckingAuth(false);
+          pendo.identify({
+            visitor: {
+              id: session.user.id,
+              email: session.user.email || '',
+              full_name: session.user.user_metadata?.full_name || '',
+            }
+          });
         }
       } catch (err) {
         console.error("[ZorabiHealth Auth] Failed to check user session:", err);
@@ -156,6 +163,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (!isPlaceholder) {
       await supabase.auth.signOut();
     }
+    pendo.clearSession();
     router.push("/");
   };
 
