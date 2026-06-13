@@ -305,12 +305,23 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
             return;
           }
 
-          const { error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
+          const { data: signInData, error: signInError } =
+            await supabase.auth.signInWithPassword({
+              email,
+              password,
+            });
 
           if (signInError) throw signInError;
+
+          if (signInData.user) {
+            pendo.identify({
+              visitor: {
+                id: signInData.user.id,
+                email: signInData.user.email,
+                full_name: signInData.user.user_metadata?.full_name,
+              },
+            });
+          }
 
           router.push("/dashboard");
         }
