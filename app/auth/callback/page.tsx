@@ -25,6 +25,13 @@ function AuthCallbackHandler() {
           data: { session },
         } = await supabase.auth.getSession();
         if (session) {
+          pendo.identify({
+            visitor: {
+              id: session.user.id,
+              email: session.user.email,
+              full_name: session.user.user_metadata?.full_name,
+            },
+          });
           setStatus("Success! Redirecting to dashboard...");
           router.push("/dashboard");
         } else {
@@ -32,6 +39,13 @@ function AuthCallbackHandler() {
             data: { user },
           } = await supabase.auth.getUser();
           if (user) {
+            pendo.identify({
+              visitor: {
+                id: user.id,
+                email: user.email,
+                full_name: user.user_metadata?.full_name,
+              },
+            });
             setStatus("Success! Redirecting...");
             router.push("/dashboard");
           } else {

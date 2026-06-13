@@ -133,6 +133,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   ];
 
   const handleLogout = async () => {
+    pendo.clearSession();
+
     const isPlaceholder =
       !process.env.NEXT_PUBLIC_SUPABASE_URL ||
       process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder-url.supabase.co");
