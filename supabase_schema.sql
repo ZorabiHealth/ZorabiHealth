@@ -148,3 +148,16 @@ create trigger update_refill_orders_modtime
     before update on refill_orders
     for each row execute function update_modified_column();
 
+-- 10. Outpatient Symptom Logs Table
+create table if not exists symptom_logs (
+    id uuid primary key default gen_random_uuid(),
+    user_id uuid not null default '00000000-0000-0000-0000-000000000000',
+    name text not null,
+    severity text not null check (severity in ('Mild', 'Moderate', 'Severe')),
+    notes text not null default '',
+    created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+create index if not exists idx_symptom_logs_user on symptom_logs(user_id, created_at desc);
+
+

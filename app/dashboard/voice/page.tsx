@@ -68,8 +68,7 @@ function detectIntent(text: string): string {
   return "general";
 }
 
-async function handleWorkoutIntent(intent: string): Promise<string> {
-  const USER_ID = "00000000-0000-0000-0000-000000000000";
+async function handleWorkoutIntent(intent: string, userId: string): Promise<string> {
   try {
     switch (intent) {
       case "start_workout":
@@ -79,7 +78,7 @@ async function handleWorkoutIntent(intent: string): Promise<string> {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            user_id: USER_ID,
+            user_id: userId,
             name: "Voice Logged Meal",
             calories: 300,
             protein_g: 15,
@@ -92,7 +91,7 @@ async function handleWorkoutIntent(intent: string): Promise<string> {
         return "I tried to log your meal but hit an error. Please use the Workout dashboard to log it manually.";
       }
       case "check_streak": {
-        const res = await fetch(`/api/workouts/streaks?userId=${USER_ID}`);
+        const res = await fetch(`/api/workouts/streaks?userId=${userId}`);
         const { data } = await res.json();
         if (data) {
           const days = Object.values(data.streak_days || {}).filter(Boolean).length;
@@ -221,6 +220,172 @@ export default function VoiceAgentPage() {
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
   const [searchQuery, setSearchQuery] = useState("");
   const [sessionTimer, setSessionTimer] = useState(0);
+  const [userId, setUserId] = useState<string>("00000000-0000-0000-0000-000000000000");
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session?.user?.id) {
+        setUserId(session.user.id);
+      }
+    });
+  }, []);
+
+  const handleClinicalVoiceIntent = async (intent: string, text: string): Promise<string> => {
+    try {
+      switch (intent) {
+        case "log_medication": {
+          const { data: meds, error } = await supabase
+            .from("medications")
+            .select("*")
+            .eq("user_id", userId)
+            .eq("is_active", true);
+
+          if (error) throw error;
+
+          let matchedMed = null;
+          if (meds && meds.length > 0) {
+            for (const med of meds) {
+              const medRegex = new RegExp(`\\b${med.name}\\b`, "i");
+              if (medRegex.test(text)) {
+                matchedMed = med;
+                break;
+              }
+            }
+            if (!matchedMed) {
+              matchedMed = meds[0];
+            }
+          }
+
+          if (!matchedMed) {
+            return "You don't have any active medications set up in the database. Please add them in the medications tracker.";
+          }
+
+          const { error: logErr } = await supabase.from("medication_logs").insert({
+            medication_id: matchedMed.id,
+            medication_name: matchedMed.name,
+            status: "taken",
+            taken_at: new Date().toISOString(),
+            scheduled_at: new Date().toISOString(),
+            dose: matchedMed.dosage,
+          });
+
+          if (logErr) throw logErr;
+
+          return `I've successfully logged that you took your ${matchedMed.name} (${matchedMed.dosage}). Your medication log has been updated.`;
+        }
+
+        case "log_symptom": {
+          const symptoms = [
+            "Palpitations",
+            "Chest Tightness",
+            "Fatigue",
+            "Shortness of Breath",
+            "Dizziness",
+            "Headache",
+          ];
+          let symptomName = "General Symptom";
+          for (const s of symptoms) {
+            if (new RegExp(`\\b${s}\\b`, "i").test(text)) {
+              symptomName = s;
+              break;
+            }
+          }
+
+          let severity = "Moderate";
+          if (/\b(severe|bad|high|intense)\b/i.test(text)) {
+            severity = "Severe";
+          } else if (/\b(mild|light|low)\b/i.test(text)) {
+            severity = "Mild";
+          }
+
+          const { error: logErr } = await supabase.from("symptom_logs").insert({
+            user_id: userId,
+            name: symptomName,
+            severity,
+            notes: text,
+          });
+
+          if (logErr) throw logErr;
+
+          if (severity === "Severe") {
+            return `I have logged your symptom as severe ${symptomName}. I've alerted your designated physician, Dr. Sarah Jenkins. Please seek immediate medical assistance if you feel chest pain or severe distress.`;
+          }
+
+          return `I've recorded your symptom of ${symptomName} as ${severity}. It has been saved to your outpatient log history.`;
+        }
+
+        case "query_vitals": {
+          const todayStr = new Date().toISOString().split("T")[0];
+          const [stepsRes, sleepRes, symptomRes] = await Promise.all([
+            supabase
+              .from("daily_steps")
+              .select("steps")
+              .eq("user_id", userId)
+              .eq("date", todayStr)
+              .maybeSingle(),
+            supabase
+              .from("sleep_sessions")
+              .select("duration,efficiency")
+              .eq("user_id", userId)
+              .order("date", { ascending: false })
+              .limit(1),
+            supabase
+              .from("symptom_logs")
+              .select("name,severity")
+              .eq("user_id", userId)
+              .order("created_at", { ascending: false })
+              .limit(1),
+          ]);
+
+          let reply = "Here are your latest health vitals from the database: ";
+
+          if (stepsRes.data) {
+            reply += `Today you have walked ${stepsRes.data.steps} steps. `;
+          } else {
+            reply += "No steps recorded today. ";
+          }
+
+          if (sleepRes.data && sleepRes.data.length > 0) {
+            reply += `Your last sleep session was ${sleepRes.data[0].duration} hours, with a sleep score of ${sleepRes.data[0].efficiency}%. `;
+          }
+
+          if (symptomRes.data && symptomRes.data.length > 0) {
+            reply += `Your most recently logged symptom was ${symptomRes.data[0].name} marked as ${symptomRes.data[0].severity}. `;
+          }
+
+          return reply;
+        }
+
+        case "set_reminder": {
+          const timeMatch = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+          let time = "08:00";
+          if (timeMatch) {
+            time = `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`;
+          }
+
+          const { error: alarmErr } = await supabase.from("wearable_alarms").insert({
+            user_id: userId,
+            time,
+            label: "Voice Reminder",
+            enabled: true,
+            repeat: ["Mon", "Tue", "Wed", "Thu", "Fri"],
+            smart_wake: true,
+            sound: "Chime Chord",
+          });
+
+          if (alarmErr) throw alarmErr;
+
+          return `I've set a new voice reminder for ${time} in your alarm schedule.`;
+        }
+
+        default:
+          return "";
+      }
+    } catch (err: any) {
+      console.error("[Voice Intent Log Error]", err);
+      return `I encountered an error logging that: ${err.message || "database connection failed"}.`;
+    }
+  };
 
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
@@ -324,6 +489,7 @@ export default function VoiceAgentPage() {
     saveToStorage(STORAGE_KEYS.VOICE_SESSIONS, updated);
     const dbPayload = {
       id: full.id,
+      user_id: userId,
       sender: full.sender,
       text: full.text,
       intent: full.intent || null,
@@ -416,6 +582,12 @@ export default function VoiceAgentPage() {
               .catch(() => {});
             const intent = detectIntent(transcript);
             const workoutIntents = ["start_workout", "log_meal", "check_streak", "suggest_workout"];
+            const clinicalIntents = [
+              "log_medication",
+              "log_symptom",
+              "query_vitals",
+              "set_reminder",
+            ];
             const handleResp = (response: string) => {
               if (!response) {
                 setStatus("listening");
@@ -432,7 +604,11 @@ export default function VoiceAgentPage() {
               else setStatus("listening");
             };
             if (workoutIntents.includes(intent)) {
-              handleWorkoutIntent(intent)
+              handleWorkoutIntent(intent, userId)
+                .then(handleResp)
+                .catch(() => setStatus("listening"));
+            } else if (clinicalIntents.includes(intent)) {
+              handleClinicalVoiceIntent(intent, transcript)
                 .then(handleResp)
                 .catch(() => setStatus("listening"));
             } else {
@@ -504,9 +680,17 @@ export default function VoiceAgentPage() {
     setStatus("processing");
     const intent = detectIntent(text);
     const workoutIntents = ["start_workout", "log_meal", "check_streak", "suggest_workout"];
-    const response = workoutIntents.includes(intent)
-      ? await handleWorkoutIntent(intent)
-      : generateLocalResponse(intent, text);
+    const clinicalIntents = ["log_medication", "log_symptom", "query_vitals", "set_reminder"];
+
+    let response = "";
+    if (workoutIntents.includes(intent)) {
+      response = await handleWorkoutIntent(intent, userId);
+    } else if (clinicalIntents.includes(intent)) {
+      response = await handleClinicalVoiceIntent(intent, text);
+    } else {
+      response = generateLocalResponse(intent, text);
+    }
+
     await addMessage({ sender: "user", text }).catch(() => {});
     await addMessage({ sender: "assistant", text: response, intent }).catch(() => {});
     if (!isMuted) speakText(response, () => setStatus("idle"));
@@ -823,9 +1007,17 @@ export default function VoiceAgentPage() {
                           "check_streak",
                           "suggest_workout",
                         ];
+                        const clinicalIntents = [
+                          "log_medication",
+                          "log_symptom",
+                          "query_vitals",
+                          "set_reminder",
+                        ];
                         const resp = workoutIntents.includes(intent)
-                          ? await handleWorkoutIntent(intent)
-                          : generateLocalResponse(intent, cmd);
+                          ? await handleWorkoutIntent(intent, userId)
+                          : clinicalIntents.includes(intent)
+                            ? await handleClinicalVoiceIntent(intent, cmd)
+                            : generateLocalResponse(intent, cmd);
                         await addMessage({ sender: "user", text: cmd }).catch(() => {});
                         await addMessage({ sender: "assistant", text: resp, intent }).catch(
                           () => {}

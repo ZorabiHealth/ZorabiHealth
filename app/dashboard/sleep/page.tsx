@@ -165,33 +165,21 @@ export default function SleepCompanionPage() {
   const [showHrOverlay, setShowHrOverlay] = useState(true);
 
   // Sleep Data
-  const [sleepHistory, setSleepHistory] = useState<SleepSession[]>([
-    {
-      date: "Jun 05",
-      duration: 7.6,
-      efficiency: 88,
-      deepMinutes: 110,
-      remMinutes: 95,
-      lightMinutes: 215,
-      awakeMinutes: 36,
-      averageHr: 58,
-      stages: [
-        { time: "23:00", stage: "Awake" },
-        { time: "23:30", stage: "Light" },
-        { time: "00:15", stage: "Deep" },
-        { time: "01:30", stage: "Light" },
-        { time: "02:00", stage: "REM" },
-        { time: "02:45", stage: "Deep" },
-        { time: "04:00", stage: "Light" },
-        { time: "04:30", stage: "REM" },
-        { time: "05:15", stage: "Deep" },
-        { time: "06:00", stage: "Light" },
-        { time: "06:36", stage: "Awake" },
-      ],
-    },
-  ]);
+  const [sleepHistory, setSleepHistory] = useState<SleepSession[]>([]);
 
-  const currentSleep = sleepHistory[sleepHistory.length - 1];
+  const fallbackSleep: SleepSession = {
+    date: "No Data",
+    duration: 0,
+    efficiency: 0,
+    deepMinutes: 0,
+    remMinutes: 0,
+    lightMinutes: 0,
+    awakeMinutes: 0,
+    averageHr: 0,
+    stages: [],
+  };
+
+  const currentSleep = sleepHistory[sleepHistory.length - 1] || fallbackSleep;
 
   // Device Simulator States
   const [isPhoneRinging, setIsPhoneRinging] = useState(false);
@@ -360,6 +348,14 @@ export default function SleepCompanionPage() {
 
   // --- Sleep Cycle Coaching Info ---
   const calculateSleepCoaching = () => {
+    if (currentSleep.duration === 0) {
+      return {
+        cyclesCount: "0.0",
+        alignment: "No Data",
+        message: "No sleep sessions recorded yet.",
+        suggestion: "Pair your companion device or sync data manually.",
+      };
+    }
     const totalMins = currentSleep.duration * 60;
     const cyclesCount = (totalMins / 90).toFixed(1);
     const remainder = totalMins % 90;
