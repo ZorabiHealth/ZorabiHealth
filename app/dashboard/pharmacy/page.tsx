@@ -425,6 +425,20 @@ export default function PharmacyPage() {
         setSyncStatus("offline");
       }
 
+      // Pendo Track: refill_order_placed
+      if (typeof window !== 'undefined' && (window as any).pendo) {
+        (window as any).pendo.track('refill_order_placed', {
+          order_id: orderId,
+          tracking_id: trackingId,
+          medication_name: selectedMed.name,
+          dosage: selectedMed.dosage,
+          quantity: parseInt(quantity),
+          vendor_name: selectedVendor.businessName,
+          total_price: totalPrice,
+          estimated_delivery: estimatedDelivery,
+        });
+      }
+
       setPlaceResult({ ok: true, msg: `Order placed! Tracking ID: ${trackingId}` });
 
       // Clean up creation variables
@@ -504,6 +518,17 @@ export default function PharmacyPage() {
   };
 
   const cancelOrder = (orderId: string) => {
+    // Pendo Track: refill_order_cancelled
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      const order = orders.find((o) => o.id === orderId);
+      (window as any).pendo.track('refill_order_cancelled', {
+        order_id: orderId,
+        tracking_id: order?.trackingId || '',
+        medication_name: order?.medicationName || '',
+        previous_status: order?.status || '',
+      });
+    }
+
     updateOrderStatus(orderId, "CANCELLED");
     if (selectedOrder?.id === orderId) {
       setSelectedOrder({
@@ -550,6 +575,17 @@ export default function PharmacyPage() {
     saveToStorage(STORAGE_KEYS.VENDORS, updated);
     setVendorSubmitted(true);
     setVendorForm(BLANK_VENDOR_FORM);
+
+    // Pendo Track: pharmacy_vendor_registered
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('pharmacy_vendor_registered', {
+        vendor_id: vendorId,
+        business_name: newVendor.businessName,
+        license_no: newVendor.licenseNo,
+        pincode: newVendor.pincode,
+        service_radius_km: newVendor.serviceRadiusKm,
+      });
+    }
 
     if (navigator.onLine) {
       try {

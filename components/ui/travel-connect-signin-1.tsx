@@ -274,6 +274,15 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
 
         if (signUpError) throw signUpError;
 
+        // Pendo Track: user_signed_up
+        if (typeof window !== 'undefined' && (window as any).pendo) {
+          (window as any).pendo.track('user_signed_up', {
+            auth_method: 'email_password',
+            has_full_name: Boolean(name),
+            email_domain: email.split('@')[1] || '',
+          });
+        }
+
         setError("Registration successful! Check your email to confirm your account.");
       } else {
         if (authMethod === "magic_link") {
@@ -292,6 +301,13 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
 
           if (otpError) throw otpError;
 
+          // Pendo Track: magic_link_sent
+          if (typeof window !== 'undefined' && (window as any).pendo) {
+            (window as any).pendo.track('magic_link_sent', {
+              email_domain: email.split('@')[1] || '',
+            });
+          }
+
           setIsMagicLinkSent(true);
         } else {
           if (!email || !password) {
@@ -306,6 +322,14 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
           });
 
           if (signInError) throw signInError;
+
+          // Pendo Track: user_signed_in
+          if (typeof window !== 'undefined' && (window as any).pendo) {
+            (window as any).pendo.track('user_signed_in', {
+              auth_method: 'password',
+              email_domain: email.split('@')[1] || '',
+            });
+          }
 
           localStorage.setItem("zh_login_time", new Date().toISOString());
           router.push("/dashboard");

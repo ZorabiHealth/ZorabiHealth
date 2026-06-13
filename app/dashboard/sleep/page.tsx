@@ -403,6 +403,17 @@ export default function SleepCompanionPage() {
       if (error) throw error;
       if (data && data[0]) {
         fetchRealData(userId);
+
+        // Pendo Track: sleep_alarm_created
+        if (typeof window !== 'undefined' && (window as any).pendo) {
+          (window as any).pendo.track('sleep_alarm_created', {
+            alarm_time: newAlarmTime,
+            alarm_label: newAlarmLabel,
+            smart_wake_enabled: newAlarmSmart,
+            sound_type: newAlarmSound,
+          });
+        }
+
         triggerToast(`Alarm "${newAlarmLabel}" synced to mobile at ${newAlarmTime}`);
         setShowAddForm(false);
       }
@@ -426,6 +437,14 @@ export default function SleepCompanionPage() {
     try {
       const { error } = await supabase.from("wearable_alarms").delete().eq("id", id);
       if (error) throw error;
+
+      // Pendo Track: sleep_alarm_deleted
+      if (typeof window !== 'undefined' && (window as any).pendo) {
+        (window as any).pendo.track('sleep_alarm_deleted', {
+          alarm_id: id,
+        });
+      }
+
       fetchRealData(userId);
     } catch {
       setAlarms((prev) => prev.filter((a) => a.id !== id));
@@ -555,6 +574,11 @@ export default function SleepCompanionPage() {
   }, [showPairingMode, pairingCode, checkPairingStatus]);
 
   const handleShareWithDoctor = () => {
+    // Pendo Track: sleep_report_shared
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('sleep_report_shared', {});
+    }
+
     triggerToast("Clinician report shared successfully with Dr. Jenkins");
   };
 

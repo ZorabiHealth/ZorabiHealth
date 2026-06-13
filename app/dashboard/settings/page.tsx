@@ -128,6 +128,16 @@ export default function SettingsPage() {
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Pendo Track: settings_saved
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('settings_saved', {
+        hr_alerts_enabled: isHRAlertsOn,
+        spo2_alerts_enabled: isSpO2AlertsOn,
+        daily_reports_enabled: isDailyReportsOn,
+      });
+    }
+
     setShowSuccessToast(true);
     setTimeout(() => {
       setShowSuccessToast(false);
@@ -155,6 +165,13 @@ export default function SettingsPage() {
       if (res.ok && json.code) {
         setPairingCode(json.code);
         setCodeExpiresIn(json.expires_in || 600);
+
+        // Pendo Track: device_pairing_code_generated
+        if (typeof window !== 'undefined' && (window as any).pendo) {
+          (window as any).pendo.track('device_pairing_code_generated', {
+            code_expires_in_seconds: json.expires_in || 600,
+          });
+        }
       }
     } catch (e) {
       console.error("Failed to generate pairing code:", e);
@@ -187,6 +204,14 @@ export default function SettingsPage() {
 
       const json = await res.json();
       if (res.ok && json.notification_id) {
+        // Pendo Track: test_push_notification_sent
+        if (typeof window !== 'undefined' && (window as any).pendo) {
+          (window as any).pendo.track('test_push_notification_sent', {
+            dispatched_count: json.dispatched || 0,
+            success: true,
+          });
+        }
+
         if (json.dispatched > 0) {
           setTestPushResult({ ok: true, msg: `Push sent to ${json.dispatched} device(s)` });
         } else {

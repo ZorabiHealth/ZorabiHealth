@@ -115,9 +115,27 @@ export default function VitalsPage() {
           },
           ...prev,
         ]);
+
+        // Pendo Track: symptom_logged
+        if (typeof window !== 'undefined' && (window as any).pendo) {
+          (window as any).pendo.track('symptom_logged', {
+            symptom_name: data.name,
+            severity: data.severity,
+            has_notes: Boolean(notes),
+          });
+        }
+
         setNotes("");
         if (severity === "Severe") {
           setShowAlertModal(true);
+
+          // Pendo Track: severe_symptom_alert_triggered
+          if (typeof window !== 'undefined' && (window as any).pendo) {
+            (window as any).pendo.track('severe_symptom_alert_triggered', {
+              symptom_name: symptomName,
+              severity: 'Severe',
+            });
+          }
         }
       }
     } catch (err) {
@@ -145,6 +163,13 @@ export default function VitalsPage() {
       const { error } = await supabase.from("symptom_logs").delete().eq("id", id);
       if (error) throw error;
       setLogs((prev) => prev.filter((log) => log.id !== id));
+
+      // Pendo Track: symptom_log_deleted
+      if (typeof window !== 'undefined' && (window as any).pendo) {
+        (window as any).pendo.track('symptom_log_deleted', {
+          log_id: id,
+        });
+      }
     } catch (err) {
       console.error("Failed to delete log from Supabase, removing locally:", err);
       setLogs((prev) => prev.filter((log) => log.id !== id));

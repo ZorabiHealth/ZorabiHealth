@@ -338,6 +338,16 @@ export default function MeditationPage() {
             setCompletedSessions((c) => c + 1);
             if (activeExercise) {
               setCompletedMinutes((m) => m + activeExercise.duration);
+
+              // Pendo Track: meditation_session_completed (prev===1 guard prevents re-fire)
+              if (prev === 1 && typeof window !== 'undefined' && (window as any).pendo) {
+                (window as any).pendo.track('meditation_session_completed', {
+                  exercise_id: activeExercise.id,
+                  exercise_title: activeExercise.title,
+                  exercise_type: activeExercise.type,
+                  duration_minutes: activeExercise.duration,
+                });
+              }
             }
             playPhaseChime(880, "sine", 1.0);
             setActiveExercise(null);
@@ -381,10 +391,33 @@ export default function MeditationPage() {
     setIsPlaying(true);
     setBreathingPhase("inhale");
     playPhaseChime(523.25, "sine", 0.8);
+
+    // Pendo Track: meditation_session_started
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('meditation_session_started', {
+        exercise_id: ex.id,
+        exercise_title: ex.title,
+        exercise_type: ex.type,
+        duration_minutes: ex.duration,
+      });
+    }
   };
 
   const handleStopSession = () => {
     stopAmbientSynth();
+
+    // Pendo Track: meditation_session_stopped
+    if (activeExercise && typeof window !== 'undefined' && (window as any).pendo) {
+      const elapsedMins = Math.floor((activeExercise.duration * 60 - timeLeft) / 60);
+      (window as any).pendo.track('meditation_session_stopped', {
+        exercise_id: activeExercise.id,
+        exercise_title: activeExercise.title,
+        exercise_type: activeExercise.type,
+        duration_minutes: activeExercise.duration,
+        elapsed_minutes: elapsedMins,
+      });
+    }
+
     if (activeExercise && timeLeft < activeExercise.duration * 60 - 30) {
       const minsCompleted = Math.floor((activeExercise.duration * 60 - timeLeft) / 60);
       if (minsCompleted > 0) {

@@ -318,6 +318,32 @@ export default function MedicationsPage() {
     setMeds(updated);
     saveToStorage(STORAGE_KEYS.MEDICATIONS, updated);
 
+    // Pendo Track: medication_added or medication_updated
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      if (editingMed) {
+        (window as any).pendo.track('medication_updated', {
+          medication_id: newMed.id,
+          medication_name: newMed.name,
+          dosage: newMed.dosage,
+          category: newMed.category,
+          frequency: newMed.frequency,
+          has_phone_alerts: Boolean(newMed.phoneForAlerts),
+          has_emergency_contact: Boolean(newMed.emergencyContact),
+        });
+      } else {
+        (window as any).pendo.track('medication_added', {
+          medication_name: newMed.name,
+          dosage: newMed.dosage,
+          category: newMed.category,
+          frequency: newMed.frequency,
+          scheduled_times_count: times.length,
+          current_stock: newMed.currentStock,
+          has_phone_alerts: Boolean(newMed.phoneForAlerts),
+          has_emergency_contact: Boolean(newMed.emergencyContact),
+        });
+      }
+    }
+
     // Save to Database
     const dbPayload = {
       id: newMed.id,
@@ -366,6 +392,13 @@ export default function MedicationsPage() {
     saveToStorage(STORAGE_KEYS.MEDICATIONS, updated);
     setShowDeleteConfirm(null);
 
+    // Pendo Track: medication_deleted
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('medication_deleted', {
+        medication_id: id,
+      });
+    }
+
     // Database deletion (mark active = false in soft delete style or hard delete)
     if (navigator.onLine) {
       try {
@@ -408,6 +441,16 @@ export default function MedicationsPage() {
     );
     setMeds(updatedMeds);
     saveToStorage(STORAGE_KEYS.MEDICATIONS, updatedMeds);
+
+    // Pendo Track: medication_dose_logged
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('medication_dose_logged', {
+        medication_id: med.id,
+        medication_name: med.name,
+        dosage: med.dosage,
+        remaining_stock: updatedStock,
+      });
+    }
 
     // Save Log & Decrement Stock in Supabase
     const dbLogPayload = {
@@ -470,6 +513,15 @@ export default function MedicationsPage() {
       });
 
       if (error) throw error;
+
+      // Pendo Track: medication_test_alarm_triggered
+      if (typeof window !== 'undefined' && (window as any).pendo) {
+        (window as any).pendo.track('medication_test_alarm_triggered', {
+          medication_id: med.id,
+          medication_name: med.name,
+          success: true,
+        });
+      }
 
       setSmsResult({
         id: med.id,

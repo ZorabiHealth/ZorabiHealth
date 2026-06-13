@@ -131,6 +131,18 @@ export default function DashboardOverview() {
 
       // Filter local state
       setMissedMeds((prev) => prev.filter((m) => !(m.id === med.id && m.time === med.time)));
+
+      // Pendo Track: missed_medication_taken
+      if (typeof window !== 'undefined' && (window as any).pendo) {
+        (window as any).pendo.track('missed_medication_taken', {
+          medication_id: med.id,
+          medication_name: med.name,
+          dosage: med.dosage,
+          scheduled_time: med.time,
+          current_stock: newStock,
+        });
+      }
+
       alert(`Dose logged successfully for ${med.name}!`);
     } catch (e) {
       console.error(e);
@@ -324,6 +336,14 @@ export default function DashboardOverview() {
       } else {
         setSearchResults([]);
       }
+
+      // Pendo Track: music_search_executed
+      if (typeof window !== 'undefined' && (window as any).pendo) {
+        (window as any).pendo.track('music_search_executed', {
+          search_query: query.substring(0, 100),
+          results_count: data.data?.results?.length || 0,
+        });
+      }
     } catch (e) {
       console.error("Failed to search song from JioSaavn proxy:", e);
       setSearchResults([]);
@@ -343,6 +363,15 @@ export default function DashboardOverview() {
     setCurrentSong({ name, artist, image, audioUrl, duration });
     setIsPlaying(true);
     setShowSearch(false);
+
+    // Pendo Track: music_song_selected
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('music_song_selected', {
+        song_name: name.substring(0, 100),
+        artist_name: artist.substring(0, 100),
+        duration_seconds: duration,
+      });
+    }
     setSearchResults([]);
     setSearchQuery("");
   };
@@ -359,6 +388,15 @@ export default function DashboardOverview() {
     if (!isNaN(parsedSpO2) && parsedSpO2 > 50 && parsedSpO2 <= 100) {
       setSpO2(parsedSpO2);
     }
+
+    // Pendo Track: vitals_submitted
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('vitals_submitted', {
+        heart_rate_bpm: parsedHR,
+        spo2_percent: parsedSpO2,
+      });
+    }
+
     setIsVitalsModalOpen(false);
   };
 

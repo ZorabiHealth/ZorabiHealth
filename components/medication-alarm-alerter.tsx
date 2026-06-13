@@ -284,6 +284,17 @@ export function MedicationAlarmAlerter() {
     if (!session?.user?.id) return;
     stopAlarmSound();
 
+    // Pendo Track: medication_alarm_taken
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('medication_alarm_taken', {
+        medication_id: alarm.med.id,
+        medication_name: alarm.med.name,
+        dosage: alarm.med.dosage,
+        scheduled_time: alarm.time,
+        remaining_stock: Math.max(0, alarm.med.current_stock - 1),
+      });
+    }
+
     const now = new Date();
     const [hours, minutes] = alarm.time.split(":").map(Number);
     const scheduledTime = new Date();
@@ -371,6 +382,17 @@ export function MedicationAlarmAlerter() {
     const scheduledTime = new Date();
     scheduledTime.setHours(hours, minutes, 0, 0);
     const snoozeUntil = new Date(new Date().getTime() + 10 * 60 * 1000).toISOString();
+
+    // Pendo Track: medication_alarm_snoozed
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('medication_alarm_snoozed', {
+        medication_id: alarm.med.id,
+        medication_name: alarm.med.name,
+        dosage: alarm.med.dosage,
+        scheduled_time: alarm.time,
+        snooze_until: snoozeUntil,
+      });
+    }
 
     const updateLocal = () => {
       const schedule = loadAlarmSchedule();

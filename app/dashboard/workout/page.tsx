@@ -300,6 +300,16 @@ export default function WorkoutDashboardPage() {
       completed: false,
     };
     setSchedule((prev) => [...prev, newItem]);
+
+    // Pendo Track: workout_schedule_added
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('workout_schedule_added', {
+        title: newScheduleTitle,
+        time: newScheduleTime,
+        date: selectedDate,
+      });
+    }
+
     setNewScheduleTitle("");
     const res = await apiFetch(`/api/workouts/schedule`, {
       method: "POST",
@@ -331,6 +341,18 @@ export default function WorkoutDashboardPage() {
       time: "Today",
     };
     setNutrition((prev) => [newEntry, ...prev]);
+
+    // Pendo Track: meal_logged
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('meal_logged', {
+        meal_name: newMealName.substring(0, 100),
+        calories: cal,
+        protein_g: parseInt(newMealProtein) || 0,
+        carbs_g: parseInt(newMealCarbs) || 0,
+        fat_g: parseInt(newMealFat) || 0,
+      });
+    }
+
     setNewMealName("");
     setNewMealCalories("");
     const res = await apiFetch(`/api/workouts/nutrition`, {
@@ -352,6 +374,14 @@ export default function WorkoutDashboardPage() {
 
   const handleDeleteMeal = async (id: string) => {
     setNutrition((prev) => prev.filter((n) => n.id !== id));
+
+    // Pendo Track: meal_deleted
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('meal_deleted', {
+        meal_id: id,
+      });
+    }
+
     await apiFetch(`/api/workouts/nutrition?id=${id}`, { method: "DELETE" }).catch(() =>
       fetchAllData()
     );
@@ -370,6 +400,13 @@ export default function WorkoutDashboardPage() {
         ? `${res.emoji} ${res.title} — ${res.description}`
         : "Try a 20-min HIIT or focus session today!";
       setChatMessages((prev) => [...prev, { sender: "ai", text }]);
+
+      // Pendo Track: ai_workout_suggestion_requested
+      if (typeof window !== 'undefined' && (window as any).pendo) {
+        (window as any).pendo.track('ai_workout_suggestion_requested', {
+          response_title: res.title || '',
+        });
+      }
     } catch {
       setChatMessages((prev) => [
         ...prev,
@@ -392,15 +429,18 @@ export default function WorkoutDashboardPage() {
         method: "POST",
         body: JSON.stringify({ message: userMsg }),
       });
-      setChatMessages((prev) => [
-        ...prev,
-        {
-          sender: "ai",
-          text: res.title
-            ? `${res.emoji} ${res.title}: ${res.description}`
-            : "Try a 20-min HIIT or focus session today!",
-        },
-      ]);
+      const aiText = res.title
+        ? `${res.emoji} ${res.title}: ${res.description}`
+        : "Try a 20-min HIIT or focus session today!";
+      setChatMessages((prev) => [...prev, { sender: "ai", text: aiText }]);
+
+      // Pendo Track: ai_chat_message_sent
+      if (typeof window !== 'undefined' && (window as any).pendo) {
+        (window as any).pendo.track('ai_chat_message_sent', {
+          user_message: userMsg.substring(0, 200),
+          ai_response: aiText.substring(0, 200),
+        });
+      }
     } catch {
       let reply =
         "Based on your profile, I suggest a moderate 20-min cardio or focus session today.";
@@ -428,7 +468,17 @@ export default function WorkoutDashboardPage() {
         method: "POST",
         body: JSON.stringify({ symptoms, medications: [] }),
       });
-      setMealSuggestions(res.suggestions || []);
+      const suggestions = res.suggestions || [];
+      setMealSuggestions(suggestions);
+
+      // Pendo Track: ai_meal_suggestions_requested
+      if (typeof window !== 'undefined' && (window as any).pendo) {
+        (window as any).pendo.track('ai_meal_suggestions_requested', {
+          symptoms: symptoms.join(','),
+          symptoms_count: symptoms.length,
+          suggestions_count: suggestions.length,
+        });
+      }
     } catch {
       setMealSuggestions([]);
     } finally {
@@ -441,6 +491,14 @@ export default function WorkoutDashboardPage() {
     setSessionTimer(minutes * 60);
     setSessionActive(true);
     setSessionPaused(false);
+
+    // Pendo Track: workout_session_started
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('workout_session_started', {
+        session_duration_minutes: minutes,
+      });
+    }
+
     if (sessionIntervalRef.current) clearInterval(sessionIntervalRef.current);
     sessionIntervalRef.current = setInterval(() => {
       setSessionTimer((prev) => {
@@ -478,8 +536,18 @@ export default function WorkoutDashboardPage() {
       clearInterval(sessionIntervalRef.current);
       sessionIntervalRef.current = null;
     }
+    const wasCompletedEarly = sessionTimer > 1;
     setSessionActive(false);
     setSessionTimer(0);
+
+    // Pendo Track: workout_session_completed
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('workout_session_completed', {
+        session_duration_minutes: sessionMinutes,
+        completed_early: wasCompletedEarly,
+      });
+    }
+
     const now = new Date();
     const timeStr = now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
     await apiFetch("/api/workouts/schedule", {

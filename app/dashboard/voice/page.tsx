@@ -535,6 +535,15 @@ export default function VoiceAgentPage() {
       wsRef.current = ws;
       ws.onopen = () => {
         setStatus("listening");
+
+        // Pendo Track: voice_session_started
+        if (typeof window !== 'undefined' && (window as any).pendo) {
+          (window as any).pendo.track('voice_session_started', {
+            stt_model: 'nova-3',
+            mic_allowed: true,
+          });
+        }
+
         const recorder = new MediaRecorder(stream, { mimeType: "audio/webm;codecs=opus" });
         mediaRecorderRef.current = recorder;
         audioBlobsRef.current = [];
@@ -593,6 +602,17 @@ export default function VoiceAgentPage() {
                 setStatus("listening");
                 return;
               }
+
+              // Pendo Track: voice_command_processed
+              if (typeof window !== 'undefined' && (window as any).pendo) {
+                (window as any).pendo.track('voice_command_processed', {
+                  intent,
+                  transcript_text: transcript.substring(0, 200),
+                  response_text: response.substring(0, 200),
+                  input_method: 'voice',
+                });
+              }
+
               addMessage({
                 sender: "assistant",
                 text: response,
@@ -693,6 +713,16 @@ export default function VoiceAgentPage() {
 
     await addMessage({ sender: "user", text }).catch(() => {});
     await addMessage({ sender: "assistant", text: response, intent }).catch(() => {});
+
+    // Pendo Track: voice_text_command_submitted
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('voice_text_command_submitted', {
+        intent,
+        input_text: text.substring(0, 200),
+        response_text: response.substring(0, 200),
+      });
+    }
+
     if (!isMuted) speakText(response, () => setStatus("idle"));
     else setStatus("idle");
   };
@@ -711,6 +741,14 @@ export default function VoiceAgentPage() {
     a.download = `clinical-voice-session-${Date.now()}.txt`;
     a.click();
     URL.revokeObjectURL(url);
+
+    // Pendo Track: voice_session_exported
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('voice_session_exported', {
+        message_count: messages.length,
+        file_name: a.download,
+      });
+    }
   };
 
   const clearSession = async () => {

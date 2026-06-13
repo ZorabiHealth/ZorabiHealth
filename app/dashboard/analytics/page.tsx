@@ -50,6 +50,16 @@ export default function AnalyticsPage() {
 
     setReadings((prev) => [...prev, newReading]);
 
+    // Pendo Track: analytics_reading_logged
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('analytics_reading_logged', {
+        date_label: inputDate,
+        heart_rate_bpm: hrVal,
+        spo2_percent: spo2Val,
+        sleep_hours: sleepVal,
+      });
+    }
+
     // Increment date automatically for next entry
     const dayMatch = inputDate.match(/\d+/);
     if (dayMatch) {
