@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useRef, useEffect, useState } from "react";
-import { Eye, EyeOff, ArrowRight, HeartPulse, ShieldCheck, Mail, Lock, User } from "lucide-react";
+import Image from "next/image";
+import { Eye, EyeOff, ArrowRight, ShieldCheck, Mail, Lock, User } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -47,12 +48,6 @@ const Input = ({ className = "", ...props }: InputProps) => {
       {...props}
     />
   );
-};
-
-type RoutePoint = {
-  x: number;
-  y: number;
-  delay: number;
 };
 
 const DotHeart = () => {
@@ -152,7 +147,7 @@ const DotHeart = () => {
       });
     }
 
-    function drawPulse(points: { x: number; y: number }[], progress: number, color: string) {
+    function drawPulse(points: { x: number; y: number }[], progress: number) {
       if (!ctx || points.length < 2 || progress <= 0) return;
 
       const totalSegments = points.length - 1;
@@ -208,7 +203,7 @@ const DotHeart = () => {
         ctx.lineWidth = 2;
         ctx.lineCap = "round";
         ctx.lineJoin = "round";
-        drawPulse(route.points, progress, route.color);
+        drawPulse(route.points, progress);
       });
 
       animationFrameId = requestAnimationFrame(animate);
@@ -279,6 +274,15 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
 
         if (signUpError) throw signUpError;
 
+        // Pendo Track: user_signed_up
+        if (typeof window !== 'undefined' && (window as any).pendo) {
+          (window as any).pendo.track('user_signed_up', {
+            auth_method: 'email_password',
+            has_full_name: Boolean(name),
+            email_domain: email.split('@')[1] || '',
+          });
+        }
+
         setError("Registration successful! Check your email to confirm your account.");
       } else {
         if (authMethod === "magic_link") {
@@ -297,6 +301,13 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
 
           if (otpError) throw otpError;
 
+          // Pendo Track: magic_link_sent
+          if (typeof window !== 'undefined' && (window as any).pendo) {
+            (window as any).pendo.track('magic_link_sent', {
+              email_domain: email.split('@')[1] || '',
+            });
+          }
+
           setIsMagicLinkSent(true);
         } else {
           if (!email || !password) {
@@ -312,6 +323,15 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
 
           if (signInError) throw signInError;
 
+          // Pendo Track: user_signed_in
+          if (typeof window !== 'undefined' && (window as any).pendo) {
+            (window as any).pendo.track('user_signed_in', {
+              auth_method: 'password',
+              email_domain: email.split('@')[1] || '',
+            });
+          }
+
+          localStorage.setItem("zh_login_time", new Date().toISOString());
           router.push("/dashboard");
         }
       }
@@ -342,10 +362,14 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
                 className="flex items-center gap-2 cursor-pointer self-start"
                 onClick={() => router.push("/")}
               >
-                <div className="h-9 w-9 rounded-xl bg-brand-500 flex items-center justify-center shadow-md shadow-brand-500/10">
-                  <HeartPulse className="text-white h-5 w-5" />
-                </div>
-                <span className="text-xl font-black text-slate-800">zorabihealth</span>
+                <Image
+                  src="/logo/image/logo.png"
+                  alt="ZorabiHealth"
+                  width={140}
+                  height={40}
+                  className="object-contain"
+                  unoptimized
+                />
               </div>
 
               <div className="flex flex-col items-center text-center">

@@ -63,7 +63,7 @@ export interface MedicationLog {
   status: LogStatus;
   dose: string;
   note?: string;
-  alertSent: boolean; // whether Vonage SMS was sent
+  alertSent: boolean;
   snoozedUntil?: string; // ISO timestamp if snoozed
 }
 
@@ -197,6 +197,202 @@ export const FREQUENCY_LABELS: Record<FrequencyType, string> = {
   weekly: "Weekly",
   as_needed: "As needed",
 };
+
+// ─────────────────────────────────────────────────────────────
+// WORK-004 — Clinical Meal Suggestion Engine
+// Extensions for macro nutrition models and symptom-based suggestions
+// Cross-team: Developer C — if Lisinopril (Blood Pressure) is active,
+//             auto-append strict low-sodium diet advice.
+// Cross-team: Developer D — symptomStates from vitals dashboard
+//             can be passed in as SymptomClassification[].
+// ─────────────────────────────────────────────────────────────
+
+export type SymptomClassification =
+  | "fatigue"
+  | "hypertension"
+  | "hyperglycemia"
+  | "high_cholesterol"
+  | "inflammation"
+  | "muscle_soreness"
+  | "dehydration"
+  | "low_energy"
+  | "digestive_issues"
+  | "anxiety";
+
+export interface MealSuggestion {
+  id: string;
+  title: string;
+  description: string;
+  foods: string[];
+  avoid: string[];
+  severity: "info" | "warning" | "critical";
+  triggerSymptoms: SymptomClassification[];
+  medicationTrigger?: string; // medication name that triggered this rule
+}
+
+// Symptom-to-suggestion rule map
+const SYMPTOM_RULES: Record<
+  SymptomClassification,
+  Omit<MealSuggestion, "id" | "triggerSymptoms">
+> = {
+  fatigue: {
+    title: "Energy Recovery Nutrition",
+    description: "Your fatigue levels suggest a need for slow-release energy and iron-rich foods.",
+    foods: ["Oatmeal", "Spinach", "Lentils", "Bananas", "Brown rice", "Eggs"],
+    avoid: ["Refined sugar", "Processed snacks", "Excessive caffeine"],
+    severity: "info",
+  },
+  hypertension: {
+    title: "Low-Sodium Protocol",
+    description: "Elevated blood pressure detected. Strict sodium restriction is recommended.",
+    foods: ["Leafy greens", "Berries", "Oats", "Garlic", "Olive oil", "Potassium-rich fruits"],
+    avoid: ["Table salt", "Canned soups", "Processed meats", "Fast food", "Pickled foods"],
+    severity: "warning",
+  },
+  hyperglycemia: {
+    title: "Glycemic Control Diet",
+    description: "Blood sugar is elevated. Prioritise low-GI foods and fibre-rich meals.",
+    foods: ["Vegetables", "Legumes", "Whole grains", "Nuts", "Greek yogurt", "Cinnamon"],
+    avoid: ["White bread", "Sugary drinks", "Pastries", "White rice", "Candy"],
+    severity: "warning",
+  },
+  high_cholesterol: {
+    title: "Cardio-Protective Nutrition",
+    description: "Elevated cholesterol levels detected. Focus on heart-healthy fats and fibre.",
+    foods: ["Oats", "Almonds", "Avocado", "Salmon", "Flaxseeds", "Olive oil"],
+    avoid: ["Trans fats", "Fried foods", "Full-fat dairy", "Red meat", "Butter"],
+    severity: "warning",
+  },
+  inflammation: {
+    title: "Anti-Inflammatory Protocol",
+    description: "Signs of inflammation present. Increase omega-3 and antioxidant intake.",
+    foods: ["Turmeric", "Ginger", "Blueberries", "Salmon", "Walnuts", "Broccoli"],
+    avoid: ["Refined carbs", "Margarine", "Alcohol", "Vegetable oils", "Processed meat"],
+    severity: "info",
+  },
+  muscle_soreness: {
+    title: "Muscle Recovery Nutrition",
+    description:
+      "Muscle soreness detected. Protein intake and anti-inflammatory foods are priority.",
+    foods: ["Chicken breast", "Cottage cheese", "Tart cherry juice", "Sweet potato", "Eggs"],
+    avoid: ["Alcohol", "High-sugar foods", "Excessive sodium"],
+    severity: "info",
+  },
+  dehydration: {
+    title: "Hydration & Electrolyte Balance",
+    description: "Low hydration levels detected. Increase water and electrolyte-rich food intake.",
+    foods: ["Water", "Cucumber", "Watermelon", "Coconut water", "Celery", "Oranges"],
+    avoid: ["Caffeinated beverages", "Alcohol", "High-sodium snacks"],
+    severity: "warning",
+  },
+  low_energy: {
+    title: "Pre-Workout Energy Boost",
+    description:
+      "Low energy levels. Optimise your carbohydrate and B-vitamin intake before workouts.",
+    foods: ["Banana", "Oats", "Peanut butter", "Whole grain toast", "Dates", "Greek yogurt"],
+    avoid: ["Heavy fatty meals", "High-fibre foods before exercise", "Alcohol"],
+    severity: "info",
+  },
+  digestive_issues: {
+    title: "Gut-Friendly Nutrition",
+    description: "Digestive discomfort logged. Switch to easily digestible, probiotic-rich foods.",
+    foods: ["Yogurt", "Ginger tea", "Bananas", "Rice", "Boiled chicken", "Cooked vegetables"],
+    avoid: ["Raw cruciferous vegetables", "Legumes", "Spicy food", "Dairy", "Caffeine"],
+    severity: "info",
+  },
+  anxiety: {
+    title: "Neuro-Calming Diet",
+    description:
+      "Elevated stress or anxiety markers. Magnesium and omega-3 rich foods are recommended.",
+    foods: ["Dark chocolate", "Chamomile tea", "Almonds", "Salmon", "Blueberries", "Avocado"],
+    avoid: ["Caffeine", "Alcohol", "Refined sugar", "Energy drinks"],
+    severity: "info",
+  },
+};
+
+// Medication-triggered diet rules (cross-team with Developer C)
+const MEDICATION_DIET_RULES: Partial<Record<MedicationCategory, MealSuggestion>> = {
+  "Blood Pressure": {
+    id: "med-rule-bp",
+    title: "Low-Sodium Required — Lisinopril Active",
+    description:
+      "You are currently prescribed a Blood Pressure medication (e.g. Lisinopril). A strict low-sodium diet is clinically required to maximise treatment effectiveness.",
+    foods: ["Fresh vegetables", "Unsalted nuts", "Fruits", "Herbs and spices", "Unsalted grains"],
+    avoid: [
+      "Table salt",
+      "Processed meats",
+      "Canned goods",
+      "Fast food",
+      "Cheese",
+      "Soy sauce",
+      "Pickled foods",
+    ],
+    severity: "critical",
+    triggerSymptoms: [],
+    medicationTrigger: "Lisinopril / Blood Pressure medication",
+  },
+  Diabetes: {
+    id: "med-rule-diabetes",
+    title: "Glycemic Management — Metformin Active",
+    description:
+      "Metformin is active in your regimen. Consistent low-GI meals are required to avoid hypoglycemic episodes.",
+    foods: ["Legumes", "Non-starchy vegetables", "Whole grains", "Lean proteins", "Berries"],
+    avoid: ["Sugary drinks", "White rice", "White bread", "Pastries", "Fruit juice"],
+    severity: "warning",
+    triggerSymptoms: [],
+    medicationTrigger: "Metformin / Diabetes medication",
+  },
+};
+
+/**
+ * WORK-004 — getSuggestionsBasedOnSymptoms
+ *
+ * Parses symptom classifications and active medications,
+ * returns a ranked list of MealSuggestion objects.
+ *
+ * @param symptoms        Array of SymptomClassification (from vitals dashboard or local input)
+ * @param activeMedications  Active medications (cross-reference with Developer C's data)
+ * @returns               Sorted MealSuggestion[] — critical first, then warning, then info
+ */
+export function getSuggestionsBasedOnSymptoms(
+  symptoms: SymptomClassification[],
+  activeMedications: Medication[] = []
+): MealSuggestion[] {
+  const suggestions: MealSuggestion[] = [];
+
+  // 1. Symptom-driven suggestions
+  const seen = new Set<SymptomClassification>();
+  for (const symptom of symptoms) {
+    if (seen.has(symptom)) continue;
+    seen.add(symptom);
+    const rule = SYMPTOM_RULES[symptom];
+    if (rule) {
+      suggestions.push({
+        id: `sym-${symptom}`,
+        triggerSymptoms: [symptom],
+        ...rule,
+      });
+    }
+  }
+
+  // 2. Medication-triggered rules (cross-team Developer C integration)
+  const activeCategories = new Set(
+    activeMedications.filter((m) => m.isActive).map((m) => m.category)
+  );
+  for (const [category, rule] of Object.entries(MEDICATION_DIET_RULES)) {
+    if (activeCategories.has(category as MedicationCategory) && rule) {
+      // Avoid duplicate if already added via symptom
+      const alreadyPresent = suggestions.some((s) => s.id === rule.id);
+      if (!alreadyPresent) {
+        suggestions.push(rule);
+      }
+    }
+  }
+
+  // 3. Sort: critical → warning → info
+  const severityOrder = { critical: 0, warning: 1, info: 2 };
+  return suggestions.sort((a, b) => severityOrder[a.severity] - severityOrder[b.severity]);
+}
 
 // ─── Seed Demo Medications ────────────────────────────────────
 export const DEMO_MEDICATIONS: Medication[] = [

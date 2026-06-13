@@ -30,7 +30,10 @@ export interface SyncItem {
     | "vendors"
     | "refill_orders"
     | "refill_order_events"
-    | "voice_messages";
+    | "voice_messages"
+    | "workouts"
+    | "workout_schedule"
+    | "nutrition_logs";
   action: "insert" | "update" | "delete";
   payload: Record<string, unknown>;
   timestamp: string;
@@ -48,7 +51,6 @@ export function queueSyncItem(item: Omit<SyncItem, "id" | "timestamp">) {
     };
     queue.push(newItem);
     localStorage.setItem("zh_sync_queue", JSON.stringify(queue));
-    console.log(`[Sync Queue] Queued ${item.action} on ${item.table}`, newItem);
   } catch (e) {
     console.error("[Sync Queue] Failed to queue sync item:", e);
   }
@@ -62,7 +64,6 @@ export async function drainSyncQueue(): Promise<void> {
     const queue: SyncItem[] = JSON.parse(raw);
     if (queue.length === 0) return;
 
-    console.log(`[Sync Queue] Draining ${queue.length} item(s)...`);
     const remaining: SyncItem[] = [];
 
     for (const item of queue) {
@@ -76,9 +77,6 @@ export async function drainSyncQueue(): Promise<void> {
           error = err;
         }
         if (error) throw error;
-        console.log(
-          `[Sync Queue] Success: ${item.action} on ${item.table} (ID: ${item.payload.id ?? "unknown"})`
-        );
       } catch (e) {
         console.error(`[Sync Queue] Failed item ${item.id}:`, e);
         remaining.push(item); // Keep in queue to retry later
@@ -94,7 +92,6 @@ export async function drainSyncQueue(): Promise<void> {
 // ─── Online Listener ─────────────────────────────────────────
 if (typeof window !== "undefined") {
   window.addEventListener("online", () => {
-    console.log("[Sync Status] Connection restored. Synchronizing offline queue...");
     drainSyncQueue();
   });
 }

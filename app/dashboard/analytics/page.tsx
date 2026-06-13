@@ -1,17 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import {
-  LineChart,
-  TrendingUp,
-  Plus,
-  HeartPulse,
-  Activity,
-  Calendar,
-  Layers,
-  Sparkles,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { Plus, HeartPulse } from "lucide-react";
 import { Input } from "@/components/ui/input";
 
 interface Reading {
@@ -59,6 +49,16 @@ export default function AnalyticsPage() {
     };
 
     setReadings((prev) => [...prev, newReading]);
+
+    // Pendo Track: analytics_reading_logged
+    if (typeof window !== 'undefined' && (window as any).pendo) {
+      (window as any).pendo.track('analytics_reading_logged', {
+        date_label: inputDate,
+        heart_rate_bpm: hrVal,
+        spo2_percent: spo2Val,
+        sleep_hours: sleepVal,
+      });
+    }
 
     // Increment date automatically for next entry
     const dayMatch = inputDate.match(/\d+/);
@@ -138,12 +138,6 @@ export default function AnalyticsPage() {
     hr: "Heart Rate Pulse History",
     spo2: "Oxygen Saturation (SpO2) Levels",
     sleep: "Outpatient Sleep Quality Telemetry",
-  };
-
-  const metricColors = {
-    hr: "stroke-brand-500 fill-brand-500/10",
-    spo2: "stroke-sky-500 fill-sky-500/10",
-    sleep: "stroke-indigo-500 fill-indigo-500/10",
   };
 
   return (

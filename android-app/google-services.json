@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "835237450296",
+    "project_id": "zorabihealth",
+    "storage_bucket": "zorabihealth.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:835237450296:android:72815d47d74015ad7fcccd",
+        "android_client_info": {
+          "package_name": "com.zorabihealth.zorabihealth"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA9DXi2NzVwO-wIVf91E_WcgiqLPuDnVkI"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
