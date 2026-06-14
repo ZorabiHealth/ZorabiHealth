@@ -993,13 +993,13 @@ export default function MedicationsPage() {
               </h3>
               <div>
                 <label className="text-xs font-bold text-slate-600 mb-1.5 block">
-                  Alert Phone Number / Telegram ID{" "}
+                  Alert Phone Number{" "}
                   <span className="font-normal text-slate-400">
-                    (E.164 phone e.g. +91xxxxxxxxxx, or telegram:123456789)
+                    (E.164 phone e.g. +91xxxxxxxxxx)
                   </span>
                 </label>
                 <Input
-                  placeholder="+919876543210 or telegram:123456789"
+                  placeholder="+919876543210"
                   value={form.phoneForAlerts}
                   onChange={(e) => setForm({ ...form, phoneForAlerts: e.target.value })}
                   className={`rounded-xl bg-white ${phoneError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
@@ -1025,10 +1025,10 @@ export default function MedicationsPage() {
                 <div>
                   <label className="text-xs font-bold text-slate-600 mb-1.5 block">
                     Emergency Contact Alerts{" "}
-                    <span className="font-normal text-slate-400">(Phone or telegram:CHAT_ID)</span>
+                    <span className="font-normal text-slate-400">(Phone number)</span>
                   </label>
                   <Input
-                    placeholder="+919876543210 or telegram:12345678"
+                    placeholder="+919876543210"
                     value={form.emergencyPhone}
                     onChange={(e) => setForm({ ...form, emergencyPhone: e.target.value })}
                     className={`rounded-xl bg-white ${emergencyPhoneError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
@@ -1156,8 +1156,8 @@ export default function MedicationsPage() {
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100">
             <h3 className="font-black text-slate-800 text-lg mb-2">Remove Medication?</h3>
             <p className="text-sm text-slate-500 leading-relaxed mb-5">
-              This action will delete this medication schedule and stop all associated Vonage SMS
-              alerts. Historic logs remain intact.
+              This action will delete this medication schedule and stop all associated SMS alerts.
+              Historic logs remain intact.
             </p>
             <div className="flex gap-3">
               <Button

@@ -48,27 +48,11 @@ export function cleanAndValidatePhone(phone: string): {
   if (!phone || phone.trim() === "") {
     return {
       isValid: false,
-      error: "Phone number or Telegram ID is required",
+      error: "Phone number is required",
     };
   }
 
   const trimmed = phone.trim();
-
-  // Check if it's a Telegram ID setting
-  if (trimmed.toLowerCase().startsWith("telegram:") || trimmed.toLowerCase().startsWith("tg:")) {
-    const parts = trimmed.split(":");
-    const idVal = parts[1]?.trim();
-    if (!idVal || !/^-?\d+$/.test(idVal)) {
-      return {
-        isValid: false,
-        error: "Invalid Telegram ID. Format: telegram:123456789",
-      };
-    }
-    return {
-      isValid: true,
-      cleanedPhone: `telegram:${idVal}`,
-    };
-  }
 
   // Enlever espaces, tirets, parenthèses, etc.
   const cleaned = trimmed.replace(/[\s\-\(\)]/g, "");
@@ -77,8 +61,7 @@ export function cleanAndValidatePhone(phone: string): {
   if (!cleaned.startsWith("+")) {
     return {
       isValid: false,
-      error:
-        "Phone must start with + (e.g., +33612345678) or use Telegram format (telegram:1234567)",
+      error: "Phone must start with + (e.g., +33612345678)",
     };
   }
 
