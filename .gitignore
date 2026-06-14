@@ -1,6 +1,6 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# Dependencies
 /node_modules
 /.pnp
 .pnp.*
@@ -9,36 +9,59 @@
 !.yarn/plugins
 !.yarn/releases
 !.yarn/versions
+.zoraipharm/
 
-# testing
+# Testing
 /coverage
+coverage/
 
-# next.js
+# Next.js
 /.next/
 /out/
 
-# production
+# Production
 /build
+dist/
+build/
 
-# misc
+# Misc
 .DS_Store
 *.pem
+Thumbs.db
 
-# debug
+# Debug
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
+*.log
 
-# env files (can opt-in for committing if needed)
+# Environment (.env* already covers .env.local, .env.*.local)
 .env*
+!.env.example
 
-# vercel
+# Vercel
 .vercel
 
-# typescript
+# TypeScript
 *.tsbuildinfo
 next-env.d.ts
 
-# firebase / service account secrets
+# Firebase / service account secrets
 *firebase-adminsdk*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Mobile native builds
+zorabihealth-mobile/android/app/build/
+zorabihealth-mobile/ios/Pods/
+zorabihealth-mobile/.expo/
+zorabihealth-mobile/expo-env.*
+
+# Supabase
+supabase/.temp/
