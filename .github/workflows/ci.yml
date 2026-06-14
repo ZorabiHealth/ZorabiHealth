@@ -29,11 +29,17 @@ jobs:
             npm install
           fi
 
+      - name: Run Code Formatter Check
+        run: npx prettier --check .
+
       - name: Run ESLint Checks
         run: npm run lint
 
       - name: Run TypeScript Compiler Check
         run: npm run typecheck
+
+      - name: Run Automated Unit Tests
+        run: npm run test
 
       - name: Verify Next.js Production Build
         run: npm run build

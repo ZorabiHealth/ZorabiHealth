@@ -4,21 +4,41 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  Book,
-  Zap,
-  LayoutDashboard,
-  LineChart,
   Activity,
-  Leaf,
+  ArrowRight,
+  BookOpen,
+  Brain,
+  Calendar,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardList,
   Dumbbell,
-  Settings,
-  Sparkles,
+  FileCode,
+  FileText,
+  FlaskConical,
+  FolderHeart,
+  HeartPulse,
+  LayoutDashboard,
+  Leaf,
+  LineChart,
+  Microscope,
+  Pill,
   Play,
   Pause,
-  Check,
+  Quote,
+  Settings,
   Shield,
+  ShoppingBasket,
   Smartphone,
-  CheckCircle2,
+  Sparkles,
+  Star,
+  Stethoscope,
+  TrendingUp,
+  Upload,
+  Users,
+  Video,
+  Zap,
 } from "lucide-react";
 import { Navbar1 } from "@/components/shadcnblocks-com-navbar1";
 import TestimonialSlider from "@/components/testimonial-slider";
@@ -33,14 +53,12 @@ const demoData = {
     title: "ZorabiHealth",
   },
   menu: [
-    {
-      title: "Home",
-      url: "/",
-    },
+    { title: "Home", url: "/" },
     {
       title: "Products",
       url: "#",
       items: [
+        { title: "Products", url: "#", isSection: true },
         {
           title: "AI Voice Assistant",
           description: "Speech-to-text wellness logging powered by Deepgram Nova-3.",
@@ -59,6 +77,56 @@ const demoData = {
           icon: <Zap className="size-5 shrink-0 text-amber-500" />,
           url: "/dashboard/medications",
         },
+        { title: "Use Cases", url: "#", isSection: true },
+        {
+          title: "Chronic Care Management",
+          description: "End-to-end care coordination across specialties.",
+          icon: <HeartPulse className="size-5 shrink-0 text-rose-500" />,
+          url: "/use-cases/chronic-care-management",
+        },
+        {
+          title: "Medication Adherence",
+          description: "Automated refill routing and compliance tracking.",
+          icon: <Pill className="size-5 shrink-0 text-emerald-500" />,
+          url: "/use-cases/medication-adherence",
+        },
+        {
+          title: "Remote Patient Monitoring",
+          description: "Real-time vitals and clinical telemetry dashboards.",
+          icon: <Microscope className="size-5 shrink-0 text-cyan-500" />,
+          url: "/use-cases/remote-patient-monitoring",
+        },
+        {
+          title: "Clinical Decision Support",
+          description: "AI-driven insights for care teams.",
+          icon: <Stethoscope className="size-5 shrink-0 text-blue-500" />,
+          url: "/use-cases/clinical-decision-support",
+        },
+        { title: "Documentation", url: "#", isSection: true },
+        {
+          title: "API Reference",
+          description: "REST and WebSocket endpoints for all platform services.",
+          icon: <FileCode className="size-5 shrink-0 text-indigo-500" />,
+          url: "/docs/api-reference",
+        },
+        {
+          title: "Integration Guide",
+          description: "Connect your EHR, pharmacy, and lab systems.",
+          icon: <BookOpen className="size-5 shrink-0 text-sky-500" />,
+          url: "/docs/integration-guide",
+        },
+        {
+          title: "SDK Quickstart",
+          description: "Client libraries for Python, TypeScript, and Swift.",
+          icon: <FlaskConical className="size-5 shrink-0 text-teal-500" />,
+          url: "/docs/sdk-quickstart",
+        },
+        {
+          title: "Compliance & Security",
+          description: "HIPAA, SOC 2, and data residency documentation.",
+          icon: <Shield className="size-5 shrink-0 text-slate-500" />,
+          url: "/docs/compliance-security",
+        },
       ],
     },
     {
@@ -72,21 +140,38 @@ const demoData = {
           url: "/dashboard",
         },
         {
+          title: "Documentation",
+          description: "Guides, tutorials, and platform reference.",
+          icon: <FileText className="size-5 shrink-0 text-slate-500" />,
+          url: "/docs",
+        },
+        {
+          title: "API Reference",
+          description: "Full API specification with interactive playground.",
+          icon: <FileCode className="size-5 shrink-0 text-indigo-500" />,
+          url: "/docs/api-reference",
+        },
+        {
+          title: "Help Center",
+          description: "FAQs, troubleshooting, and community forums.",
+          icon: <Users className="size-5 shrink-0 text-amber-500" />,
+          url: "/resources/help-center",
+        },
+        {
           title: "Clinical Verification",
           description: "Read about our compliance standards and HIPAA privacy alignment.",
-          icon: <Book className="size-5 shrink-0 text-slate-500" />,
-          url: "#",
+          icon: <Shield className="size-5 shrink-0 text-emerald-500" />,
+          url: "/resources/clinical-verification",
         },
       ],
     },
-    {
-      title: "Patient Portal",
-      url: "/dashboard",
-    },
+    { title: "Pricing", url: "/pricing" },
   ],
   mobileExtraLinks: [
-    { name: "Clinical Safety", url: "#" },
-    { name: "Support", url: "#" },
+    { name: "Clinical Safety", url: "/resources/clinical-verification" },
+    { name: "Help & Support", url: "/resources/help-center" },
+    { name: "API Docs", url: "/docs/api-reference" },
+    { name: "Status", url: "#" },
   ],
   auth: {
     login: { text: "Log in", url: "/login" },
@@ -146,7 +231,7 @@ export default function Home() {
       {/* END: TopNavigation */}
 
       {/* BEGIN: HeroSection */}
-      <section className="grid grid-cols-12 gap-8 px-10 pb-20 items-center min-h-[calc(100vh-8rem)] relative bg-white overflow-hidden">
+      <section className="grid grid-cols-12 gap-8 px-10 pt-24 pb-20 items-center min-h-[calc(100vh-8rem)] relative bg-white overflow-hidden">
         {/* Left Column: Copy */}
         <div className="col-span-5 animate-on-scroll-left" data-purpose="hero-copy">
           <div className="flex flex-col gap-4 mb-6">
@@ -176,7 +261,7 @@ export default function Home() {
           </h1>
           <ul className="space-y-4 mb-10">
             <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-50 text-xs bg-brand-50">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-600 text-xs bg-brand-50">
                 ✓
               </span>
               <span className="text-slate-600 font-medium">
@@ -184,7 +269,7 @@ export default function Home() {
               </span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-50 text-xs bg-brand-50">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-600 text-xs bg-brand-50">
                 ✓
               </span>
               <span className="text-slate-600 font-medium">
@@ -192,7 +277,7 @@ export default function Home() {
               </span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-50 text-xs bg-brand-50">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-600 text-xs bg-brand-50">
                 ✓
               </span>
               <span className="text-slate-600 font-medium">
@@ -759,7 +844,7 @@ export default function Home() {
                         <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
                     </div>
-                    <span className="text-xs font-bold">Download app</span>
+                    <span className="text-xs font-bold">View details</span>
                   </Link>
                 </section>
                 {/* END: Sleep Tracking Card */}
@@ -936,7 +1021,7 @@ export default function Home() {
                             <div className="w-10 h-10 bg-slate-100 rounded-xl" />
                             <div>
                               <p className="text-xs font-bold text-slate-800">
-                                Homemade Plain Waffles
+                                Morning HIIT Training
                               </p>
                               <p className="text-[9px] text-slate-500 mt-0.5">
                                 Intense • 30 min • Cardio
@@ -1165,7 +1250,7 @@ export default function Home() {
                       <p className="text-2xl font-bold text-slate-800">22</p>
                       <p className="text-[10px] text-slate-500 mb-2">Longest Streak</p>
                       <p className="text-[9px] text-slate-400 leading-relaxed px-4">
-                        You are on fire! Keep using the sandow app to gain more streak!
+                        You are on fire! Keep using ZorabiHealth to gain more streak!
                       </p>
                     </div>
 
@@ -1967,6 +2052,548 @@ export default function Home() {
         </div>
       </section>
       {/* END: Integrated Health Dashboard */}
+
+      {/* NEW SECTION 1: Pharmacy & Medication Management */}
+      <section className="px-10 py-16 bg-[#f8fafc] border-t border-slate-100 animate-on-scroll">
+        <div className="relative bg-white rounded-[40px] overflow-hidden min-h-[600px] flex items-center px-12 py-16 shadow-sm border border-slate-100">
+          {/* Background Decorative Curves */}
+          <div className="absolute inset-0 pointer-events-none">
+            <svg
+              className="w-full h-full opacity-20"
+              fill="none"
+              viewBox="0 0 1200 600"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M-100 450 Q 300 350 600 450 T 1300 350"
+                stroke="#0ea5e9"
+                strokeDasharray="8 8"
+                strokeWidth="2"
+              ></path>
+              <path
+                d="M-100 500 Q 400 400 700 500 T 1300 400"
+                stroke="#0ea5e9"
+                strokeDasharray="8 8"
+                strokeWidth="2"
+              ></path>
+            </svg>
+          </div>
+          <div className="grid grid-cols-12 gap-8 items-center w-full relative z-10">
+            {/* Left Content */}
+            <div className="col-span-12 lg:col-span-6">
+              <h2 className="text-5xl font-bold text-slate-900 leading-[1.1] mb-6">
+                Your <span className="text-brand-500">trusted partner</span>
+                <br />
+                in digital healthcare.
+              </h2>
+              <p className="text-slate-500 text-sm leading-relaxed mb-8 max-w-md">
+                <span className="text-brand-500 font-bold">
+                  Empowering Your Health at Every Step.
+                </span>{" "}
+                Experience personalized medical care from the comfort of your home. Connect with{" "}
+                <span className="text-brand-500 font-bold underline">certified doctors</span>,
+                manage prescriptions, and schedule appointments with ease. Ready to take control of
+                your health? <span className="text-brand-500 font-bold">Get Started</span> or Book
+                an Appointment today.
+              </p>
+              <button className="bg-brand-500 hover:bg-brand-600 text-white font-bold py-4 px-8 rounded-xl flex items-center gap-3 transition-all shadow-lg shadow-brand-100 mb-12 cursor-pointer">
+                Book an appointment <ChevronRight className="w-5 h-5" />
+              </button>
+              <div className="space-y-4">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Trusted by millions across the globe:
+                </p>
+                <div className="flex items-center gap-6 opacity-60 grayscale">
+                  <div className="relative h-5 w-20">
+                    <Image
+                      alt="Amazon"
+                      fill
+                      className="object-contain"
+                      src="/images/logos/amazon.png"
+                      sizes="80px"
+                    />
+                  </div>
+                  <div className="relative h-5 w-16">
+                    <Image
+                      alt="Apple"
+                      fill
+                      className="object-contain"
+                      src="/images/logos/apple.png"
+                      sizes="64px"
+                    />
+                  </div>
+                  <div className="relative h-5 w-20">
+                    <Image
+                      alt="Google"
+                      fill
+                      className="object-contain"
+                      src="/images/logos/google.png"
+                      sizes="80px"
+                    />
+                  </div>
+                  <div className="relative h-5 w-16">
+                    <Image
+                      alt="Notion"
+                      fill
+                      className="object-contain"
+                      src="/images/logos/notion.png"
+                      sizes="64px"
+                    />
+                  </div>
+                  <div className="relative h-5 w-20">
+                    <Image
+                      alt="Spotify"
+                      fill
+                      className="object-contain"
+                      src="/images/logos/spotify.png"
+                      sizes="80px"
+                    />
+                  </div>
+                  <div className="relative h-5 w-16">
+                    <Image
+                      alt="Slack"
+                      fill
+                      className="object-contain"
+                      src="/images/logos/slack.png"
+                      sizes="64px"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Right Visual */}
+            <div className="col-span-12 lg:col-span-6 relative flex justify-center">
+              <div className="relative w-full max-w-md aspect-square">
+                {/* Doctor Image in Circle */}
+                <div className="absolute inset-0 bg-brand-50 rounded-full overflow-hidden border-[12px] border-white shadow-xl">
+                  <Image
+                    alt="Doctor"
+                    className="object-cover object-top"
+                    src="/images/doctor_partner.jpg"
+                    fill
+                    sizes="400px"
+                  />
+                </div>
+                {/* Floating Badge 1: Easy Appointment */}
+                <div className="absolute top-1/2 -left-12 -translate-y-1/2 bg-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 border border-slate-50 z-20">
+                  <Star className="text-brand-500 w-4 h-4 fill-brand-500" />
+                  <span className="text-[10px] font-bold text-slate-700">
+                    Easy Appointment Booking
+                  </span>
+                </div>
+                {/* Floating Badge 2: Happy Customers */}
+                <div className="absolute top-1/4 -right-8 bg-white p-3 rounded-xl shadow-lg border border-slate-50 w-40 z-20">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex -space-x-2">
+                      <div className="w-6 h-6 rounded-full border border-white bg-slate-200 overflow-hidden relative">
+                        <Image
+                          alt=""
+                          fill
+                          src="/images/doctor1.jpg"
+                          sizes="24px"
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="w-6 h-6 rounded-full border border-white bg-slate-300 overflow-hidden relative">
+                        <Image
+                          alt=""
+                          fill
+                          src="/images/doctor2.jpg"
+                          sizes="24px"
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="w-6 h-6 rounded-full border border-white bg-slate-400 overflow-hidden relative">
+                        <Image
+                          alt=""
+                          fill
+                          src="/images/doctor3.jpg"
+                          sizes="24px"
+                          className="object-cover"
+                        />
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-800">2400+</span>
+                  </div>
+                  <p className="text-[8px] font-bold text-brand-500 mb-1">Happy Customers</p>
+                  <div className="flex text-yellow-500 text-[8px] items-center gap-0.5">
+                    <Star className="w-2.5 h-2.5 fill-current" />
+                    <Star className="w-2.5 h-2.5 fill-current" />
+                    <Star className="w-2.5 h-2.5 fill-current" />
+                    <Star className="w-2.5 h-2.5 fill-current" />
+                    <Star className="w-2.5 h-2.5 fill-current" />
+                    <span className="ml-1 text-slate-400 font-semibold">(4.7 Stars)</span>
+                  </div>
+                </div>
+                {/* Floating Badge 3: Quote */}
+                <div className="absolute -bottom-4 -right-4 bg-white/80 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-white/50 max-w-[200px] z-20">
+                  <Quote className="text-brand-500 w-5 h-5 mb-1" />
+                  <p className="text-[10px] font-medium text-slate-600 leading-tight italic">
+                    Where science meets art, and compassion heals.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* NEW SECTION 2: Patient Empowerment Portal */}
+      <section className="px-10 py-24 bg-white animate-on-scroll">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-16">
+          <div className="w-full lg:w-1/2">
+            <span className="text-brand-500 font-bold text-sm uppercase tracking-widest mb-4 block">
+              Central Intelligence
+            </span>
+            <h2 className="text-5xl font-bold leading-tight mb-6 text-slate-900">
+              Your Health,{" "}
+              <span className="bg-gradient-to-r from-brand-600 to-brand-400 bg-clip-text text-transparent">
+                Unified.
+              </span>
+            </h2>
+            <p className="text-slate-500 text-lg mb-10 leading-relaxed">
+              Experience a clean, light-filled portal where your entire medical history meets
+              real-time predictive analytics.
+            </p>
+            <div className="space-y-8">
+              <div className="flex gap-6">
+                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                  <FolderHeart className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl mb-2 text-slate-800">
+                    Centralized medical records
+                  </h3>
+                  <p className="text-slate-500 text-sm">
+                    Secure access to labs, imaging, and histories in one high-fidelity interface.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-6">
+                <div className="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center shrink-0">
+                  <HeartPulse className="w-6 h-6 text-brand-500" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl mb-2 text-slate-800">
+                    Real-time vitals monitoring
+                  </h3>
+                  <p className="text-slate-500 text-sm">
+                    Synchronize wearable data with clinical-grade visualization tools.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-6">
+                <div className="w-12 h-12 rounded-full bg-violet-50 flex items-center justify-center shrink-0">
+                  <Brain className="w-6 h-6 text-violet-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl mb-2 text-slate-800">
+                    Personalized AI health insights
+                  </h3>
+                  <p className="text-slate-500 text-sm">
+                    ZorabiHealth analyzes your unique markers to provide actionable recovery
+                    pathways.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Visual: High-contrast data visualizations mirroring ZorabiHealth style */}
+          <div className="w-full lg:w-1/2 grid grid-cols-2 gap-4">
+            <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex justify-between items-start mb-12">
+                <Activity className="w-6 h-6 text-brand-500" />
+                <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-1 rounded-full border">
+                  LIVE
+                </span>
+              </div>
+              <div className="h-24 flex items-end gap-2">
+                <div className="w-full bg-brand-200 rounded-t-lg h-[60%]"></div>
+                <div className="w-full bg-brand-400 rounded-t-lg h-[85%]"></div>
+                <div className="w-full bg-brand-500 rounded-t-lg h-[70%]"></div>
+                <div className="w-full bg-brand-300 rounded-t-lg h-[100%] animate-pulse"></div>
+                <div className="w-full bg-brand-200 rounded-t-lg h-[55%]"></div>
+              </div>
+              <p className="mt-6 font-bold text-slate-800">Oxygen Saturation</p>
+              <p className="text-xs text-slate-400">98% Avg this week</p>
+            </div>
+            <div className="bg-slate-900 p-8 rounded-[40px] text-white flex flex-col justify-between hover:scale-[1.02] transition-transform">
+              <TrendingUp className="w-8 h-8 text-brand-400" />
+              <div>
+                <h4 className="text-3xl font-bold mb-2">+12%</h4>
+                <p className="text-white/60 text-xs font-bold uppercase tracking-widest">
+                  Metabolic Efficiency
+                </p>
+              </div>
+            </div>
+            <div className="col-span-2 bg-gradient-to-br from-brand-500 to-brand-600 p-8 rounded-[40px] text-white flex items-center justify-between shadow-sm">
+              <div>
+                <h4 className="text-2xl font-bold mb-1">Unified Health Score</h4>
+                <p className="text-white/80 text-sm">Clinical benchmark: Optimized</p>
+              </div>
+              <div className="w-16 h-16 rounded-full border-4 border-white/20 flex items-center justify-center text-xl font-black">
+                94
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* NEW SECTION 3: Doctor-Patient Appointment Hub */}
+      <section className="px-10 py-16 bg-[#f0f4f8] animate-on-scroll">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-5xl font-bold text-slate-900 mb-4">
+              Seamless Clinical Connection.
+            </h2>
+            <p className="text-slate-500 text-lg max-w-2xl mx-auto">
+              Sophisticated scheduling for the modern patient-doctor relationship, inspired by
+              clinical excellence.
+            </p>
+          </div>
+          <div className="grid grid-cols-12 gap-8">
+            {/* Feature Cards */}
+            <div className="col-span-12 lg:col-span-4 space-y-6">
+              <div className="appointment-glass p-8 rounded-[32px] hover:bg-white transition-colors cursor-pointer group shadow-sm bg-white/70 border border-white/40">
+                <Calendar className="w-8 h-8 text-brand-600 mb-4 group-hover:scale-110 transition-transform" />
+                <h3 className="text-xl font-bold text-slate-800 mb-2">Instant booking</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                  Synchronize directly with clinical calendars for zero-latency scheduling.
+                </p>
+              </div>
+              <div className="appointment-glass p-8 rounded-[32px] hover:bg-white transition-colors cursor-pointer group shadow-sm bg-white/70 border border-white/40">
+                <Video className="w-8 h-8 text-brand-600 mb-4 group-hover:scale-110 transition-transform" />
+                <h3 className="text-xl font-bold text-slate-800 mb-2">
+                  Secure video consultations
+                </h3>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                  HIPAA-compliant, high-definition tele-health integration with low latency.
+                </p>
+              </div>
+              <div className="appointment-glass p-8 rounded-[32px] hover:bg-white transition-colors cursor-pointer group shadow-sm bg-white/70 border border-white/40">
+                <ClipboardList className="w-8 h-8 text-brand-600 mb-4 group-hover:scale-110 transition-transform" />
+                <h3 className="text-xl font-bold text-slate-800 mb-2">
+                  Integrated patient history
+                </h3>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                  Automatic pre-briefing for doctors using ZorabiHealth predictive summaries.
+                </p>
+              </div>
+            </div>
+            {/* Appointment Interface */}
+            <div className="col-span-12 lg:col-span-8 bg-white rounded-[40px] p-8 shadow-xl border border-slate-200 relative overflow-hidden flex flex-col justify-between">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-brand-50 rounded-full blur-3xl -mr-20 -mt-20 opacity-50 pointer-events-none"></div>
+              <div className="relative z-10 flex flex-col h-full justify-between gap-8">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-2xl font-bold text-slate-800">Upcoming Consultations</h4>
+                  <div className="flex gap-2">
+                    <button className="p-2 rounded-full border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors cursor-pointer">
+                      <ChevronRight className="w-5 h-5 rotate-180" />
+                    </button>
+                    <button className="p-2 rounded-full border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors cursor-pointer">
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  {/* Glassmorphism Appointment Cards */}
+                  <div className="flex items-center gap-6 p-6 rounded-3xl bg-slate-50 border border-slate-100 group hover:border-brand-500 transition-all">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-200 overflow-hidden shrink-0 relative">
+                      <Image
+                        alt="Doctor"
+                        className="object-cover"
+                        src="/images/doctor_jenkins.jpg"
+                        fill
+                        sizes="64px"
+                      />
+                    </div>
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-slate-800">Dr. Sarah Jenkins</h5>
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                        Cardiology Specialist
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-slate-800">Today, 14:30</p>
+                      <p className="text-xs text-brand-500 font-bold">Video Consult</p>
+                    </div>
+                    <button className="bg-brand-500 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-brand-100 transform group-hover:scale-105 transition-all cursor-pointer">
+                      Join Room
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-6 p-6 rounded-3xl bg-white border border-slate-100 hover:bg-slate-50 transition-all opacity-80">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-200 overflow-hidden shrink-0 relative">
+                      <Image
+                        alt="Doctor"
+                        className="object-cover"
+                        src="/images/doctor2.jpg"
+                        fill
+                        sizes="64px"
+                      />
+                    </div>
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-slate-800">Dr. Michael Chen</h5>
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                        Internal Medicine
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-slate-800">July 26, 09:15</p>
+                      <p className="text-xs text-slate-400 font-bold">In-Person</p>
+                    </div>
+                    <button className="bg-slate-100 text-slate-400 px-6 py-2 rounded-xl text-sm font-bold cursor-pointer">
+                      Manage
+                    </button>
+                  </div>
+                </div>
+                <div className="pt-6 flex items-center justify-between border-t border-slate-100">
+                  <div className="flex items-center gap-4">
+                    <div className="flex -space-x-3">
+                      <div className="w-10 h-10 rounded-full border-2 border-white bg-slate-200 overflow-hidden relative">
+                        <Image
+                          alt=""
+                          fill
+                          className="object-cover"
+                          src="/images/doctor1.jpg"
+                          sizes="40px"
+                        />
+                      </div>
+                      <div className="w-10 h-10 rounded-full border-2 border-white bg-slate-300 overflow-hidden relative">
+                        <Image
+                          alt=""
+                          fill
+                          className="object-cover"
+                          src="/images/doctor2.jpg"
+                          sizes="40px"
+                        />
+                      </div>
+                      <div className="w-10 h-10 rounded-full border-2 border-white bg-brand-500 flex items-center justify-center text-[10px] font-bold text-white z-10">
+                        +24
+                      </div>
+                    </div>
+                    <p className="text-xs font-bold text-slate-400">
+                      Trusted by top specialists globally
+                    </p>
+                  </div>
+                  <button className="text-brand-500 font-bold text-sm flex items-center gap-2 hover:underline cursor-pointer">
+                    View complete directory <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* NEW SECTION 4: Online Pharmacy Section */}
+      <section
+        className="px-10 py-24 bg-white border-t border-slate-100 animate-on-scroll"
+        data-purpose="pharmacy-section"
+      >
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-12 gap-12 items-center mb-16">
+            <div className="col-span-12 lg:col-span-6">
+              <h2 className="text-5xl font-bold text-slate-900 leading-tight mb-6">
+                Your Trusted <span className="text-brand-500">Online Pharmacy</span>
+              </h2>
+              <p className="text-slate-500 text-lg mb-10 leading-relaxed">
+                Safe medicines, fast delivery, and professional guidance all in one place. We are a
+                certified online pharmacy committed to making healthcare simple, safe, and
+                affordable.
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <button className="bg-brand-500 hover:bg-brand-600 text-white font-bold py-4 px-8 rounded-2xl flex items-center gap-3 transition-all shadow-lg shadow-brand-100 cursor-pointer">
+                  <ShoppingBasket className="w-5 h-5" /> Shop Medicines
+                </button>
+                <button className="bg-white border-2 border-brand-500 text-brand-500 hover:bg-brand-50 font-bold py-4 px-8 rounded-2xl flex items-center gap-3 transition-all cursor-pointer">
+                  <Upload className="w-5 h-5" /> Upload Prescription
+                </button>
+              </div>
+            </div>
+            <div className="col-span-12 lg:col-span-6 relative flex justify-center">
+              <div className="w-full max-w-md aspect-square rounded-[40px] overflow-hidden shadow-2xl border-[12px] border-white relative">
+                <Image
+                  alt="Medical Professional"
+                  className="object-cover"
+                  src="/images/medical_professional.jpg"
+                  fill
+                  sizes="450px"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-24">
+            <div className="bg-slate-50 p-8 rounded-[32px] text-center hover:shadow-md transition-shadow border border-slate-100">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm text-3xl">
+                💊
+              </div>
+              <p className="font-bold text-slate-800">Supplements</p>
+            </div>
+            <div className="bg-slate-50 p-8 rounded-[32px] text-center hover:shadow-md transition-shadow border border-slate-100">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm text-3xl">
+                💉
+              </div>
+              <p className="font-bold text-slate-800">Diabetes</p>
+            </div>
+            <div className="bg-slate-50 p-8 rounded-[32px] text-center hover:shadow-md transition-shadow border border-slate-100">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm text-3xl">
+                🧴
+              </div>
+              <p className="font-bold text-slate-800">Beauty Products</p>
+            </div>
+            <div className="bg-slate-50 p-8 rounded-[32px] text-center hover:shadow-md transition-shadow border border-slate-100">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm text-3xl">
+                🪥
+              </div>
+              <p className="font-bold text-slate-800">Oral Care</p>
+            </div>
+          </div>
+          <div className="flex justify-between items-end mb-12">
+            <h3 className="text-3xl font-bold text-slate-900">Shop by Health Concerns</h3>
+            <button className="text-brand-500 font-bold flex items-center gap-2 hover:underline cursor-pointer">
+              View All <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 text-center hover:border-brand-500 transition-colors">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🫁
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Lung</p>
+            </div>
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 text-center hover:border-brand-500 transition-colors">
+              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🦷
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Dental</p>
+            </div>
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 text-center hover:border-brand-500 transition-colors">
+              <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                ❤️
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Heart</p>
+            </div>
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 text-center hover:border-brand-500 transition-colors">
+              <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🦴
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Bone</p>
+            </div>
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 text-center hover:border-brand-500 transition-colors">
+              <div className="w-20 h-20 bg-yellow-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🥩
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Liver</p>
+            </div>
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 text-center hover:border-brand-500 transition-colors">
+              <div className="w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🦠
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Virus</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* BEGIN: Medicine Section */}
       <section className="medicine-section relative py-24 border-t border-slate-100 overflow-hidden animate-on-scroll">

@@ -8,7 +8,6 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const { device_name } = await req.json();
     const admin = getAdminClient();
     const userId = auth.user.id;
 
@@ -20,10 +19,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (existing) {
-      await admin
-        .from("user_pairings")
-        .update({ is_active: true, device_name: device_name || "Mobile App" })
-        .eq("id", existing.id);
+      await admin.from("user_pairings").update({ is_active: true }).eq("id", existing.id);
       return NextResponse.json({ pairing_id: existing.id, paired: true });
     }
 
@@ -32,7 +28,6 @@ export async function POST(req: NextRequest) {
       .insert({
         web_user_id: userId,
         mobile_user_id: userId,
-        device_name: device_name || "Mobile App",
       })
       .select("id")
       .single();

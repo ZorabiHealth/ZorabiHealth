@@ -11,26 +11,18 @@ export async function POST(req: NextRequest) {
     const user = auth.user;
 
     const body = await req.json();
-    const { transport, fcm_token, apns_token, platform, device_name, device_os, app_version } =
-      body;
+    const { transport, expo_push_token, platform, device_name, device_os, app_version } = body;
 
-    if (!transport || !["web_push", "fcm", "apns"].includes(transport)) {
+    if (!transport || !["web_push", "expo_push"].includes(transport)) {
       return NextResponse.json(
-        { error: "Invalid transport. Must be web_push, fcm, or apns" },
+        { error: "Invalid transport. Must be web_push or expo_push" },
         { status: 400 }
       );
     }
 
-    if (transport === "fcm" && !fcm_token) {
+    if (transport === "expo_push" && !expo_push_token) {
       return NextResponse.json(
-        { error: "fcm_token is required for fcm transport" },
-        { status: 400 }
-      );
-    }
-
-    if (transport === "apns" && !apns_token) {
-      return NextResponse.json(
-        { error: "apns_token is required for apns transport" },
+        { error: "expo_push_token is required for expo_push transport" },
         { status: 400 }
       );
     }
@@ -44,19 +36,8 @@ export async function POST(req: NextRequest) {
 
     const admin = getAdminClient();
 
-    // Check for existing device with same transport token
-    let lookupField: string;
-    let lookupValue: string;
-    if (transport === "fcm") {
-      lookupField = "fcm_token";
-      lookupValue = fcm_token;
-    } else if (transport === "apns") {
-      lookupField = "apns_token";
-      lookupValue = apns_token;
-    } else {
-      lookupField = "push_endpoint";
-      lookupValue = body.push_endpoint;
-    }
+    const lookupField = transport === "web_push" ? "push_endpoint" : "expo_push_token";
+    const lookupValue = transport === "web_push" ? body.push_endpoint : expo_push_token;
 
     const { data: existing } = await admin
       .from("notification_devices")
@@ -75,8 +56,7 @@ export async function POST(req: NextRequest) {
       last_active_at: new Date().toISOString(),
     };
 
-    if (transport === "fcm") payload.fcm_token = fcm_token;
-    else if (transport === "apns") payload.apns_token = apns_token;
+    if (transport === "expo_push") payload.expo_push_token = expo_push_token;
     else {
       payload.push_endpoint = body.push_endpoint;
       payload.push_keys = body.push_keys || {};

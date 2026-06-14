@@ -157,6 +157,125 @@ export function saveToStorage<T>(key: string, data: T): void {
   }
 }
 
+// ─── DB Column Mapping Utilities ──────────────────────────────
+// Maps TypeScript camelCase to DB snake_case for Supabase writes.
+// All insert/upsert/update payloads MUST go through these.
+
+export function medicationToDb(med: Partial<Medication> & { id: string }) {
+  return {
+    id: med.id,
+    name: med.name,
+    generic_name: med.genericName || null,
+    dosage: med.dosage,
+    category: med.category,
+    frequency: med.frequency,
+    scheduled_times: med.scheduledTimes,
+    start_date: med.startDate,
+    end_date: med.endDate || null,
+    current_stock: med.currentStock,
+    refill_at: med.refillAt,
+    prescribed_by: med.prescribedBy || null,
+    phone_for_alerts: med.phoneForAlerts || null,
+    emergency_contact_name: med.emergencyContact?.name || null,
+    emergency_contact_phone: med.emergencyContact?.phone || null,
+    alert_after_misses: med.emergencyContact?.alertAfterMisses ?? 2,
+    vendor_preference: med.vendorPreference || null,
+    is_active: med.isActive ?? true,
+    color: med.color || "blue",
+    notes: med.notes || null,
+    updated_at: med.updatedAt || new Date().toISOString(),
+  };
+}
+
+export function vendorToDb(vendor: Partial<Vendor> & { id: string }) {
+  return {
+    id: vendor.id,
+    business_name: vendor.businessName,
+    license_no: vendor.licenseNo,
+    email: vendor.email,
+    phone: vendor.phone || null,
+    address: vendor.address,
+    pincode: vendor.pincode,
+    lat: vendor.lat,
+    lng: vendor.lng,
+    service_radius_km: vendor.serviceRadiusKm,
+    operating_hours: vendor.operatingHours,
+    is_active: vendor.isActive ?? true,
+    is_verified: vendor.isVerified ?? false,
+    rating: vendor.rating ?? 4.5,
+    inventory: vendor.inventory || {},
+  };
+}
+
+export function refillOrderToDb(order: Partial<RefillOrder> & { id: string }) {
+  return {
+    id: order.id,
+    tracking_id: order.trackingId,
+    medication_id: order.medicationId,
+    medication_name: order.medicationName,
+    dosage: order.dosage,
+    quantity: order.quantity,
+    vendor_id: order.vendorId,
+    vendor_name: order.vendorName,
+    vendor_email: order.vendorEmail,
+    vendor_phone: order.vendorPhone || null,
+    patient_email: order.patientEmail,
+    patient_phone: order.patientPhone || null,
+    delivery_address: order.deliveryAddress,
+    status: order.status,
+    total_price: order.totalPrice,
+    estimated_delivery: order.estimatedDelivery || null,
+    idempotency_key: order.idempotencyKey || null,
+  };
+}
+
+export function refillOrderEventToDb(event: {
+  orderId: string;
+  status: OrderStatus;
+  timestamp: string;
+  note?: string;
+}) {
+  return {
+    order_id: event.orderId,
+    status: event.status,
+    timestamp: event.timestamp,
+    note: event.note || null,
+  };
+}
+
+export function medicationLogToDb(log: Partial<MedicationLog> & { id: string }) {
+  return {
+    id: log.id,
+    medication_id: log.medicationId,
+    medication_name: log.medicationName,
+    scheduled_at: log.scheduledAt,
+    taken_at: log.takenAt || null,
+    status: log.status,
+    dose: log.dose,
+    note: log.note || null,
+    alert_sent: log.alertSent ?? false,
+    snoozed_until: log.snoozedUntil || null,
+  };
+}
+
+export function voiceMessageToDb(msg: {
+  id: string;
+  userId?: string;
+  sender: "user" | "assistant";
+  text: string;
+  intent?: string;
+  actionTaken?: string;
+}) {
+  return {
+    id: msg.id,
+    user_id: msg.userId || null,
+    sender: msg.sender,
+    text: msg.text,
+    intent: msg.intent || null,
+    action_taken: msg.actionTaken || null,
+  };
+}
+
 // ─── Tracking ID Generator ────────────────────────────────────
 export function generateTrackingId(): string {
   const today = new Date();

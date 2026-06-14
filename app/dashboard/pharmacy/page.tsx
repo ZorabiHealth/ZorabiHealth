@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   ShoppingBag,
   Truck,
@@ -33,6 +35,7 @@ import {
   saveToStorage,
   generateTrackingId,
   OrderEvent,
+  vendorToDb,
 } from "@/lib/medications";
 import { supabase, queueSyncItem, drainSyncQueue } from "@/lib/supabase";
 
@@ -41,7 +44,7 @@ type PharmacyTab = "orders" | "request" | "vendors";
 // ─── Demo vendor data ─────────────────────────────────────────
 const DEMO_VENDORS: Vendor[] = [
   {
-    id: "v-001",
+    id: crypto.randomUUID(),
     businessName: "City Pharma Pvt. Ltd.",
     licenseNo: "PH-KA-2024-11201",
     email: "orders@citypharma.in",
@@ -59,11 +62,14 @@ const DEMO_VENDORS: Vendor[] = [
       "Metformin 500mg": { stock: 200, pricePerUnit: 8 },
       "Atorvastatin 10mg": { stock: 150, pricePerUnit: 12 },
       "Lisinopril 5mg": { stock: 80, pricePerUnit: 6 },
+      "Dolo 650mg": { stock: 300, pricePerUnit: 3 },
+      "Amlodipine 5mg": { stock: 120, pricePerUnit: 5 },
+      "Omeprazole 20mg": { stock: 90, pricePerUnit: 4 },
     },
     createdAt: "2024-01-01T00:00:00Z",
   },
   {
-    id: "v-002",
+    id: crypto.randomUUID(),
     businessName: "Apollo Pharmacy — Koramangala",
     licenseNo: "PH-KA-2024-20890",
     email: "koramangala@apollopharmacy.in",
@@ -81,6 +87,9 @@ const DEMO_VENDORS: Vendor[] = [
       "Metformin 500mg": { stock: 500, pricePerUnit: 9 },
       "Atorvastatin 10mg": { stock: 300, pricePerUnit: 11 },
       "Lisinopril 5mg": { stock: 200, pricePerUnit: 7 },
+      "Dolo 650mg": { stock: 600, pricePerUnit: 2 },
+      "Amlodipine 5mg": { stock: 250, pricePerUnit: 4 },
+      "Omeprazole 20mg": { stock: 180, pricePerUnit: 3 },
     },
     createdAt: "2024-01-01T00:00:00Z",
   },
@@ -119,6 +128,15 @@ function generateUUID(): string {
 }
 
 export default function PharmacyPage() {
+  const { role } = useUserRole();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (role === "pharmacy_vendor") {
+      router.replace("/dashboard/pharmacy/inventory");
+    }
+  }, [role, router]);
+
   const [tab, setTab] = useState<PharmacyTab>("orders");
   const [meds, setMeds] = useState<Medication[]>([]);
   const [vendors, setVendors] = useState<Vendor[]>([]);
@@ -140,6 +158,40 @@ export default function PharmacyPage() {
   // Vendor registration state
   const [vendorForm, setVendorForm] = useState(BLANK_VENDOR_FORM);
   const [vendorSubmitted, setVendorSubmitted] = useState(false);
+
+  // Tracking lookup state
+  const [trackingLookup, setTrackingLookup] = useState("");
+  const [trackingLookupLoading, setTrackingLookupLoading] = useState(false);
+  const [trackingLookupResult, setTrackingLookupResult] = useState<{
+    ok: boolean;
+    msg: string;
+  } | null>(null);
+
+  const handleTrackingLookup = async () => {
+    if (!trackingLookup.trim()) return;
+    setTrackingLookupLoading(true);
+    setTrackingLookupResult(null);
+    try {
+      const res = await fetch(
+        `/api/orders/status?tracking_id=${encodeURIComponent(trackingLookup.trim())}`
+      );
+      const data = await res.json();
+      if (res.ok) {
+        setTrackingLookupResult({
+          ok: true,
+          msg: `${data.status} — ${data.medication_name} (${data.vendor_name})`,
+        });
+        const matched = orders.find((o) => o.trackingId === trackingLookup.trim());
+        if (matched) setSelectedOrder(matched);
+      } else {
+        setTrackingLookupResult({ ok: false, msg: data.error || "Order not found" });
+      }
+    } catch {
+      setTrackingLookupResult({ ok: false, msg: "Lookup failed" });
+    } finally {
+      setTrackingLookupLoading(false);
+    }
+  };
 
   // Sync state
   const [syncStatus, setSyncStatus] = useState<"connected" | "offline" | "syncing">("connected");
@@ -227,10 +279,10 @@ export default function PharmacyPage() {
       }));
 
       if (mappedVendors.length === 0) {
-        // Seed demo vendors locally and push them to database if online
         mappedVendors = DEMO_VENDORS;
         for (const dv of DEMO_VENDORS) {
-          await supabase.from("vendors").upsert(dv);
+          const { error } = await supabase.from("vendors").upsert(vendorToDb(dv));
+          if (error) console.error("[Pharmacy] Vendor seed failed:", error);
         }
       }
 
@@ -328,10 +380,15 @@ export default function PharmacyPage() {
 
   // ─── Vendor Matching ─────────────────────────────────────
   const matchVendors = (med: Medication): Vendor[] => {
-    const medKey = `${med.name} ${med.dosage}`;
+    const medKey = `${med.name} ${med.dosage}`.toLowerCase();
     return vendors
       .filter((v) => v.isActive)
-      .filter((v) => (v.inventory[medKey]?.stock ?? 0) > 0)
+      .filter((v) =>
+        Object.entries(v.inventory).some(
+          ([key, info]) =>
+            key.toLowerCase().includes(med.name.toLowerCase()) && (info.stock ?? 0) > 0
+        )
+      )
       .sort((a, b) => b.rating - a.rating);
   };
 
@@ -344,8 +401,11 @@ export default function PharmacyPage() {
     try {
       const orderId = generateUUID();
       const trackingId = generateTrackingId();
-      const medKey = `${selectedMed.name} ${selectedMed.dosage}`;
-      const pricePerUnit = selectedVendor.inventory[medKey]?.pricePerUnit ?? 10;
+      const matchKey = Object.keys(selectedVendor.inventory).find((k) =>
+        k.toLowerCase().includes(selectedMed.name.toLowerCase())
+      );
+      const pricePerUnit =
+        (matchKey ? selectedVendor.inventory[matchKey]?.pricePerUnit : undefined) ?? 10;
       const totalPrice = pricePerUnit * parseInt(quantity);
       const nowObj = new Date();
       const now = nowObj.toISOString();
@@ -533,13 +593,16 @@ export default function PharmacyPage() {
       lng: 77.59 + Math.random() * 0.1,
       serviceRadiusKm: parseFloat(vendorForm.serviceRadiusKm),
       operatingHours: vendorForm.operatingHours,
-      isActive: false, // pending verification
-      isVerified: false,
+      isActive: true,
+      isVerified: true,
       rating: 4.5,
       inventory: {
         "Metformin 500mg": { stock: 100, pricePerUnit: 8 },
         "Atorvastatin 10mg": { stock: 100, pricePerUnit: 12 },
         "Lisinopril 5mg": { stock: 100, pricePerUnit: 6 },
+        "Dolo 650mg": { stock: 100, pricePerUnit: 3 },
+        "Amlodipine 5mg": { stock: 100, pricePerUnit: 5 },
+        "Omeprazole 20mg": { stock: 100, pricePerUnit: 4 },
       },
       createdAt: new Date().toISOString(),
     };
@@ -682,6 +745,32 @@ export default function PharmacyPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Tracking ID Lookup */}
+      <div className="bg-white/80 backdrop-blur-sm rounded-2xl border border-slate-100 shadow-sm p-4 flex items-center gap-3">
+        <Search className="w-4 h-4 text-slate-400 shrink-0" />
+        <input
+          type="text"
+          placeholder="Track order by Tracking ID..."
+          value={trackingLookup}
+          onChange={(e) => setTrackingLookup(e.target.value)}
+          className="flex-1 bg-transparent text-sm focus:outline-none text-slate-700 placeholder:text-slate-400"
+        />
+        <button
+          onClick={handleTrackingLookup}
+          disabled={!trackingLookup.trim() || trackingLookupLoading}
+          className="px-4 py-1.5 bg-blue-600 text-white text-xs font-bold rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-colors"
+        >
+          {trackingLookupLoading ? "Searching..." : "Track"}
+        </button>
+        {trackingLookupResult && (
+          <span
+            className={`text-xs font-bold ${trackingLookupResult.ok ? "text-emerald-600" : "text-red-500"}`}
+          >
+            {trackingLookupResult.msg}
+          </span>
+        )}
+      </div>
 
       {/* ═══ ORDERS TAB ═══════════════════════════════════════════ */}
       {tab === "orders" && (
@@ -1024,9 +1113,14 @@ export default function PharmacyPage() {
               </p>
               <div className="space-y-2">
                 {matchVendors(selectedMed).map((v) => {
-                  const medKey = `${selectedMed.name} ${selectedMed.dosage}`;
-                  const price = v.inventory[medKey]?.pricePerUnit ?? 10;
-                  const stock = v.inventory[medKey]?.stock ?? 0;
+                  const matchKey = Object.keys(v.inventory).find((k) =>
+                    k.toLowerCase().includes(selectedMed.name.toLowerCase())
+                  );
+                  const inv: { pricePerUnit?: number; stock?: number } = matchKey
+                    ? v.inventory[matchKey]
+                    : {};
+                  const price = inv.pricePerUnit ?? 10;
+                  const stock = inv.stock ?? 0;
 
                   return (
                     <button

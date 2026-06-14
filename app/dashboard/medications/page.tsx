@@ -136,10 +136,16 @@ export default function MedicationsPage() {
       } = await supabase.auth.getSession();
       const userId = session?.user?.id ?? sessionUserId;
 
-      // Fetch Medications
-      let medsQuery = supabase.from("medications").select("*").eq("is_active", true);
-      if (userId) medsQuery = medsQuery.eq("user_id", userId);
-      const { data: dbMeds, error: medsError } = await medsQuery.order("name", { ascending: true });
+      if (!userId) {
+        throw new Error("User not authenticated");
+      }
+
+      const { data: dbMeds, error: medsError } = await supabase
+        .from("medications")
+        .select("*")
+        .eq("is_active", true)
+        .eq("user_id", userId)
+        .order("name", { ascending: true });
 
       if (medsError) throw medsError;
 

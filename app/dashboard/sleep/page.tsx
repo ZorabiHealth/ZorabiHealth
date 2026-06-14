@@ -111,7 +111,7 @@ export default function SleepCompanionPage() {
   }, []);
 
   // --- State Variables ---
-  const [userId, setUserId] = useState<string>("00000000-0000-0000-0000-000000000000");
+  const [userId, setUserId] = useState<string>("");
   const [isPaired, setIsPaired] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
   const [, setSyncTimestamp] = useState("Never synced");

@@ -8,10 +8,14 @@ const supabase = createClient(
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("userId") || "00000000-0000-0000-0000-000000000000";
+  const userId = searchParams.get("userId");
   const category = searchParams.get("category");
   const bodyArea = searchParams.get("bodyArea");
   const bookmarked = searchParams.get("bookmarked");
+
+  if (!userId) {
+    return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+  }
 
   let query = supabase.from("workouts").select("*").eq("user_id", userId);
   if (category && category !== "All") query = query.eq("category", category);

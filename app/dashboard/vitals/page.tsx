@@ -25,7 +25,7 @@ interface SymptomLog {
 
 export default function VitalsPage() {
   const [logs, setLogs] = useState<SymptomLog[]>([]);
-  const [userId, setUserId] = useState<string>("00000000-0000-0000-0000-000000000000");
+  const [userId, setUserId] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
   // Form State
@@ -72,7 +72,7 @@ export default function VitalsPage() {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      const uid = session?.user?.id || "00000000-0000-0000-0000-000000000000";
+      const uid = session?.user?.id || "";
       setUserId(uid);
       fetchLogs(uid);
     };

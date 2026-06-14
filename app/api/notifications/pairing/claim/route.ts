@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const { code, device_name } = await req.json();
+    const { code } = await req.json();
     if (!code) {
       return NextResponse.json({ error: "Missing pairing code" }, { status: 400 });
     }
@@ -45,10 +45,7 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
 
     if (existing) {
-      await admin
-        .from("user_pairings")
-        .update({ is_active: true, device_name: device_name || "Mobile Device" })
-        .eq("id", existing.id);
+      await admin.from("user_pairings").update({ is_active: true }).eq("id", existing.id);
 
       await admin
         .from("pairing_codes")
@@ -63,7 +60,6 @@ export async function POST(req: NextRequest) {
       .insert({
         web_user_id: webUserId,
         mobile_user_id: mobileUserId,
-        device_name: device_name || "Mobile Device",
       })
       .select("id")
       .single();

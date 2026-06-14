@@ -47,11 +47,11 @@ export async function GET(req: NextRequest) {
 
     // Skip if already sent via all available transports
     const sent = notif.sent_via || [];
-    if (sent.includes("fcm") && sent.includes("web_push")) {
+    if (sent.includes("expo_push") && sent.includes("web_push")) {
       continue;
     }
 
-    // Direct devices (web push, own FCM)
+    // Direct devices (web push, Expo push)
     const { data: directDevices } = await admin
       .from("notification_devices")
       .select("*")

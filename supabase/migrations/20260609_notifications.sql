@@ -32,14 +32,17 @@ CREATE INDEX IF NOT EXISTS idx_notification_devices_transport ON notification_de
 
 ALTER TABLE notification_devices ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own devices" ON notification_devices;
 CREATE POLICY "Users can read own devices"
   ON notification_devices FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own devices" ON notification_devices;
 CREATE POLICY "Users can insert own devices"
   ON notification_devices FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own devices" ON notification_devices;
 CREATE POLICY "Users can update own devices"
   ON notification_devices FOR UPDATE
   USING (auth.uid() = user_id);
@@ -65,10 +68,12 @@ CREATE INDEX IF NOT EXISTS idx_notifications_category ON notifications(category)
 
 ALTER TABLE notifications ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own notifications" ON notifications;
 CREATE POLICY "Users can read own notifications"
   ON notifications FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can insert own notifications" ON notifications;
 CREATE POLICY "Users can insert own notifications"
   ON notifications FOR INSERT
   WITH CHECK (auth.uid() = user_id);
@@ -94,6 +99,7 @@ CREATE INDEX IF NOT EXISTS idx_notification_delivery_status ON notification_deli
 
 ALTER TABLE notification_delivery ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own deliveries" ON notification_delivery;
 CREATE POLICY "Users can read own deliveries"
   ON notification_delivery FOR SELECT
   USING (
@@ -116,14 +122,17 @@ CREATE TABLE IF NOT EXISTS notification_preferences (
 
 ALTER TABLE notification_preferences ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "Users can read own preferences" ON notification_preferences;
 CREATE POLICY "Users can read own preferences"
   ON notification_preferences FOR SELECT
   USING (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can upsert own preferences" ON notification_preferences;
 CREATE POLICY "Users can upsert own preferences"
   ON notification_preferences FOR INSERT
   WITH CHECK (auth.uid() = user_id);
 
+DROP POLICY IF EXISTS "Users can update own preferences" ON notification_preferences;
 CREATE POLICY "Users can update own preferences"
   ON notification_preferences FOR UPDATE
   USING (auth.uid() = user_id);

@@ -2,7 +2,18 @@
 
 import React, { useRef, useEffect, useState } from "react";
 import Image from "next/image";
-import { Eye, EyeOff, ArrowRight, ShieldCheck, Mail, Lock, User } from "lucide-react";
+import {
+  Eye,
+  EyeOff,
+  ArrowRight,
+  ShieldCheck,
+  Mail,
+  Lock,
+  User,
+  HeartPulse,
+  Stethoscope,
+  Pill,
+} from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
@@ -237,6 +248,9 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
   const [authMethod, setAuthMethod] = useState<"magic_link" | "password">("magic_link");
   const [isMagicLinkSent, setIsMagicLinkSent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [selectedRole, setSelectedRole] = useState<"patient" | "doctor" | "pharmacy_vendor">(
+    "patient"
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -261,7 +275,7 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
           return;
         }
 
-        const { error: signUpError } = await supabase.auth.signUp({
+        const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
           email,
           password,
           options: {
@@ -273,6 +287,43 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
         });
 
         if (signUpError) throw signUpError;
+
+        if (signUpData?.user) {
+          // Retry up to 3 times (handles transient network failures)
+          const accessToken = signUpData.session?.access_token || null;
+          for (let attempt = 0; attempt < 3; attempt++) {
+            try {
+              const res = await fetch("/api/auth/set-role-initial", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  user_id: signUpData.user.id,
+                  role: selectedRole,
+                  full_name: name,
+                  email: email,
+                  token: accessToken,
+                }),
+              });
+              if (res.ok) break;
+              if (res.status === 409) {
+                console.warn("Role already exists for user — skipping");
+                break;
+              }
+              const errData = await res.json();
+              if (attempt < 2) {
+                await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+              } else {
+                console.error("Failed to set role after 3 attempts:", errData);
+              }
+            } catch (roleErr) {
+              if (attempt < 2) {
+                await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+              } else {
+                console.error("Failed to insert user role during signup:", roleErr);
+              }
+            }
+          }
+        }
 
         setError("Registration successful! Check your email to confirm your account.");
       } else {
@@ -344,6 +395,8 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
                   width={140}
                   height={40}
                   className="object-contain"
+                  style={{ width: "auto", height: "auto" }}
+                  loading="eager"
                   unoptimized
                 />
               </div>
@@ -472,26 +525,75 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
                   )}
 
                   {isSignUp && (
-                    <div>
-                      <label
-                        htmlFor="name"
-                        className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
-                      >
-                        Full Name <span className="text-brand-500">*</span>
-                      </label>
-                      <div className="relative">
-                        <Input
-                          id="name"
-                          type="text"
-                          value={name}
-                          onChange={(e) => setName(e.target.value)}
-                          placeholder="Dr. Alexander Flemming"
-                          required
-                          className="pl-10"
-                        />
-                        <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <>
+                      <div>
+                        <label
+                          htmlFor="name"
+                          className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5"
+                        >
+                          Full Name <span className="text-brand-500">*</span>
+                        </label>
+                        <div className="relative">
+                          <Input
+                            id="name"
+                            type="text"
+                            value={name}
+                            onChange={(e) => setName(e.target.value)}
+                            placeholder="Dr. Alexander Flemming"
+                            required
+                            className="pl-10"
+                          />
+                          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                        </div>
                       </div>
-                    </div>
+
+                      <div className="space-y-1.5">
+                        <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider">
+                          Select Role <span className="text-brand-500">*</span>
+                        </label>
+                        <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200/50">
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRole("patient")}
+                            className={cn(
+                              "flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer",
+                              selectedRole === "patient"
+                                ? "bg-white text-slate-800 shadow-sm font-extrabold"
+                                : "text-slate-500 hover:text-slate-700"
+                            )}
+                          >
+                            <HeartPulse className="w-3.5 h-3.5 text-blue-600" />
+                            Patient
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRole("doctor")}
+                            className={cn(
+                              "flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer",
+                              selectedRole === "doctor"
+                                ? "bg-white text-slate-800 shadow-sm font-extrabold"
+                                : "text-slate-500 hover:text-slate-700"
+                            )}
+                          >
+                            <Stethoscope className="w-3.5 h-3.5 text-violet-600" />
+                            Doctor
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSelectedRole("pharmacy_vendor")}
+                            className={cn(
+                              "flex-1 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition-all duration-200 cursor-pointer",
+                              selectedRole === "pharmacy_vendor"
+                                ? "bg-white text-slate-800 shadow-sm font-extrabold"
+                                : "text-slate-500 hover:text-slate-700"
+                            )}
+                          >
+                            <Pill className="w-3.5 h-3.5 text-emerald-600" />
+                            Pharmacy
+                          </button>
+                        </div>
+                      </div>
+                    </>
                   )}
 
                   <div>

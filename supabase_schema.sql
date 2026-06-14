@@ -12,7 +12,7 @@ drop table if exists medications cascade;
 -- 3. Medications Table
 create table medications (
     id uuid primary key default gen_random_uuid(),
-    user_id uuid not null default '00000000-0000-0000-0000-000000000000',
+    user_id uuid not null,
     name text not null,
     generic_name text,
     dosage text not null,
@@ -84,7 +84,7 @@ create index idx_vendors_pincode on vendors(pincode);
 create table refill_orders (
     id uuid primary key default gen_random_uuid(),
     tracking_id text not null unique, -- ZH-YYYYMMDD-XXXX
-    user_id uuid not null default '00000000-0000-0000-0000-000000000000',
+    user_id uuid not null,
     medication_id uuid references medications(id) on delete set null,
     medication_name text not null,
     dosage text not null,
@@ -121,7 +121,8 @@ create index idx_order_events_order on refill_order_events(order_id, timestamp d
 -- 8. Voice Sessions / Messages Table
 create table voice_messages (
     id uuid primary key default gen_random_uuid(),
-    user_id uuid not null default '00000000-0000-0000-0000-000000000000',
+    user_id uuid not null,
+    audio_url text,
     sender text not null check (sender in ('user', 'assistant')),
     text text not null,
     intent text,
@@ -151,7 +152,7 @@ create trigger update_refill_orders_modtime
 -- 10. Outpatient Symptom Logs Table
 create table if not exists symptom_logs (
     id uuid primary key default gen_random_uuid(),
-    user_id uuid not null default '00000000-0000-0000-0000-000000000000',
+    user_id uuid not null,
     name text not null,
     severity text not null check (severity in ('Mild', 'Moderate', 'Severe')),
     notes text not null default '',

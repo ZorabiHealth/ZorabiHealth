@@ -1,6 +1,8 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
   UserCheck,
   BellRing,
@@ -12,6 +14,9 @@ import {
   XCircle,
   LogIn,
   QrCode,
+  RefreshCw,
+  Package,
+  Stethoscope,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
@@ -28,6 +33,7 @@ interface PairedDevice {
 }
 
 export default function SettingsPage() {
+  const { role } = useUserRole();
   const [name, setName] = useState("Dr. Sarah Jenkins");
   const [age, setAge] = useState("34");
   const [height, setHeight] = useState("168");
@@ -295,6 +301,110 @@ export default function SettingsPage() {
                   required
                 />
               </div>
+            </div>
+          </section>
+
+          {/* Pharmacy Profile Section (pharmacy role only) */}
+          {role === "pharmacy_vendor" && (
+            <section className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+              <div className="flex gap-2.5 items-center mb-2">
+                <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                  <Package className="text-emerald-500 h-5.5 w-5.5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">Pharmacy Profile</h3>
+                  <p className="text-slate-500 text-xs font-semibold">
+                    Manage your pharmacy business details.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Business Name
+                  </label>
+                  <Input type="text" placeholder="City Pharmacy" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    License Number
+                  </label>
+                  <Input type="text" placeholder="PH-KA-2026-XXXXX" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Business Email
+                  </label>
+                  <Input type="email" placeholder="orders@pharmacy.in" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Business Phone
+                  </label>
+                  <Input type="tel" placeholder="+91802XXXXXXXX" />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Doctor Profile Section (doctor role only) */}
+          {role === "doctor" && (
+            <section className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+              <div className="flex gap-2.5 items-center mb-2">
+                <div className="h-10 w-10 rounded-xl bg-violet-50 flex items-center justify-center">
+                  <Stethoscope className="text-violet-500 h-5.5 w-5.5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">Clinical Profile</h3>
+                  <p className="text-slate-500 text-xs font-semibold">
+                    Manage your medical practice details.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Specialization
+                  </label>
+                  <Input type="text" placeholder="Cardiology" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Medical License
+                  </label>
+                  <Input type="text" placeholder="MCI-XXXXX" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Clinic / Hospital
+                  </label>
+                  <Input type="text" placeholder="City Hospital" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Years of Experience
+                  </label>
+                  <Input type="number" placeholder="10" />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Role Badge */}
+          <section className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+            <div className="flex gap-2.5 items-center mb-2">
+              <div className="h-10 w-10 rounded-xl bg-violet-50 flex items-center justify-center">
+                <RefreshCw className="text-violet-500 h-5.5 w-5.5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Account Role</h3>
+                <p className="text-slate-500 text-xs font-semibold">
+                  Your role is set at signup and cannot be changed.
+                </p>
+              </div>
+            </div>
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-sm font-bold capitalize">
+              {role === "pharmacy_vendor" ? "Pharmacy" : role === "doctor" ? "Doctor" : "Patient"}
             </div>
           </section>
 

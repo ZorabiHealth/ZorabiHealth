@@ -220,7 +220,7 @@ export default function VoiceAgentPage() {
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
   const [searchQuery, setSearchQuery] = useState("");
   const [sessionTimer, setSessionTimer] = useState(0);
-  const [userId, setUserId] = useState<string>("00000000-0000-0000-0000-000000000000");
+  const [userId, setUserId] = useState<string>("");
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -270,6 +270,12 @@ export default function VoiceAgentPage() {
           });
 
           if (logErr) throw logErr;
+
+          const newStock = Math.max(0, (matchedMed.current_stock || 0) - 1);
+          await supabase
+            .from("medications")
+            .update({ current_stock: newStock })
+            .eq("id", matchedMed.id);
 
           return `I've successfully logged that you took your ${matchedMed.name} (${matchedMed.dosage}). Your medication log has been updated.`;
         }
@@ -376,6 +382,23 @@ export default function VoiceAgentPage() {
           if (alarmErr) throw alarmErr;
 
           return `I've set a new voice reminder for ${time} in your alarm schedule.`;
+        }
+
+        case "refill_request": {
+          const { data: activeMeds, error: refillErr } = await supabase
+            .from("medications")
+            .select("name, current_stock, refill_at")
+            .eq("user_id", userId)
+            .eq("is_active", true);
+
+          if (refillErr) throw refillErr;
+
+          const lowStockMeds = (activeMeds || []).filter((m) => m.current_stock <= m.refill_at);
+          if (lowStockMeds.length === 0) {
+            return "Good news — all your medications are adequately stocked. Head to the Pharmacy section if you'd like to place an order preemptively.";
+          }
+
+          return `I found ${lowStockMeds.length} medication(s) that need refills: ${lowStockMeds.map((m) => `${m.name} (${m.current_stock} left)`).join(", ")}. Please go to the Pharmacy dashboard to place refill orders.`;
         }
 
         default:
@@ -561,22 +584,25 @@ export default function VoiceAgentPage() {
             setStatus("processing");
             addMessage({ sender: "user", text: transcript })
               .then(async (msgId) => {
-                if (audioBlobsRef.current.length > 0 && navigator.onLine) {
-                  const blob = new Blob(audioBlobsRef.current, { type: "audio/webm" });
-                  const fileName = `${msgId}.webm`;
-                  const { error } = await supabase.storage
-                    .from("voicesessions")
-                    .upload(fileName, blob, { contentType: "audio/webm" });
-                  if (!error) {
-                    const { data: urlData } = supabase.storage
-                      .from("voicesessions")
-                      .getPublicUrl(fileName);
-                    await supabase
-                      .from("voice_messages")
-                      .update({ audio_url: urlData.publicUrl })
-                      .eq("id", msgId);
-                  }
+                if (navigator.onLine) {
+                  const blobs = audioBlobsRef.current;
                   audioBlobsRef.current = [];
+                  if (blobs.length > 0) {
+                    const blob = new Blob(blobs, { type: "audio/webm" });
+                    const fileName = `${msgId}.webm`;
+                    const { error } = await supabase.storage
+                      .from("voicesessions")
+                      .upload(fileName, blob, { contentType: "audio/webm" });
+                    if (!error) {
+                      const { data: urlData } = supabase.storage
+                        .from("voicesessions")
+                        .getPublicUrl(fileName);
+                      await supabase
+                        .from("voice_messages")
+                        .update({ audio_url: urlData.publicUrl })
+                        .eq("id", msgId);
+                    }
+                  }
                 }
               })
               .catch(() => {});
@@ -587,6 +613,7 @@ export default function VoiceAgentPage() {
               "log_symptom",
               "query_vitals",
               "set_reminder",
+              "refill_request",
             ];
             const handleResp = (response: string) => {
               if (!response) {
@@ -680,7 +707,13 @@ export default function VoiceAgentPage() {
     setStatus("processing");
     const intent = detectIntent(text);
     const workoutIntents = ["start_workout", "log_meal", "check_streak", "suggest_workout"];
-    const clinicalIntents = ["log_medication", "log_symptom", "query_vitals", "set_reminder"];
+    const clinicalIntents = [
+      "log_medication",
+      "log_symptom",
+      "query_vitals",
+      "set_reminder",
+      "refill_request",
+    ];
 
     let response = "";
     if (workoutIntents.includes(intent)) {
@@ -709,8 +742,10 @@ export default function VoiceAgentPage() {
     const a = document.createElement("a");
     a.href = url;
     a.download = `clinical-voice-session-${Date.now()}.txt`;
+    document.body.appendChild(a);
     a.click();
-    URL.revokeObjectURL(url);
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
   const clearSession = async () => {
@@ -718,10 +753,7 @@ export default function VoiceAgentPage() {
     saveToStorage(STORAGE_KEYS.VOICE_SESSIONS, []);
     if (navigator.onLine) {
       try {
-        await supabase
-          .from("voice_messages")
-          .delete()
-          .eq("user_id", "00000000-0000-0000-0000-000000000000");
+        await supabase.from("voice_messages").delete().eq("user_id", userId);
       } catch {}
     }
   };
@@ -1012,6 +1044,7 @@ export default function VoiceAgentPage() {
                           "log_symptom",
                           "query_vitals",
                           "set_reminder",
+                          "refill_request",
                         ];
                         const resp = workoutIntents.includes(intent)
                           ? await handleWorkoutIntent(intent, userId)

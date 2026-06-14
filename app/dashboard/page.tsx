@@ -18,9 +18,24 @@ import {
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 export default function DashboardOverview() {
+  const { role, loading: roleLoading } = useUserRole();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!roleLoading) {
+      if (role === "doctor") {
+        router.replace("/dashboard/doctor");
+      } else if (role === "pharmacy_vendor") {
+        router.replace("/dashboard/pharmacy/inventory");
+      }
+    }
+  }, [role, roleLoading, router]);
+
   // Missed Medication Alerts State
   const [session, setSession] = useState<any>(null);
   const [missedMeds, setMissedMeds] = useState<any[]>([]);
@@ -699,39 +714,38 @@ export default function DashboardOverview() {
         </section>
         {/* END: Time/Music Card */}
 
-        {/* BEGIN: Clinical Visualization Card (Bottom Left - 5 Cols, 3 Rows) */}
+        {/* BEGIN: Choose Your Doctor Card (Bottom Left - 5 Cols, 3 Rows) */}
         <section className="col-span-12 lg:col-span-5 bg-white/40 backdrop-blur-xl border border-white/30 rounded-[32px] p-6 flex flex-col justify-between shadow-md min-h-[350px]">
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-              Medical Imagery
+              Your Health Team
             </span>
             <h2 className="text-xl font-bold text-slate-800 leading-snug mt-1">
-              Clinical Visualization
+              Choose Your Doctor
             </h2>
           </div>
 
           <div className="flex gap-3 justify-center py-2">
             <div className="w-full h-32 rounded-2xl overflow-hidden border border-white/30 shadow-md relative group select-none pointer-events-none">
-              <div className="w-full h-full bg-gradient-to-br from-brand-400 via-brand-600 to-purple-700 transition-transform duration-700 group-hover:scale-105"></div>
+              <div className="w-full h-full bg-gradient-to-br from-blue-500 via-[#0c4381] to-purple-700 transition-transform duration-700 group-hover:scale-105 flex items-center justify-center">
+                <div className="text-white/30 text-5xl font-black">+</div>
+              </div>
             </div>
           </div>
 
           <div className="space-y-4">
-            <div className="flex gap-1 justify-center">
-              <div className="w-1 h-1 bg-slate-300 rounded-full" />
-              <div className="w-1.5 h-1 bg-blue-500 rounded-full" />
-              <div className="w-1 h-1 bg-slate-300 rounded-full" />
-              <div className="w-1 h-1 bg-slate-300 rounded-full" />
-            </div>
+            <p className="text-xs text-slate-500 text-center font-medium">
+              Browse verified doctors, check availability, and book instantly
+            </p>
             <Link
-              href="/dashboard/analytics"
+              href="/dashboard/patient/book-appointment"
               className="w-full block text-center bg-white/80 border border-slate-200 text-slate-700 font-bold py-3 rounded-2xl text-xs hover:bg-white transition-colors cursor-pointer shadow-sm"
             >
-              Explore analysis
+              Find a Doctor
             </Link>
           </div>
         </section>
-        {/* END: Clinical Visualization Card */}
+        {/* END: Choose Your Doctor Card */}
 
         {/* BEGIN: Sleep Tracking Card (Bottom Middle - 3 Cols, 3 Rows) */}
         <section className="col-span-12 lg:col-span-3 bg-slate-900 rounded-[32px] p-6 flex flex-col justify-between text-white relative overflow-hidden shadow-md min-h-[350px]">

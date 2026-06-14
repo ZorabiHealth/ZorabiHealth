@@ -8,7 +8,10 @@ const supabase = createClient(
 
 export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("userId") || "00000000-0000-0000-0000-000000000000";
+  const userId = searchParams.get("userId");
+  if (!userId) {
+    return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+  }
 
   const { data, error } = await supabase
     .from("workout_streaks")
@@ -83,7 +86,10 @@ function getLongestStreak(streakDays: Record<string, boolean>): number {
 export async function PUT(req: Request) {
   try {
     const body = await req.json();
-    const user_id = body.user_id || "00000000-0000-0000-0000-000000000000";
+    const user_id = body.user_id;
+    if (!user_id) {
+      return NextResponse.json({ error: "Missing user_id" }, { status: 400 });
+    }
 
     const today = new Date().toISOString().split("T")[0];
 

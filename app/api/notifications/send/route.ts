@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
     let dispatched = 0;
     let deliveryError: string | null = null;
 
-    // Direct devices (web push, own FCM)
+    // Direct devices (web push, Expo push)
     const { data: directDevices } = await admin
       .from("notification_devices")
       .select("*")

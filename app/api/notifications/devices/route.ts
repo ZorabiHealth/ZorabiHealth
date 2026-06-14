@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
 
     const { data: pairings, error } = await admin
       .from("user_pairings")
-      .select("id, device_name, is_active, paired_at, web_user_id, mobile_user_id")
+      .select("id, is_active, paired_at, web_user_id, mobile_user_id")
       .eq("web_user_id", auth.user.id)
       .order("paired_at", { ascending: false });
 
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       devices: (pairings || []).map((p) => ({
         id: p.id,
-        device_name: p.device_name,
+        device_name: p.web_user_id === p.mobile_user_id ? "Same Account" : "Paired Device",
         platform: "android",
         is_active: p.is_active,
         last_active_at: p.paired_at,

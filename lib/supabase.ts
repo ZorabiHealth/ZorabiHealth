@@ -65,25 +65,28 @@ export async function drainSyncQueue(): Promise<void> {
     if (queue.length === 0) return;
 
     const remaining: SyncItem[] = [];
+    let hasFailure = false;
 
     for (const item of queue) {
       try {
-        let error = null;
-        if (item.action === "insert" || item.action === "update") {
-          const { error: err } = await supabase.from(item.table).upsert(item.payload);
-          error = err;
-        } else if (item.action === "delete") {
-          const { error: err } = await supabase.from(item.table).delete().eq("id", item.payload.id);
-          error = err;
+        if (item.action === "delete") {
+          const { error } = await supabase.from(item.table).delete().eq("id", item.payload.id);
+          if (error) throw error;
+        } else {
+          const { error } = await supabase.from(item.table).upsert(item.payload);
+          if (error) throw error;
         }
-        if (error) throw error;
       } catch (e) {
         console.error(`[Sync Queue] Failed item ${item.id}:`, e);
-        remaining.push(item); // Keep in queue to retry later
+        remaining.push(item);
+        hasFailure = true;
       }
     }
 
     localStorage.setItem("zh_sync_queue", JSON.stringify(remaining));
+    if (hasFailure && remaining.length > 0) {
+      console.warn(`[Sync Queue] ${remaining.length} items remaining for retry`);
+    }
   } catch (e) {
     console.error("[Sync Queue] Drain loop failed:", e);
   }
