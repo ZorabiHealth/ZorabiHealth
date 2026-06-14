@@ -38,6 +38,7 @@ The ZorabiHealth codebase has **three disjoint pharmacy systems** and **zero end
 ## Scenario 1: Vendor Workspace Setup Immediately After Auth/Login
 
 ### Current State
+
 - Doctor has a full 5-step onboarding flow at `/dashboard/doctor/onboarding/page.tsx`
 - Pharmacy vendors get **nothing**. After role selection (`pharmacy_vendor`), they are redirected to `/dashboard/pharmacy/inventory` at `pharmacy/page.tsx:135-137`:
   ```typescript
@@ -51,15 +52,17 @@ The ZorabiHealth codebase has **three disjoint pharmacy systems** and **zero end
 - The inventory page at `inventory/page.tsx:55-70` checks for `pharmacy_profiles` but the registration tab creates `vendors` records — **schema mismatch**
 
 ### Missing Features
-| Gap | Detail | File/Line |
-|-----|--------|-----------|
-| No post-auth onboarding redirect for `pharmacy_vendor` | Doctor gets `/dashboard/doctor/onboarding` redirect if `!onboarding_completed`. Vendor gets nothing. | `pharmacy/page.tsx:135-137` |
-| No `pharmacy_vendor` onboarding wizard | Doctor has 5-step: Clinic Info → Consultation → Availability → Languages → Permissions. Vendor has zero steps. | Compare `doctor/onboarding/page.tsx` (720 lines) vs nothing |
-| Registration writes to wrong table | Inline form inserts into `vendors` (old v1 table) but inventory reads from `pharmacy_profiles` (v2 table) | `pharmacy/page.tsx:613-633` vs `inventory/page.tsx:55-70` |
-| No `onboarding_completed` column on `pharmacy_profiles` | `doctor_profiles` has it; `pharmacy_profiles` does not | `20260616_zorabihealth_ecosystem.sql:34-51` |
-| No workspace name, license upload, delivery config | Doctor onboarding captures workspace name, photo, signature. Vendor has no equivalent. | — |
+
+| Gap                                                     | Detail                                                                                                         | File/Line                                                   |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| No post-auth onboarding redirect for `pharmacy_vendor`  | Doctor gets `/dashboard/doctor/onboarding` redirect if `!onboarding_completed`. Vendor gets nothing.           | `pharmacy/page.tsx:135-137`                                 |
+| No `pharmacy_vendor` onboarding wizard                  | Doctor has 5-step: Clinic Info → Consultation → Availability → Languages → Permissions. Vendor has zero steps. | Compare `doctor/onboarding/page.tsx` (720 lines) vs nothing |
+| Registration writes to wrong table                      | Inline form inserts into `vendors` (old v1 table) but inventory reads from `pharmacy_profiles` (v2 table)      | `pharmacy/page.tsx:613-633` vs `inventory/page.tsx:55-70`   |
+| No `onboarding_completed` column on `pharmacy_profiles` | `doctor_profiles` has it; `pharmacy_profiles` does not                                                         | `20260616_zorabihealth_ecosystem.sql:34-51`                 |
+| No workspace name, license upload, delivery config      | Doctor onboarding captures workspace name, photo, signature. Vendor has no equivalent.                         | —                                                           |
 
 ### Required
+
 - Add `onboarding_completed` to `pharmacy_profiles` table
 - Build `/dashboard/pharmacy/onboarding/` with steps: Business Info → License Upload → Delivery Configuration → Inventory Setup
 - Fix vendor registration to write to `pharmacy_profiles` instead of `vendors`
@@ -70,21 +73,24 @@ The ZorabiHealth codebase has **three disjoint pharmacy systems** and **zero end
 ## Scenario 2: Checking Received Orders — Pharmacy Store + Doctor Prescriptions
 
 ### Current State
+
 - **Store orders** (`store_orders` table): patient-facing, fetched via `/api/store/orders` (GET). Pharmacy vendor has **no visibility** into these.
 - **Prescription orders** (`orders` table v2): exists in schema but **no UI** reads or writes to it. The `orders` table at `20260616_zorabihealth_ecosystem.sql:120-131` has a complete schema (`prescription_id`, `pharmacy_id`, `patient_id`, `tracking_id`, `status`, `total_amount`, `delivery_address`), but zero code references it.
 - **Refill orders** (`refill_orders` table v1): the only working order system, but it's patient-initiated, not pharmacy-driven.
 - **API routes**: `/api/orders/status/` handles status lookup/update for both `refill_orders` and `orders` v2, but there's **no incoming order feed** for pharmacy vendors.
 
 ### Missing Features
-| Gap | Detail | Evidence |
-|-----|--------|----------|
-| Pharmacy has no "Incoming Orders" view | No unified feed showing store orders + prescription orders + refill orders | No route or component exists |
-| No API to fetch orders assigned to a pharmacy | `/api/orders/status` is for individual tracking_id lookups, not listing | `app/api/orders/status/route.ts` |
-| `orders` table (v2) has zero CRUD UI | Schema exists at `20260616_zorabihealth_ecosystem.sql:120-131` but nothing reads/writes | `grep "from.*orders"` returns no results in frontend code |
-| Store orders not visible to pharmacy | `store_orders` RLS policy only allows `auth.uid() = user_id` (patient). No pharmacy access. | `20260620000001_zobraipharm_store_orders.sql:49-56` |
-| No pharmacy order status update UI | Vendor can change status on refill_orders via simulation UI, but no real pharmacy-facing order management | `pharmacy/page.tsx` vendor tabs |
+
+| Gap                                           | Detail                                                                                                    | Evidence                                                  |
+| --------------------------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
+| Pharmacy has no "Incoming Orders" view        | No unified feed showing store orders + prescription orders + refill orders                                | No route or component exists                              |
+| No API to fetch orders assigned to a pharmacy | `/api/orders/status` is for individual tracking_id lookups, not listing                                   | `app/api/orders/status/route.ts`                          |
+| `orders` table (v2) has zero CRUD UI          | Schema exists at `20260616_zorabihealth_ecosystem.sql:120-131` but nothing reads/writes                   | `grep "from.*orders"` returns no results in frontend code |
+| Store orders not visible to pharmacy          | `store_orders` RLS policy only allows `auth.uid() = user_id` (patient). No pharmacy access.               | `20260620000001_zobraipharm_store_orders.sql:49-56`       |
+| No pharmacy order status update UI            | Vendor can change status on refill_orders via simulation UI, but no real pharmacy-facing order management | `pharmacy/page.tsx` vendor tabs                           |
 
 ### Required
+
 - Add `pharmacy_id` to `store_orders` table (or create a route to assign store orders to nearest pharmacy)
 - Add RLS policy so pharmacy vendors can read orders assigned to their pharmacy
 - Build "Incoming Orders" tab at `/dashboard/pharmacy/orders/` showing:
@@ -98,6 +104,7 @@ The ZorabiHealth codebase has **three disjoint pharmacy systems** and **zero end
 ## Scenario 3: Medicine Creation — "Send to Pharmacy" from Doctor
 
 ### Current State
+
 - Doctor creates prescriptions at `/dashboard/doctor/page.tsx` with inline Rx pad
 - `savePrescription()` at `doctor/page.tsx:659-798` inserts into `prescriptions` + `prescription_items` tables
 - After saving an active prescription, it sends a **notification** to all pharmacies (`doctor/page.tsx:761-791`) but does **NOT** create an order in the `orders` table
@@ -106,15 +113,17 @@ The ZorabiHealth codebase has **three disjoint pharmacy systems** and **zero end
 - The search `send_to_pharmacy|sendToPharmacy|forward_prescription` returns **zero results** across the entire codebase
 
 ### Missing Features
-| Gap | Detail | File/Line |
-|-----|--------|-----------|
-| No "Send to Pharmacy" button on doctor's Rx pad | After `savePrescription("active")`, only a notification is sent. No order is created. | `doctor/page.tsx:758-791` |
-| No pharmacy selection during prescription creation | Doctor cannot choose which pharmacy to send to | — |
-| No `orders` table insertion from prescription flow | `orders` table at `20260616_zorabihealth_ecosystem.sql:120-131` exists but never populated from doctor flow | — |
-| Prescription list page has no actionable items | `/dashboard/doctor/prescriptions/` shows data but no buttons to forward | `doctor/prescriptions/page.tsx` (273 lines) |
-| No prescription → patient acknowledgment | Patient never knows a prescription was created unless doctor tells them | — |
+
+| Gap                                                | Detail                                                                                                      | File/Line                                   |
+| -------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------- |
+| No "Send to Pharmacy" button on doctor's Rx pad    | After `savePrescription("active")`, only a notification is sent. No order is created.                       | `doctor/page.tsx:758-791`                   |
+| No pharmacy selection during prescription creation | Doctor cannot choose which pharmacy to send to                                                              | —                                           |
+| No `orders` table insertion from prescription flow | `orders` table at `20260616_zorabihealth_ecosystem.sql:120-131` exists but never populated from doctor flow | —                                           |
+| Prescription list page has no actionable items     | `/dashboard/doctor/prescriptions/` shows data but no buttons to forward                                     | `doctor/prescriptions/page.tsx` (273 lines) |
+| No prescription → patient acknowledgment           | Patient never knows a prescription was created unless doctor tells them                                     | —                                           |
 
 ### Required
+
 - Add "Send to Pharmacy" button to the doctor's Rx pad UI (after `savePrescription("active")`)
 - Show pharmacy vendor selector (populated from `pharmacy_profiles`)
 - On click:
@@ -130,6 +139,7 @@ The ZorabiHealth codebase has **three disjoint pharmacy systems** and **zero end
 ## Scenario 4: Unique ID Display Immediately After Send
 
 ### Current State
+
 - Two tracking ID generators exist:
   - `lib/medications.ts:280-287` → `ZH-YYYYMMDD-XXXX` (reads localStorage for sequence)
   - `app/api/store/orders/route.ts:23-30` → `ZH-YYYYMMDD-XXXX` (random 4 digits, no sequence)
@@ -138,14 +148,16 @@ The ZorabiHealth codebase has **three disjoint pharmacy systems** and **zero end
 - The preview shows a ref ID `VP-RX-${timestamp}` but this is non-persistent and not stored in DB (`doctor/page.tsx:2218`)
 
 ### Missing Features
-| Gap | Detail | File/Line |
-|-----|--------|-----------|
-| No persistent tracking ID on prescriptions | `prescriptions` table has `tracking_id` column (added in `20260617000004`) but never populated | `doctor/page.tsx:685-696` |
-| No confirmation modal after "Send to Pharmacy" | Doctor sees only a toast. No modal with tracking ID, pharmacy name, next steps. | `doctor/page.tsx:753-756` |
-| Inconsistent ID formats | `ZH-` prefix for store orders, `VP-RX-` for preview, `ZR-RX-` in migration — no standard | Multiple files |
-| localStorage-based sequence is unreliable | `generateTrackingId()` at `medications.ts:280-287` reads localStorage which can be cleared | `lib/medications.ts:283` |
+
+| Gap                                            | Detail                                                                                         | File/Line                 |
+| ---------------------------------------------- | ---------------------------------------------------------------------------------------------- | ------------------------- |
+| No persistent tracking ID on prescriptions     | `prescriptions` table has `tracking_id` column (added in `20260617000004`) but never populated | `doctor/page.tsx:685-696` |
+| No confirmation modal after "Send to Pharmacy" | Doctor sees only a toast. No modal with tracking ID, pharmacy name, next steps.                | `doctor/page.tsx:753-756` |
+| Inconsistent ID formats                        | `ZH-` prefix for store orders, `VP-RX-` for preview, `ZR-RX-` in migration — no standard       | Multiple files            |
+| localStorage-based sequence is unreliable      | `generateTrackingId()` at `medications.ts:280-287` reads localStorage which can be cleared     | `lib/medications.ts:283`  |
 
 ### Required
+
 - Add a confirmation modal after "Send to Pharmacy" showing:
   - **Tracking ID** (persisted in `orders.tracking_id`)
   - Pharmacy name & address
@@ -160,6 +172,7 @@ The ZorabiHealth codebase has **three disjoint pharmacy systems** and **zero end
 ## Scenario 5: Direct Patient Order from Pharmacy Store → Patient Dashboard Sync
 
 ### Current State
+
 - **Store works**: `/zobraipharm/checkout/page.tsx` places orders via `/api/store/orders` -> `store_orders` table
 - **Patient dashboard works**: `/dashboard/my-orders/page.tsx` fetches from `/api/store/orders` and displays orders
 - **Confirmation works**: `/zobraipharm/confirmation/page.tsx` shows order details with tracking timeline
@@ -169,16 +182,18 @@ The ZorabiHealth codebase has **three disjoint pharmacy systems** and **zero end
 - **Product data**: 12 hardcoded products in `lib/pharmacy-store-data.ts` — no sync with `drug_catalog` table or `pharmacy_inventory`
 
 ### Missing Features
-| Gap | Detail | File/Line |
-|-----|--------|-----------|
-| Store orders not assigned to any pharmacy | `store_orders` table has no `pharmacy_id` column | `20260620000001_zobraipharm_store_orders.sql:4-19` |
-| No payment integration | Checkout only supports COD. Payment step in stepper shows no payment form. | `checkout/page.tsx:240` |
-| Products are hardcoded, not from DB | `PRODUCTS` array in `pharmacy-store-data.ts` vs `drug_catalog` table | `lib/pharmacy-store-data.ts:69-420` |
-| No real inventory check during checkout | Stock from hardcoded data, not from `pharmacy_inventory` | `checkout/page.tsx` |
-| No pharmacy vendor notification for new store orders | No notification/event when store order placed | `/api/store/orders/route.ts` |
-| No vendor order status management for store orders | Pharmacy has no UI to update `store_orders` status | — |
+
+| Gap                                                  | Detail                                                                     | File/Line                                          |
+| ---------------------------------------------------- | -------------------------------------------------------------------------- | -------------------------------------------------- |
+| Store orders not assigned to any pharmacy            | `store_orders` table has no `pharmacy_id` column                           | `20260620000001_zobraipharm_store_orders.sql:4-19` |
+| No payment integration                               | Checkout only supports COD. Payment step in stepper shows no payment form. | `checkout/page.tsx:240`                            |
+| Products are hardcoded, not from DB                  | `PRODUCTS` array in `pharmacy-store-data.ts` vs `drug_catalog` table       | `lib/pharmacy-store-data.ts:69-420`                |
+| No real inventory check during checkout              | Stock from hardcoded data, not from `pharmacy_inventory`                   | `checkout/page.tsx`                                |
+| No pharmacy vendor notification for new store orders | No notification/event when store order placed                              | `/api/store/orders/route.ts`                       |
+| No vendor order status management for store orders   | Pharmacy has no UI to update `store_orders` status                         | —                                                  |
 
 ### Required
+
 - Add `pharmacy_id` to `store_orders` table (nullable, assigned at order time based on nearest pharmacy or patient pincode)
 - Add pharmacy vendor notification dispatch in `/api/store/orders/route.ts` after order creation
 - Build real inventory checks using `pharmacy_inventory` table (price, stock availability)
@@ -191,6 +206,7 @@ The ZorabiHealth codebase has **three disjoint pharmacy systems** and **zero end
 ## Scenario 6: Stock-Triggered Auto-Refill Without Manual Ordering
 
 ### Current State
+
 - `pharmacy/inventory/page.tsx:25-30` has an `auto_refill_threshold` field in the `InventoryItem` interface
 - Migration `20260617000001_add_auto_refill_threshold.sql` adds the column
 - The inventory page has an auto-refill toggle UI but **no backend logic** executes auto-refill
@@ -199,16 +215,18 @@ The ZorabiHealth codebase has **three disjoint pharmacy systems** and **zero end
 - No cron job, scheduled function, or DB trigger exists for auto-refill
 
 ### Missing Features
-| Gap | Detail | File/Line |
-|-----|--------|-----------|
-| Auto-refill threshold stored but never checked | `pharmacy_inventory.auto_refill_threshold` column exists but no code reads it | `20260617000001_add_auto_refill_threshold.sql` |
-| No scheduled auto-refill cron | No Supabase Edge Function, pg_cron, or external scheduler | — |
-| No auto-refill order creation logic | When stock drops below threshold, no `refill_orders` or `orders` record is created | — |
-| No vendor notification on low stock | Pharmacy vendor is not alerted when inventory runs low | — |
-| Patient medications have `refillAt` but no auto-refill action | `medications.ts:27-28` defines `refillAt` and `currentStock` but nothing triggers a refill | `lib/medications.ts` |
-| No refill schedule/skip logic | Patient cannot set "auto-refill every 30 days" preference | — |
+
+| Gap                                                           | Detail                                                                                     | File/Line                                      |
+| ------------------------------------------------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| Auto-refill threshold stored but never checked                | `pharmacy_inventory.auto_refill_threshold` column exists but no code reads it              | `20260617000001_add_auto_refill_threshold.sql` |
+| No scheduled auto-refill cron                                 | No Supabase Edge Function, pg_cron, or external scheduler                                  | —                                              |
+| No auto-refill order creation logic                           | When stock drops below threshold, no `refill_orders` or `orders` record is created         | —                                              |
+| No vendor notification on low stock                           | Pharmacy vendor is not alerted when inventory runs low                                     | —                                              |
+| Patient medications have `refillAt` but no auto-refill action | `medications.ts:27-28` defines `refillAt` and `currentStock` but nothing triggers a refill | `lib/medications.ts`                           |
+| No refill schedule/skip logic                                 | Patient cannot set "auto-refill every 30 days" preference                                  | —                                              |
 
 ### Required
+
 - Create a Supabase Edge Function `auto-refill-check` that:
   1. Queries `pharmacy_inventory` for items where `stock <= auto_refill_threshold`
   2. Queries `medications` for patient records where `current_stock <= refill_at`
@@ -253,18 +271,18 @@ Doctor creates Rx ──→ [NO SEND BUTTON] ──→ (stuck as draft/active in
 
 ### Current Gaps (Step by Step)
 
-| Step | Current State | Gap |
-|------|---------------|-----|
-| Doctor creates Rx | ✅ Works — `savePrescription()` at `doctor/page.tsx:659-798` | — |
-| Doctor sends to pharmacy | ❌ **Missing** — No "Send to Pharmacy" button | Scenario 3 above |
-| Prescription → patient order list as "Awaiting Confirmation" | ❌ **Missing** — No patient-facing prescription order list; `/dashboard/my-orders/` only shows `store_orders` | — |
-| Patient confirms prescription order | ❌ **Missing** — No "Confirm Order" UI on patient dashboard | — |
-| Pre-authenticated pharmacy checkout | ❌ **Missing** — No flow to take patient from confirmation → pharmacy cart with pre-filled prescription items | — |
-| Payment workflow | ⚠️ **Partial** — COD only, no UPI/Card; checkout step "payment" at `checkout/page.tsx:33` has no payment form | `checkout/page.tsx:240` |
-| Tracking ID generation | ⚠️ **Partial** — DB trigger exists (`20260617000005`) but not triggered from doctor flow | — |
-| Vendor notification | ⚠️ **Partial** — Notification sent but no actionable alert with order details | `doctor/page.tsx:761-791` |
-| Vendor status management | ⚠️ **Partial** — Refill orders have status simulation; `orders` v2 table has no UI | `pharmacy/page.tsx` |
-| Status reflected in patient dashboard | ❌ **Missing** — `/dashboard/my-orders/` only shows `store_orders`, not prescription orders | — |
+| Step                                                         | Current State                                                                                                 | Gap                       |
+| ------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------- | ------------------------- |
+| Doctor creates Rx                                            | ✅ Works — `savePrescription()` at `doctor/page.tsx:659-798`                                                  | —                         |
+| Doctor sends to pharmacy                                     | ❌ **Missing** — No "Send to Pharmacy" button                                                                 | Scenario 3 above          |
+| Prescription → patient order list as "Awaiting Confirmation" | ❌ **Missing** — No patient-facing prescription order list; `/dashboard/my-orders/` only shows `store_orders` | —                         |
+| Patient confirms prescription order                          | ❌ **Missing** — No "Confirm Order" UI on patient dashboard                                                   | —                         |
+| Pre-authenticated pharmacy checkout                          | ❌ **Missing** — No flow to take patient from confirmation → pharmacy cart with pre-filled prescription items | —                         |
+| Payment workflow                                             | ⚠️ **Partial** — COD only, no UPI/Card; checkout step "payment" at `checkout/page.tsx:33` has no payment form | `checkout/page.tsx:240`   |
+| Tracking ID generation                                       | ⚠️ **Partial** — DB trigger exists (`20260617000005`) but not triggered from doctor flow                      | —                         |
+| Vendor notification                                          | ⚠️ **Partial** — Notification sent but no actionable alert with order details                                 | `doctor/page.tsx:761-791` |
+| Vendor status management                                     | ⚠️ **Partial** — Refill orders have status simulation; `orders` v2 table has no UI                            | `pharmacy/page.tsx`       |
+| Status reflected in patient dashboard                        | ❌ **Missing** — `/dashboard/my-orders/` only shows `store_orders`, not prescription orders                   | —                         |
 
 ### Required (Full Pipeline)
 
@@ -304,6 +322,7 @@ Doctor creates Rx ──→ [NO SEND BUTTON] ──→ (stuck as draft/active in
 ## Scenario 8: Automated Review After Order Received
 
 ### Current State
+
 - **Zero review/rating system exists** in the codebase
 - Vendors have a `rating` field on `Vendor` interface (`medications.ts:85`) and `pharmacy_profiles.rating` column
 - These ratings are **default values** (4.5 or 4.7/4.9) — never updated by user reviews
@@ -313,19 +332,21 @@ Doctor creates Rx ──→ [NO SEND BUTTON] ──→ (stuck as draft/active in
 - No automated review request after delivery
 
 ### Missing Features
-| Gap | Detail | Evidence |
-|-----|--------|-----------|
-| No reviews table | Migration files define 20+ tables but none for reviews | `supabase/migrations/` |
-| No review submission API | No `/api/reviews/` route | — |
-| No review UI on product pages | `/zobraipharm/product/[slug]/page.tsx` (330 lines) has no review section | — |
-| No review UI on order confirmation | After delivery, no prompt to rate the experience | `/zobraipharm/confirmation/page.tsx` |
-| Vendor ratings are static | `pharmacy_profiles.rating` is set once and never updated | `pharmacy/page.tsx:598` sets `rating: 4.5` |
-| No automated review request trigger | No notification/cron to ask for review N days after delivery | — |
-| No per-medication reviews | Reviews should be linkable to specific medications/products | — |
+
+| Gap                                 | Detail                                                                   | Evidence                                   |
+| ----------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------ |
+| No reviews table                    | Migration files define 20+ tables but none for reviews                   | `supabase/migrations/`                     |
+| No review submission API            | No `/api/reviews/` route                                                 | —                                          |
+| No review UI on product pages       | `/zobraipharm/product/[slug]/page.tsx` (330 lines) has no review section | —                                          |
+| No review UI on order confirmation  | After delivery, no prompt to rate the experience                         | `/zobraipharm/confirmation/page.tsx`       |
+| Vendor ratings are static           | `pharmacy_profiles.rating` is set once and never updated                 | `pharmacy/page.tsx:598` sets `rating: 4.5` |
+| No automated review request trigger | No notification/cron to ask for review N days after delivery             | —                                          |
+| No per-medication reviews           | Reviews should be linkable to specific medications/products              | —                                          |
 
 ### Required
 
 1. **Create reviews table** (migration):
+
 ```sql
 create table product_reviews (
   id              uuid primary key default gen_random_uuid(),
@@ -372,6 +393,7 @@ create index idx_reviews_medication on product_reviews(medication_id, created_at
 ### Core Ideology
 
 The platform must be a **multi-vendor pharmacy marketplace** where:
+
 1. **Independent vendors** onboard, manage their own catalog (products, images, pricing, stock)
 2. **Orders arrive automatically** from two distinct sources — customers (storefront) and doctors (prescriptions)
 3. **Automation handles routing** (nearest pharmacy, pincode match, inventory availability)
@@ -431,21 +453,22 @@ The platform must be a **multi-vendor pharmacy marketplace** where:
 
 ### Current State
 
-| Capability | Current | Required |
-|------------|---------|----------|
-| Vendor can add products to catalog | ❌ — 12 hardcoded products in `lib/pharmacy-store-data.ts`, no vendor creation flow | ✅ — Each vendor uploads products with images, descriptions, pricing |
-| Product images in Storage buckets | ❌ — Images hardcoded as `/images/pharmacy/dolo-650mg.png` from public folder | ✅ — Vendor uploads to `pharmacy_assets/{vendor_id}/products/{product_id}.webp` |
-| Per-vendor catalog UI | ❌ — Single storefront shows all products | ✅ — Each vendor's storefront shows their catalog only |
-| Automated stock sync from inventory | ❌ — `pharmacy_inventory` table exists but disconnected from storefront products | ✅ — `store_products` (or vendor's product catalog) auto-syncs stock from `pharmacy_inventory` |
-| Orders auto-routed to vendor | ❌ — No `pharmacy_id` on `store_orders` | ✅ — Every order assigned to specific vendor; appears in their queue |
-| Human-in-the-loop approval | ❌ — No accept/reject flow | ✅ — Vendor must accept before preparation begins |
-| Multi-tenant RLS (vendor isolation) | ❌ — No vendor-specific RLS on catalog/storefront | ✅ — Each vendor sees only their own products, orders, customers |
+| Capability                          | Current                                                                             | Required                                                                                       |
+| ----------------------------------- | ----------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| Vendor can add products to catalog  | ❌ — 12 hardcoded products in `lib/pharmacy-store-data.ts`, no vendor creation flow | ✅ — Each vendor uploads products with images, descriptions, pricing                           |
+| Product images in Storage buckets   | ❌ — Images hardcoded as `/images/pharmacy/dolo-650mg.png` from public folder       | ✅ — Vendor uploads to `pharmacy_assets/{vendor_id}/products/{product_id}.webp`                |
+| Per-vendor catalog UI               | ❌ — Single storefront shows all products                                           | ✅ — Each vendor's storefront shows their catalog only                                         |
+| Automated stock sync from inventory | ❌ — `pharmacy_inventory` table exists but disconnected from storefront products    | ✅ — `store_products` (or vendor's product catalog) auto-syncs stock from `pharmacy_inventory` |
+| Orders auto-routed to vendor        | ❌ — No `pharmacy_id` on `store_orders`                                             | ✅ — Every order assigned to specific vendor; appears in their queue                           |
+| Human-in-the-loop approval          | ❌ — No accept/reject flow                                                          | ✅ — Vendor must accept before preparation begins                                              |
+| Multi-tenant RLS (vendor isolation) | ❌ — No vendor-specific RLS on catalog/storefront                                   | ✅ — Each vendor sees only their own products, orders, customers                               |
 
 ### What Needs to Change
 
 #### 9.1 — Vendor Product Catalog (Replaces Hardcoded Products)
 
 **New table: `vendor_products`**
+
 ```sql
 create table vendor_products (
   id                uuid primary key default gen_random_uuid(),
@@ -487,11 +510,13 @@ create policy "Vendors manage own products"
 ```
 
 **Storage bucket: `pharmacy_assets`**
+
 - Path: `{pharmacy_id}/products/{product_id}.{ext}`
 - Policies: vendor can upload to their own folder; anyone can read public images
 - Supported formats: webp, jpg, png (convert to webp on upload for performance)
 
 **Vendor Catalog UI** (`/dashboard/pharmacy/catalog/`)
+
 - Grid view of vendor's own products with image thumbnails (from storage)
 - "Add Product" button → form with: name, generic name, category, manufacturer, description, price, MRP, stock, prescription-only toggle, image upload (with preview & crop)
 - "Edit Product" → update any field, replace image
@@ -501,17 +526,17 @@ create policy "Vendors manage own products"
 
 #### 9.2 — Automated Update Feature
 
-| Trigger | Automation | Human-in-Loop |
-|---------|-----------|---------------|
-| Vendor updates stock in `pharmacy_inventory` | Auto-sync to `vendor_products.stock` via DB trigger | — |
-| Vendor changes price in `pharmacy_inventory` | Auto-sync to `vendor_products.price` via DB trigger | — |
-| Stock drops to zero | Auto-set `vendor_products.is_available = false` | Vendor can override and mark as "backorder" |
-| New drug added to `drug_catalog` | Notify matching vendors to add it to their catalog | Vendor chooses to add or ignore |
-| Order placed (storefront or prescription) | Auto-route to vendor's incoming queue | Vendor must accept before processing |
-| Vendor rejects an order | Auto-reassign to next nearest pharmacy (fallback chain) | System notifies patient of reassignment |
-| Payment confirmed | Auto-change order status to `confirmed` | Vendor sees "confirmed" and must click "accept" |
-| Delivery completed | Auto-trigger review request after 3 days | Patient optionally submits review |
-| Stock below auto-refill threshold | Auto-create refill order for patient's recurring meds | Vendor must confirm refill order |
+| Trigger                                      | Automation                                              | Human-in-Loop                                   |
+| -------------------------------------------- | ------------------------------------------------------- | ----------------------------------------------- |
+| Vendor updates stock in `pharmacy_inventory` | Auto-sync to `vendor_products.stock` via DB trigger     | —                                               |
+| Vendor changes price in `pharmacy_inventory` | Auto-sync to `vendor_products.price` via DB trigger     | —                                               |
+| Stock drops to zero                          | Auto-set `vendor_products.is_available = false`         | Vendor can override and mark as "backorder"     |
+| New drug added to `drug_catalog`             | Notify matching vendors to add it to their catalog      | Vendor chooses to add or ignore                 |
+| Order placed (storefront or prescription)    | Auto-route to vendor's incoming queue                   | Vendor must accept before processing            |
+| Vendor rejects an order                      | Auto-reassign to next nearest pharmacy (fallback chain) | System notifies patient of reassignment         |
+| Payment confirmed                            | Auto-change order status to `confirmed`                 | Vendor sees "confirmed" and must click "accept" |
+| Delivery completed                           | Auto-trigger review request after 3 days                | Patient optionally submits review               |
+| Stock below auto-refill threshold            | Auto-create refill order for patient's recurring meds   | Vendor must confirm refill order                |
 
 #### 9.3 — Multi-Vendor Storefront (Replaces Single /zobraipharm)
 
@@ -531,6 +556,7 @@ create policy "Vendors manage own products"
 ```
 
 **Storefront logic**:
+
 - On page load, detect user's pincode (from profile or geolocation)
 - Query `vendor_products` JOIN `pharmacy_profiles` WHERE `delivery_radius_km` covers pincode
 - Show products grouped by vendor or blended (with vendor badge)
@@ -540,6 +566,7 @@ create policy "Vendors manage own products"
 #### 9.4 — Order Routing Engine (Automation + Human-in-Loop)
 
 **Algorithm for auto-assignment**:
+
 ```
 1. Doctor/Customer creates order with delivery pincode
 2. Find pharmacies where:
@@ -579,6 +606,7 @@ Vendor prepares   Next pharmacy
 ```
 
 **Edge cases covered**:
+
 - All vendors reject → system notifies doctor/patient, suggests manual pharmacy search
 - Vendor accepts but later runs out of stock → can mark "partially fulfilled", rest cancelled/backordered
 - Vendor doesn't respond within N hours → auto-escalate to next vendor + penalty on acceptance rating
@@ -602,14 +630,14 @@ const prescriptionOrders = await supabase
   .order("created_at", { ascending: false });
 ```
 
-| Column | Store Order | Prescription Order |
-|--------|-------------|-------------------|
-| Order Source Badge | 🛒 Store | 📋 Rx |
-| Customer | Name + phone from form | Name from patient_profiles |
-| Items | Product name + qty from store_order_items | Drug name + dosage from prescription_items |
-| Doctor Info | — | Doctor name + license |
-| Prescription PDF | — | View/Download link |
-| Action | Accept / Reject / Dispatch | Same + "Need refill clarification?" |
+| Column             | Store Order                               | Prescription Order                         |
+| ------------------ | ----------------------------------------- | ------------------------------------------ |
+| Order Source Badge | 🛒 Store                                  | 📋 Rx                                      |
+| Customer           | Name + phone from form                    | Name from patient_profiles                 |
+| Items              | Product name + qty from store_order_items | Drug name + dosage from prescription_items |
+| Doctor Info        | —                                         | Doctor name + license                      |
+| Prescription PDF   | —                                         | View/Download link                         |
+| Action             | Accept / Reject / Dispatch                | Same + "Need refill clarification?"        |
 
 #### 9.6 — Migration: Hardcoded Products → vendor_products Seed
 
@@ -621,15 +649,15 @@ The current 12 hardcoded products in `lib/pharmacy-store-data.ts` must be seeded
 
 ### Required Migration Changes Summary
 
-| Migration | Purpose |
-|-----------|---------|
-| `create_vendor_products_table` | Multi-vendor catalog with images, pricing, stock per vendor |
-| `add_pharmacy_id_to_store_orders` | Route store orders to specific vendor |
-| `add_pharmacy_id_index_to_store_orders` | Performance for vendor order queries |
-| `create_pharmacy_assets_bucket` | Supabase Storage bucket for product images |
-| `seed_vendor_products_from_hardcoded` | Migrate 12 existing products to all vendors |
-| `add_order_reassignment_events` | Track when orders are reassigned between vendors |
-| `add_vendor_response_time_column` | Track acceptance SLA for ranking |
+| Migration                               | Purpose                                                     |
+| --------------------------------------- | ----------------------------------------------------------- |
+| `create_vendor_products_table`          | Multi-vendor catalog with images, pricing, stock per vendor |
+| `add_pharmacy_id_to_store_orders`       | Route store orders to specific vendor                       |
+| `add_pharmacy_id_index_to_store_orders` | Performance for vendor order queries                        |
+| `create_pharmacy_assets_bucket`         | Supabase Storage bucket for product images                  |
+| `seed_vendor_products_from_hardcoded`   | Migrate 12 existing products to all vendors                 |
+| `add_order_reassignment_events`         | Track when orders are reassigned between vendors            |
+| `add_vendor_response_time_column`       | Track acceptance SLA for ranking                            |
 
 ### Architecture Diagram (Updated)
 
@@ -680,67 +708,68 @@ The current 12 hardcoded products in `lib/pharmacy-store-data.ts` must be seeded
 
 ### New Files Needed
 
-| File | Purpose |
-|------|---------|
-| `supabase/migrations/create_vendor_products.sql` | `vendor_products` table + RLS + indexes |
-| `app/api/vendor/products/route.ts` | CRUD API for vendor's own products |
-| `app/api/vendor/products/upload/route.ts` | Image upload to storage bucket |
-| `app/api/orders/routing/route.ts` | Auto-assignment engine (pincode, stock, distance) |
-| `app/dashboard/pharmacy/catalog/manage/page.tsx` | Add/Edit product form with image upload |
-| `app/dashboard/pharmacy/catalog/manage/[id]/page.tsx` | Edit specific product |
-| `app/dashboard/pharmacy/orders/[id]/page.tsx` | Order detail (accept/reject/dispatch UI) |
-| `app/zobraipharm/vendor/[pharmacyId]/page.tsx` | Single vendor's full catalog |
-| `app/api/pharmacy/nearby/route.ts` | Find pharmacies by pincode (for routing) |
-| `supabase/functions/order-auto-assign/` | Edge Function for async auto-assignment |
-| `supabase/functions/auto-escalate-unconfirmed/` | Edge Function for stale order escalation |
-| `lib/vendor-store-data.ts` | Shared types for vendor catalog (replaces `pharmacy-store-data.ts`) |
+| File                                                  | Purpose                                                             |
+| ----------------------------------------------------- | ------------------------------------------------------------------- |
+| `supabase/migrations/create_vendor_products.sql`      | `vendor_products` table + RLS + indexes                             |
+| `app/api/vendor/products/route.ts`                    | CRUD API for vendor's own products                                  |
+| `app/api/vendor/products/upload/route.ts`             | Image upload to storage bucket                                      |
+| `app/api/orders/routing/route.ts`                     | Auto-assignment engine (pincode, stock, distance)                   |
+| `app/dashboard/pharmacy/catalog/manage/page.tsx`      | Add/Edit product form with image upload                             |
+| `app/dashboard/pharmacy/catalog/manage/[id]/page.tsx` | Edit specific product                                               |
+| `app/dashboard/pharmacy/orders/[id]/page.tsx`         | Order detail (accept/reject/dispatch UI)                            |
+| `app/zobraipharm/vendor/[pharmacyId]/page.tsx`        | Single vendor's full catalog                                        |
+| `app/api/pharmacy/nearby/route.ts`                    | Find pharmacies by pincode (for routing)                            |
+| `supabase/functions/order-auto-assign/`               | Edge Function for async auto-assignment                             |
+| `supabase/functions/auto-escalate-unconfirmed/`       | Edge Function for stale order escalation                            |
+| `lib/vendor-store-data.ts`                            | Shared types for vendor catalog (replaces `pharmacy-store-data.ts`) |
 
 ### RLS Policy Matrix
 
-| Table | patient can | doctor can | pharmacy_vendor can |
-|-------|------------|------------|-------------------|
-| `vendor_products` | SELECT (available only) | SELECT | ALL (own only) |
-| `store_orders` | SELECT (own) | — | SELECT (assigned) + UPDATE (status) |
-| `orders` (prescription) | SELECT (own) | SELECT (created) | SELECT (assigned) + UPDATE (status) |
-| `pharmacy_profiles` | SELECT (active) | SELECT | ALL (own only) |
-| `pharmacy_inventory` | — | SELECT | ALL (own only) |
-| `pharmacy_assets` bucket | SELECT (public) | SELECT (public) | INSERT (own folder) |
+| Table                    | patient can             | doctor can       | pharmacy_vendor can                 |
+| ------------------------ | ----------------------- | ---------------- | ----------------------------------- |
+| `vendor_products`        | SELECT (available only) | SELECT           | ALL (own only)                      |
+| `store_orders`           | SELECT (own)            | —                | SELECT (assigned) + UPDATE (status) |
+| `orders` (prescription)  | SELECT (own)            | SELECT (created) | SELECT (assigned) + UPDATE (status) |
+| `pharmacy_profiles`      | SELECT (active)         | SELECT           | ALL (own only)                      |
+| `pharmacy_inventory`     | —                       | SELECT           | ALL (own only)                      |
+| `pharmacy_assets` bucket | SELECT (public)         | SELECT (public)  | INSERT (own folder)                 |
 
 ---
 
 ## Schema Inconsistencies Blocking the Pipeline
 
-| Issue | Tables Involved | Impact |
-|-------|----------------|--------|
-| `vendors` (v1) vs `pharmacy_profiles` (v2) | `vendors`, `pharmacy_profiles`, `refill_orders`, `orders` | Registration writes to `vendors`, inventory reads from `pharmacy_profiles`. Orders reference either depending on code path. |
-| `refill_orders` (v1) vs `orders` (v2) | `refill_orders`, `orders`, `refill_order_events`, `order_events` | Patient refill flow uses v1, prescription fulfillment should use v2. Two tracking systems. |
-| `store_orders` has no `pharmacy_id` | `store_orders` | Store orders cannot be routed to a specific pharmacy vendor |
-| `prescriptions` has `tracking_id` column but never populated | `prescriptions` | Column added by migration `20260617000004` but no code writes to it |
-| `medications` table has no `prescription_id` link | `medications`, `prescriptions` | Patient's `medications` table is disconnected from doctor's `prescriptions` — no way to know which medication came from which prescription |
+| Issue                                                        | Tables Involved                                                  | Impact                                                                                                                                     |
+| ------------------------------------------------------------ | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `vendors` (v1) vs `pharmacy_profiles` (v2)                   | `vendors`, `pharmacy_profiles`, `refill_orders`, `orders`        | Registration writes to `vendors`, inventory reads from `pharmacy_profiles`. Orders reference either depending on code path.                |
+| `refill_orders` (v1) vs `orders` (v2)                        | `refill_orders`, `orders`, `refill_order_events`, `order_events` | Patient refill flow uses v1, prescription fulfillment should use v2. Two tracking systems.                                                 |
+| `store_orders` has no `pharmacy_id`                          | `store_orders`                                                   | Store orders cannot be routed to a specific pharmacy vendor                                                                                |
+| `prescriptions` has `tracking_id` column but never populated | `prescriptions`                                                  | Column added by migration `20260617000004` but no code writes to it                                                                        |
+| `medications` table has no `prescription_id` link            | `medications`, `prescriptions`                                   | Patient's `medications` table is disconnected from doctor's `prescriptions` — no way to know which medication came from which prescription |
 
 ---
 
 ## Edge Cases Not Handled
 
-| Edge Case | Scenario | Impact |
-|-----------|----------|--------|
-| Patient has no saved address | Prescription send → patient confirm → checkout has no address | Pre-fill fails, order cannot be completed |
-| Multiple pharmacies within radius | Doctor send → which pharmacy receives it? | Need pharmacy selection or auto-assign logic |
-| Pharmacy rejects the order | Vendor sees incoming order but declines | Need fallback to reassign to another pharmacy |
-| Partial fulfillment | Only some medications in stock | Need partial acceptance flow (partially_filled status) |
-| Out-of-stock at time of patient confirmation | Items in prescription not available at chosen pharmacy | Need to alert patient or suggest alternatives |
-| Prescription expired before patient confirms | Prescription status = `expired` | Need to block confirmation and notify patient |
-| Patient has multiple pending prescriptions | Unconfirmed orders accumulate | Need clear dashboard organization |
-| Payment failure after order creation | Order created but payment failed | Need order -> `payment_pending` status with retry |
-| Patient edits prescription quantities during confirm | Doctor prescribed `x10`, patient wants `x5` | Need quantity adjustment with doctor override |
-| Auto-refill creates duplicate orders | Stock check runs twice before first order arrives | Need idempotency key check |
-| Delivery address pincode out of pharmacy range | Pharmacy cannot deliver to patient's area | Need pincode validation during pharmacy assignment |
+| Edge Case                                            | Scenario                                                      | Impact                                                 |
+| ---------------------------------------------------- | ------------------------------------------------------------- | ------------------------------------------------------ |
+| Patient has no saved address                         | Prescription send → patient confirm → checkout has no address | Pre-fill fails, order cannot be completed              |
+| Multiple pharmacies within radius                    | Doctor send → which pharmacy receives it?                     | Need pharmacy selection or auto-assign logic           |
+| Pharmacy rejects the order                           | Vendor sees incoming order but declines                       | Need fallback to reassign to another pharmacy          |
+| Partial fulfillment                                  | Only some medications in stock                                | Need partial acceptance flow (partially_filled status) |
+| Out-of-stock at time of patient confirmation         | Items in prescription not available at chosen pharmacy        | Need to alert patient or suggest alternatives          |
+| Prescription expired before patient confirms         | Prescription status = `expired`                               | Need to block confirmation and notify patient          |
+| Patient has multiple pending prescriptions           | Unconfirmed orders accumulate                                 | Need clear dashboard organization                      |
+| Payment failure after order creation                 | Order created but payment failed                              | Need order -> `payment_pending` status with retry      |
+| Patient edits prescription quantities during confirm | Doctor prescribed `x10`, patient wants `x5`                   | Need quantity adjustment with doctor override          |
+| Auto-refill creates duplicate orders                 | Stock check runs twice before first order arrives             | Need idempotency key check                             |
+| Delivery address pincode out of pharmacy range       | Pharmacy cannot deliver to patient's area                     | Need pincode validation during pharmacy assignment     |
 
 ---
 
 ## Implementation Plan (Phased)
 
 ### Phase 1 — Foundation (Schema & Vendor Onboarding)
+
 - [ ] Add `onboarding_completed` column to `pharmacy_profiles`
 - [ ] Build `/dashboard/pharmacy/onboarding/` (5-step wizard)
 - [ ] Fix vendor registration to use `pharmacy_profiles` instead of `vendors`
@@ -752,6 +781,7 @@ The current 12 hardcoded products in `lib/pharmacy-store-data.ts` must be seeded
 - [ ] Add RLS policies for `vendor_products` (vendor can CRUD own, patient/doctor can SELECT available)
 
 ### Phase 2 — Vendor Self-Service Catalog
+
 - [ ] Build `/dashboard/pharmacy/catalog/manage/` — Add/Edit product form with image upload (→ Storage bucket)
 - [ ] Build `/dashboard/pharmacy/catalog/manage/[id]/` — Edit specific product
 - [ ] Build single-vendor storefront at `/zobraipharm/vendor/[pharmacyId]/` — full catalog view
@@ -762,6 +792,7 @@ The current 12 hardcoded products in `lib/pharmacy-store-data.ts` must be seeded
 - [ ] Build auto-sync DB trigger: `pharmacy_inventory` changes → `vendor_products.stock` + `vendor_products.price`
 
 ### Phase 3 — Doctor → Pharmacy Send
+
 - [ ] Add "Send to Pharmacy" button to doctor's Rx pad (post-finalize)
 - [ ] Build pharmacy vendor selector modal (query `pharmacy_profiles` by active + pincode + inventory match)
 - [ ] Insert into `orders` table with proper tracking ID
@@ -769,6 +800,7 @@ The current 12 hardcoded products in `lib/pharmacy-store-data.ts` must be seeded
 - [ ] Add "Send to Pharmacy" to `/dashboard/doctor/prescriptions/` list (for active prescriptions)
 
 ### Phase 4 — Multi-Vendor Storefront + Order Routing
+
 - [ ] Refactor `/zobraipharm/` to query `vendor_products` instead of hardcoded array
 - [ ] Build pincode detection + nearest-pharmacy product query
 - [ ] Build order routing: auto-assign to nearest pharmacy with stock
@@ -779,6 +811,7 @@ The current 12 hardcoded products in `lib/pharmacy-store-data.ts` must be seeded
 - [ ] Add vendor order detail with accept/reject/dispatch actions
 
 ### Phase 5 — Patient Order Flow
+
 - [ ] Build `/dashboard/prescription-orders/` or extend `/dashboard/my-orders/` to show prescription orders
 - [ ] Add "Awaiting Confirmation" status with "Confirm Order" action
 - [ ] Build pre-authenticated checkout flow with prescription items pre-filled
@@ -786,6 +819,7 @@ The current 12 hardcoded products in `lib/pharmacy-store-data.ts` must be seeded
 - [ ] On payment success: create `order_events`, notify vendor
 
 ### Phase 6 — Auto-Refill & Reviews
+
 - [ ] Create Edge Function `auto-refill-check` (scheduled every 6 hours)
 - [ ] Add patient-facing auto-refill toggle on medication detail
 - [ ] Build review submission UI with 5-star rating
@@ -793,6 +827,7 @@ The current 12 hardcoded products in `lib/pharmacy-store-data.ts` must be seeded
 - [ ] Create Edge Function `request-review` (3 days post-delivery)
 
 ### Phase 7 — Edge Cases & Automation
+
 - [ ] Pharmacy rejection → auto-reassign to next nearest pharmacy (fallback chain)
 - [ ] Vendor SLA timeout: no response in N hours → auto-escalate + ranking penalty
 - [ ] Partial fulfillment flow (partially_filled status)
@@ -807,38 +842,38 @@ The current 12 hardcoded products in `lib/pharmacy-store-data.ts` must be seeded
 
 ## Files That Need Changes
 
-| File | Phase | Change Description |
-|------|-------|-------------------|
-| `supabase/migrations/create_vendor_products.sql` | 1 | New: `vendor_products` table, Storage bucket, RLS, auto-sync triggers |
-| `supabase/migrations/*.sql` | 1 | New migrations for `pharmacy_profiles.onboarding_completed`, `store_orders.pharmacy_id`, `product_reviews`, `medications.prescription_id` |
-| `app/dashboard/pharmacy/page.tsx` | 1 | Remove `pharmacy_vendor` redirect to inventory; add onboarding check instead |
-| `app/dashboard/pharmacy/inventory/page.tsx` | 1 | Fix schema references from `vendors` to `pharmacy_profiles`; add CSV → `vendor_products` sync |
-| `app/dashboard/pharmacy/catalog/manage/page.tsx` | 2 | New: Add/Edit product form with image upload |
-| `app/dashboard/pharmacy/catalog/manage/[id]/page.tsx` | 2 | New: Edit specific product |
-| `app/api/vendor/products/route.ts` | 2 | New: CRUD API for vendor's own products |
-| `app/api/vendor/products/upload/route.ts` | 2 | New: Image upload to Storage bucket |
-| `lib/vendor-store-data.ts` | 2 | New: Shared types for vendor catalog (replaces `pharmacy-store-data.ts`) |
-| `lib/pharmacy-store-data.ts` | 2 | Deprecate: migrate to `vendor-store-data.ts` + DB |
-| `app/dashboard/doctor/page.tsx` | 3 | Add "Send to Pharmacy" button + pharmacy selector + `orders` table insert |
-| `app/dashboard/doctor/prescriptions/page.tsx` | 3 | Add "Send to Pharmacy" action for active prescriptions |
-| `app/zobraipharm/page.tsx` | 4 | Refactor: query `vendor_products` dynamically instead of hardcoded array |
-| `app/zobraipharm/vendor/[pharmacyId]/page.tsx` | 4 | New: Single vendor's full catalog |
-| `app/zobraipharm/product/[slug]/page.tsx` | 4 | Refactor: show price comparison across vendors + reviews |
-| `app/zobraipharm/checkout/page.tsx` | 5 | Add prescription pre-fill, multi-vendor cart split, payment integration |
-| `app/api/orders/routing/route.ts` | 4 | New: Auto-assignment engine (pincode, stock, distance, rating) |
-| `app/api/pharmacy/nearby/route.ts` | 4 | New: Find pharmacies by pincode |
-| `app/dashboard/pharmacy/orders/page.tsx` | 4 | New: Unified incoming order feed (store + prescription) |
-| `app/dashboard/pharmacy/orders/[id]/page.tsx` | 4 | New: Order detail with accept/reject/dispatch actions |
-| `app/dashboard/my-orders/page.tsx` | 5 | Extend to show prescription orders from `orders` table |
-| `supabase/functions/order-auto-assign/` | 4 | New: Edge Function for async auto-assignment |
-| `supabase/functions/auto-escalate-unconfirmed/` | 7 | New: Edge Function for stale order escalation |
-| `supabase/functions/auto-refill-check/` | 6 | New: Edge Function for auto-refill |
-| `supabase/functions/request-review/` | 6 | New: Edge Function for review requests |
-| `app/api/store/orders/route.ts` | 3 | Add pharmacy assignment, payment handling |
-| `app/api/orders/status/route.ts` | 4 | Extend for vendor status updates with auth |
-| `app/dashboard/pharmacy/orders/` (new) | 4 | New directory for vendor order management |
-| `lib/medications.ts` | 5 | Add review-related interfaces, auto-refill types |
-| `app/zobraipharm/product/[slug]/page.tsx` | 5 | Add review section |
-| `lib/pharmacy-store-data.ts` | 6 | Replace hardcoded products with DB fetch |
-| `supabase/functions/auto-refill-check/` (new) | 5 | Edge Function for auto-refill |
-| `supabase/functions/request-review/` (new) | 5 | Edge Function for review requests |
+| File                                                  | Phase | Change Description                                                                                                                        |
+| ----------------------------------------------------- | ----- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `supabase/migrations/create_vendor_products.sql`      | 1     | New: `vendor_products` table, Storage bucket, RLS, auto-sync triggers                                                                     |
+| `supabase/migrations/*.sql`                           | 1     | New migrations for `pharmacy_profiles.onboarding_completed`, `store_orders.pharmacy_id`, `product_reviews`, `medications.prescription_id` |
+| `app/dashboard/pharmacy/page.tsx`                     | 1     | Remove `pharmacy_vendor` redirect to inventory; add onboarding check instead                                                              |
+| `app/dashboard/pharmacy/inventory/page.tsx`           | 1     | Fix schema references from `vendors` to `pharmacy_profiles`; add CSV → `vendor_products` sync                                             |
+| `app/dashboard/pharmacy/catalog/manage/page.tsx`      | 2     | New: Add/Edit product form with image upload                                                                                              |
+| `app/dashboard/pharmacy/catalog/manage/[id]/page.tsx` | 2     | New: Edit specific product                                                                                                                |
+| `app/api/vendor/products/route.ts`                    | 2     | New: CRUD API for vendor's own products                                                                                                   |
+| `app/api/vendor/products/upload/route.ts`             | 2     | New: Image upload to Storage bucket                                                                                                       |
+| `lib/vendor-store-data.ts`                            | 2     | New: Shared types for vendor catalog (replaces `pharmacy-store-data.ts`)                                                                  |
+| `lib/pharmacy-store-data.ts`                          | 2     | Deprecate: migrate to `vendor-store-data.ts` + DB                                                                                         |
+| `app/dashboard/doctor/page.tsx`                       | 3     | Add "Send to Pharmacy" button + pharmacy selector + `orders` table insert                                                                 |
+| `app/dashboard/doctor/prescriptions/page.tsx`         | 3     | Add "Send to Pharmacy" action for active prescriptions                                                                                    |
+| `app/zobraipharm/page.tsx`                            | 4     | Refactor: query `vendor_products` dynamically instead of hardcoded array                                                                  |
+| `app/zobraipharm/vendor/[pharmacyId]/page.tsx`        | 4     | New: Single vendor's full catalog                                                                                                         |
+| `app/zobraipharm/product/[slug]/page.tsx`             | 4     | Refactor: show price comparison across vendors + reviews                                                                                  |
+| `app/zobraipharm/checkout/page.tsx`                   | 5     | Add prescription pre-fill, multi-vendor cart split, payment integration                                                                   |
+| `app/api/orders/routing/route.ts`                     | 4     | New: Auto-assignment engine (pincode, stock, distance, rating)                                                                            |
+| `app/api/pharmacy/nearby/route.ts`                    | 4     | New: Find pharmacies by pincode                                                                                                           |
+| `app/dashboard/pharmacy/orders/page.tsx`              | 4     | New: Unified incoming order feed (store + prescription)                                                                                   |
+| `app/dashboard/pharmacy/orders/[id]/page.tsx`         | 4     | New: Order detail with accept/reject/dispatch actions                                                                                     |
+| `app/dashboard/my-orders/page.tsx`                    | 5     | Extend to show prescription orders from `orders` table                                                                                    |
+| `supabase/functions/order-auto-assign/`               | 4     | New: Edge Function for async auto-assignment                                                                                              |
+| `supabase/functions/auto-escalate-unconfirmed/`       | 7     | New: Edge Function for stale order escalation                                                                                             |
+| `supabase/functions/auto-refill-check/`               | 6     | New: Edge Function for auto-refill                                                                                                        |
+| `supabase/functions/request-review/`                  | 6     | New: Edge Function for review requests                                                                                                    |
+| `app/api/store/orders/route.ts`                       | 3     | Add pharmacy assignment, payment handling                                                                                                 |
+| `app/api/orders/status/route.ts`                      | 4     | Extend for vendor status updates with auth                                                                                                |
+| `app/dashboard/pharmacy/orders/` (new)                | 4     | New directory for vendor order management                                                                                                 |
+| `lib/medications.ts`                                  | 5     | Add review-related interfaces, auto-refill types                                                                                          |
+| `app/zobraipharm/product/[slug]/page.tsx`             | 5     | Add review section                                                                                                                        |
+| `lib/pharmacy-store-data.ts`                          | 6     | Replace hardcoded products with DB fetch                                                                                                  |
+| `supabase/functions/auto-refill-check/` (new)         | 5     | Edge Function for auto-refill                                                                                                             |
+| `supabase/functions/request-review/` (new)            | 5     | Edge Function for review requests                                                                                                         |

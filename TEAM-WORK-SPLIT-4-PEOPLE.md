@@ -8,18 +8,19 @@
 
 ## Person Assignment
 
-| Person | Focus | Branch | Files They Touch | Overlap Risk |
-|--------|-------|--------|------------------|-------------|
-| **P1** | **Mobile App + Cross-Platform Integration + Remaining Features** | `p1-mobile-integration` | `zorabihealth-mobile/`, shared libs, Supabase Realtime channels, notification dispatch | Shared `lib/` files — coordinate with P2/P3 on any changes |
-| **P2** | **Web UI Components + Doctor/Patient/Pharmacy Frontend** | `p2-web-ui` | `app/dashboard/`, `app/zobraipharm/`, `components/`, `lib/` (UI only) | No overlap with P1 (mobile). Coordinate with P3 on API contract changes |
-| **P3** | **Backend API + Pharmacy Pipeline + Order Routing** | `p3-backend-pharmacy` | `app/api/`, `app/dashboard/pharmacy/`, `supabase/functions/`, new routes for pharmacy pipeline | Coordinate with P2 on API response shapes; coordinate with P4 on migrations |
-| **P4** | **Testing + Security + Schema Migrations + Reviews** | `p4-test-security-reviews` | `__tests__/`, `supabase/migrations/`, `.env.local`, `app/api/reviews/`, RLS policies | Depends on P3 schema changes — run migrations after P3 finalizes |
+| Person | Focus                                                            | Branch                     | Files They Touch                                                                               | Overlap Risk                                                                |
+| ------ | ---------------------------------------------------------------- | -------------------------- | ---------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| **P1** | **Mobile App + Cross-Platform Integration + Remaining Features** | `p1-mobile-integration`    | `zorabihealth-mobile/`, shared libs, Supabase Realtime channels, notification dispatch         | Shared `lib/` files — coordinate with P2/P3 on any changes                  |
+| **P2** | **Web UI Components + Doctor/Patient/Pharmacy Frontend**         | `p2-web-ui`                | `app/dashboard/`, `app/zobraipharm/`, `components/`, `lib/` (UI only)                          | No overlap with P1 (mobile). Coordinate with P3 on API contract changes     |
+| **P3** | **Backend API + Pharmacy Pipeline + Order Routing**              | `p3-backend-pharmacy`      | `app/api/`, `app/dashboard/pharmacy/`, `supabase/functions/`, new routes for pharmacy pipeline | Coordinate with P2 on API response shapes; coordinate with P4 on migrations |
+| **P4** | **Testing + Security + Schema Migrations + Reviews**             | `p4-test-security-reviews` | `__tests__/`, `supabase/migrations/`, `.env.local`, `app/api/reviews/`, RLS policies           | Depends on P3 schema changes — run migrations after P3 finalizes            |
 
 ---
 
 ## PERSON 1 — Mobile App + Cross-Platform Integration + Remaining Features
 
 ### Identity Badge
+
 ```
 Name: Mobile & Cross-Platform Integrator
 Scope: zorabihealth-mobile/ (Expo), shared lib/, Supabase Realtime, notification systems
@@ -27,6 +28,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 ```
 
 ### Prerequisite Check (Complete Before Starting)
+
 - [ ] Read `zorabihealth-mobile/lib/alarm-queue.ts` — understand offline queue
 - [ ] Read `zorabihealth-mobile/lib/background-sync.ts` — understand background sync
 - [ ] Read `zorabihealth-mobile/app/(tabs)/medications.tsx` — understand mobile medication flow
@@ -41,6 +43,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 **Why**: Identical 70-line function exists in 2 places (`zorabihealth/lib/alarm-queue.ts:87-161` and `zorabihealth-mobile/lib/alarm-queue.ts:163-232`). Bug fixes must be applied twice.
 
 **What to do**:
+
 1. Create `zorabihealth/packages/shared/src/sync/buildScheduleFromRemote.ts`:
    - Copy the function from `zorabihealth/lib/alarm-queue.ts:87-161`
    - Export as `buildScheduleFromRemote(medications: RemoteMedication[]): ScheduleItem[]`
@@ -51,7 +54,8 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 5. Update `zorabihealth-mobile/lib/alarm-queue.ts:163-232` — import from `@zorabihealth/shared`
 6. **Verify**: Both web and mobile `buildScheduleFromRemote` call the same shared code
 
-**Files changed**: 
+**Files changed**:
+
 - `zorabihealth/packages/shared/` (NEW — 3 files)
 - `zorabihealth/lib/alarm-queue.ts` (edit import)
 - `zorabihealth-mobile/lib/alarm-queue.ts` (edit import)
@@ -67,6 +71,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 **Why**: 4 copies of queue-drain logic exist (#16, #17). Single source of truth needed.
 
 **What to do**:
+
 1. Create `zorabihealth/packages/shared/src/sync/syncOfflineQueue.ts`:
    - Copy from `zorabihealth/lib/supabase.ts:60-93` (the most complete version)
    - Add `delete` operation support (currently mobile version skips deletes — `zorahihealth-mobile/lib/background-sync.ts:128-146`)
@@ -80,6 +85,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 6. **Edge case**: If a single item fails permanently (FK constraint), remove it from queue AND log to error reporting. Don't block remaining items.
 
 **Files changed**:
+
 - `zorabihealth/packages/shared/src/sync/syncOfflineQueue.ts` (NEW)
 - `zorabihealth/packages/shared/src/index.ts` (add export)
 - `zorabihealth/lib/supabase.ts` (edit)
@@ -96,15 +102,16 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 **Why**: Two queue systems (`zh_sync_queue` and `zh_offline_queue`) can queue the same action twice, causing duplicate writes (#11, #14).
 
 **What to do**:
+
 1. Add vector clock to `zh_sync_queue` table via shared type:
    ```typescript
    interface SyncQueueItem {
      id: string;
      table: string;
-     action: 'insert' | 'update' | 'delete';
+     action: "insert" | "update" | "delete";
      payload: Record<string, unknown>;
-     vector_clock: number;  // monotonically increasing per-device
-     device_id: string;     // 'web' | 'mobile-' + deviceName
+     vector_clock: number; // monotonically increasing per-device
+     device_id: string; // 'web' | 'mobile-' + deviceName
      retry_count: number;
      created_at: string;
    }
@@ -117,6 +124,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 5. **Verify**: Insert medication log on web offline → immediately insert same log on mobile offline → when both come online, only one write hits the DB
 
 **Files changed**:
+
 - `zorabihealth/packages/shared/src/sync/syncOfflineQueue.ts` (add conflict resolution)
 - `zorabihealth/packages/shared/src/types.ts` (add SyncQueueItem, VectorClock types)
 - `zorabihealth/lib/supabase.ts` (update queueSyncItem signature)
@@ -132,6 +140,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 **Why**: `zorabihealth-mobile/app/(tabs)/medications.tsx:157-164` captures `user?.id` in initial closure. If user switches accounts, old data shows.
 
 **What to do**:
+
 1. In `zorabihealth-mobile/app/(tabs)/medications.tsx:157`, add `user?.id` to the `useEffect` dependency array
 2. Add a `useRef` to track previous user ID
 3. When user ID changes, call `fetchMedications()` immediately AND clear old state
@@ -139,6 +148,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 5. **Edge case**: If fetch fails during user switch, show error state, don't fall back to old user's data
 
 **Files changed**:
+
 - `zorabihealth-mobile/app/(tabs)/medications.tsx:157-164` (fix deps + add user-switch guard)
 - `zorabihealth-mobile/app/(tabs)/medications.tsx` (add loading state for user switch)
 
@@ -151,23 +161,30 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 **Why**: Web marks "Taken" → Mobile alarm still rings (#28, UI Audit #83). Mobile only refreshes on AppState change.
 
 **What to do**:
+
 1. On mobile, subscribe to Supabase Realtime channel for `medication_logs`:
+
    ```typescript
    // In zorahihealth-mobile/lib/realtime-sync.ts (NEW)
-   import { supabase } from '../lib/supabase';
-   
+   import { supabase } from "../lib/supabase";
+
    export function subscribeToMedicationLogs(userId: string, onLogInserted: (log) => void) {
      return supabase
        .channel(`medication-logs-${userId}`)
        .on(
-         'postgres_changes',
-         { event: 'INSERT', schema: 'public', table: 'medication_logs',
-           filter: `user_id=eq.${userId}` },
+         "postgres_changes",
+         {
+           event: "INSERT",
+           schema: "public",
+           table: "medication_logs",
+           filter: `user_id=eq.${userId}`,
+         },
          (payload) => onLogInserted(payload.new)
        )
        .subscribe();
    }
    ```
+
 2. In `zorabihealth-mobile/app/(tabs)/medications.tsx`, on receiving a Realtime event for a medication marked "taken":
    - Cancel the pending local notification alarm for that medication's scheduled time
    - Update the UI state to reflect "taken" status
@@ -184,6 +201,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 5. Store `last_sync_time` in AsyncStorage on mobile for reconciliation
 
 **Files changed**:
+
 - `zorabihealth-mobile/lib/realtime-sync.ts` (NEW)
 - `zorabihealth-mobile/app/(tabs)/medications.tsx` (add Realtime subscription + alarm cancel)
 - `zorabihealth-mobile/lib/background-sync.ts` (add reconciliation on reconnect)
@@ -198,17 +216,19 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 **Why**: `zorabihealth-mobile/lib/background-sync.ts:196-203` polls with `.limit(10)`. If >10 notifications arrive, `lastChecked` advances past the missed ones (#25).
 
 **What to do**:
+
 1. Change polling to use cursor-based pagination instead of `lastChecked`:
    ```typescript
    let hasMore = true;
    let lastId = null;
    while (hasMore) {
-     let query = supabase.from('notifications')
-       .select('*')
-       .eq('user_id', userId)
-       .order('created_at', { ascending: false })
+     let query = supabase
+       .from("notifications")
+       .select("*")
+       .eq("user_id", userId)
+       .order("created_at", { ascending: false })
        .limit(10);
-     if (lastId) query = query.lt('id', lastId);
+     if (lastId) query = query.lt("id", lastId);
      const { data } = await query;
      if (!data || data.length < 10) hasMore = false;
      lastId = data[data.length - 1]?.id;
@@ -220,6 +240,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 4. **Edge case**: If notification processing throws mid-way, don't update `lastProcessedId`. Retry on next poll cycle.
 
 **Files changed**:
+
 - `zorabihealth-mobile/lib/background-sync.ts:196-203` (replace limit-based with cursor-based)
 - `zorabihealth-mobile/lib/background-sync.ts:286-296` (update checkpoint/cleanup logic)
 
@@ -232,12 +253,14 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 **Why**: `zorabihealth/app/lib/notifications-transport.ts:66-97` never deactivates expired tokens (#23).
 
 **What to do**:
+
 1. In `zorabihealth/app/lib/notifications-transport.ts`, after receiving Expo push response with `"InvalidCredentials"` or `"DeviceNotRegistered"` error:
    - Call `supabase.from('notification_devices').update({ is_active: false }).eq('expo_push_token', token)`
 2. Log the deactivation for monitoring
 3. Add a weekly cleanup Edge Function (in `supabase/functions/cleanup-expired-devices/`) that queries all devices with `is_active = false` and `updated_at < now() - interval '30 days'` and deletes them
 
 **Files changed**:
+
 - `zorabihealth/app/lib/notifications-transport.ts:66-97` (add token deactivation)
 - `supabase/functions/cleanup-expired-devices/index.ts` (NEW)
 
@@ -250,16 +273,17 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 **Why**: `zorabihealth-mobile/app/(tabs)/medications.tsx:256` uses `local-${Date.now()}` as fallback ID (#38). Not UUID format.
 
 **What to do**:
+
 1. Add `uuid` package to mobile or use `crypto.randomUUID()` (available in modern Hermes):
    ```typescript
    // In zorabihealth-mobile/lib/uuid.ts (NEW)
    export function generateUUID(): string {
-     if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+     if (typeof crypto !== "undefined" && crypto.randomUUID) {
        return crypto.randomUUID();
      }
-     return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, c => {
-       const r = Math.random() * 16 | 0;
-       return (c === 'x' ? r : (r & 0x3 | 0x8)).toString(16);
+     return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+       const r = (Math.random() * 16) | 0;
+       return (c === "x" ? r : (r & 0x3) | 0x8).toString(16);
      });
    }
    ```
@@ -267,6 +291,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 3. Search for any other `local-` prefixed IDs in mobile code and replace them
 
 **Files changed**:
+
 - `zorabihealth-mobile/lib/uuid.ts` (NEW)
 - `zorabihealth-mobile/app/(tabs)/medications.tsx:256` (replace ID generation)
 - `zorabihealth-mobile/lib/` (search and replace any other temp IDs)
@@ -280,6 +305,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 **Why**: Mobile home screen (`index.tsx`) and vitals screen (`vitals.tsx`) have NO loading, empty, or error states (UI Audit #68, #69).
 
 **What to do**:
+
 1. For `zorabihealth-mobile/app/(tabs)/index.tsx`:
    - Add `ActivityIndicator` (loading state) shown during initial data fetch
    - Add empty state: illustration + "No health data yet" + "Sync your medications to get started" CTA
@@ -290,6 +316,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
    - Empty state: "No vitals recorded yet. Log your first reading."
 
 **Files changed**:
+
 - `zorabihealth-mobile/app/(tabs)/index.tsx` (add 3 missing states)
 - `zorabihealth-mobile/app/(tabs)/vitals.tsx` (add 3 missing states)
 
@@ -302,6 +329,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 **Why**: `zorabihealth-mobile/lib/background-sync.ts:286-296` checkpoint file never fully cleaned (#30).
 
 **What to do**:
+
 1. Add a cleanup mechanism:
    - Keep `shownIds` as a Set (automatically deduplicates)
    - Every 30 days (or 1000 notifications), write a fresh checkpoint with only the last 100 IDs
@@ -309,6 +337,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 2. Add checkpoint file size monitoring — if > 500KB, trigger full reset
 
 **Files changed**:
+
 - `zorabihealth-mobile/lib/background-sync.ts:286-296` (add cleanup logic)
 
 **Commit message**: `fix(mobile): add periodic checkpoint file cleanup`
@@ -318,6 +347,7 @@ Goal: Ship a working mobile app that syncs with web, unify duplicated sync logic
 ## PERSON 2 — Web UI Components & Doctor/Patient/Pharmacy Frontend
 
 ### Identity Badge
+
 ```
 Name: Web UI Engineer
 Scope: app/dashboard/, app/zobraipharm/, components/, lib/ (UI only)
@@ -325,6 +355,7 @@ Goal: Eliminate all UI glitches, build reusable components, ship polished doctor
 ```
 
 ### Prerequisite Check (Complete Before Starting)
+
 - [ ] Read UI-AUDIT-MISSING-COMPONENTS-GLITCHES.md completely
 - [ ] Read `app/dashboard/layout.tsx:398-421` — understand help button + settings redirect
 - [ ] Read `app/dashboard/medications/page.tsx` — understand dose logging, test alarm, phone validation
@@ -341,14 +372,16 @@ Goal: Eliminate all UI glitches, build reusable components, ship polished doctor
 **Create these 6 components in `components/ui/`:**
 
 #### 1.1 Toast Component (`components/ui/toast.tsx`)
+
 ```typescript
 interface ToastProps {
   message: string;
-  type: 'success' | 'error' | 'info' | 'warning';
-  duration?: number;  // default 4000
+  type: "success" | "error" | "info" | "warning";
+  duration?: number; // default 4000
   onDismiss?: () => void;
 }
 ```
+
 - Auto-dismiss after duration
 - Stack multiple toasts vertically
 - Slide-in animation (CSS transition)
@@ -356,31 +389,36 @@ interface ToastProps {
 - ARIA live region for screen readers
 
 #### 1.2 ErrorBoundary Component (`components/ui/error-boundary.tsx`)
+
 ```typescript
 interface ErrorBoundaryProps {
   fallback?: React.ReactNode;
   onError?: (error: Error, errorInfo: React.ErrorInfo) => void;
 }
 ```
+
 - Catches render errors in child tree
 - Shows "Something went wrong" UI with "Try Again" button
 - Logs error to console (dev mode) / error reporting (prod)
 - Wraps `app/dashboard/layout.tsx` root
 
 #### 1.3 Skeleton Component (`components/ui/skeleton.tsx`)
+
 ```typescript
 interface SkeletonProps {
-  variant: 'text' | 'circular' | 'rectangular' | 'card' | 'table-row';
+  variant: "text" | "circular" | "rectangular" | "card" | "table-row";
   width?: string;
   height?: string;
-  count?: number;  // repeat N times for lists
+  count?: number; // repeat N times for lists
 }
 ```
+
 - CSS shimmer animation
 - Pre-built variants for common patterns (card, table row, text line)
 - Accessible: `aria-busy="true"` `aria-label="Loading"`
 
 #### 1.4 EmptyState Component (`components/ui/empty-state.tsx`)
+
 ```typescript
 interface EmptyStateProps {
   icon?: React.ReactNode;
@@ -389,11 +427,13 @@ interface EmptyStateProps {
   action?: { label: string; onClick: () => void };
 }
 ```
+
 - Centered layout with optional illustration/icon
 - Action button for common next steps
 - Used in all list pages instead of inline "No data" divs
 
 #### 1.5 ConfirmDialog Component (`components/ui/confirm-dialog.tsx`)
+
 ```typescript
 interface ConfirmDialogProps {
   open: boolean;
@@ -401,26 +441,30 @@ interface ConfirmDialogProps {
   message: string;
   confirmLabel?: string;
   cancelLabel?: string;
-  variant?: 'danger' | 'warning' | 'info';
+  variant?: "danger" | "warning" | "info";
   onConfirm: () => void;
   onCancel: () => void;
 }
 ```
+
 - Modal overlay with backdrop
 - Keyboard accessible (Escape to cancel, Enter to confirm)
 - Focus trap inside dialog
 - Danger variant has red confirm button
 
 #### 1.6 NetworkBanner Component (`components/ui/network-banner.tsx`)
+
 ```typescript
 function NetworkBanner(): JSX.Element;
 ```
+
 - Subscribes to `window.addEventListener('online'/'offline')`
 - Shows "You are offline — changes will sync when connected" banner
 - Hides automatically when back online
 - Fixed position at top of viewport
 
 **Files changed**:
+
 - `components/ui/toast.tsx` (NEW)
 - `components/ui/error-boundary.tsx` (NEW)
 - `components/ui/skeleton.tsx` (NEW)
@@ -437,6 +481,7 @@ function NetworkBanner(): JSX.Element;
 **Why**: Doctor settings link → 404 (`/dashboard/doctor/settings` doesn't exist — #3). Help button is raw `alert()` (#2). Hardcoded avatar (#1).
 
 **What to do**:
+
 1. Create `app/dashboard/doctor/settings/page.tsx`:
    - Copy from `app/dashboard/settings/page.tsx` (patient settings)
    - Remove patient-specific sections (medication refill, patient pairing)
@@ -451,6 +496,7 @@ function NetworkBanner(): JSX.Element;
    - Fall back to initials avatar if no avatar_url
 
 **Files changed**:
+
 - `app/dashboard/doctor/settings/page.tsx` (NEW — 200+ lines)
 - `app/dashboard/layout.tsx:398` (replace alert with modal/navigation)
 - `app/dashboard/layout.tsx:421` (replace hardcoded image with dynamic avatar)
@@ -465,9 +511,10 @@ function NetworkBanner(): JSX.Element;
 
 **What to do**:
 Create a global toast hook at `hooks/useToast.ts`:
+
 ```typescript
 function useToast() {
-  const addToast = (message: string, type: 'success' | 'error' | 'info' | 'warning') => {
+  const addToast = (message: string, type: "success" | "error" | "info" | "warning") => {
     // Dispatch to toast context
   };
   return { addToast };
@@ -476,21 +523,22 @@ function useToast() {
 
 Then replace each `alert()` call:
 
-| # | Current Code | File:Line | Replacement |
-|---|-------------|-----------|-------------|
-| 4 | `alert("DocAssist Help Center is online.")` | `app/dashboard/layout.tsx:398` | Already fixed in P2-2 |
-| 5 | `alert('Dose logged successfully for ${med.name}!')` | `app/dashboard/page.tsx:149` | `addToast("Dose logged for ${med.name}", "success")` |
-| 6 | `alert("Failed to log dose.")` | `app/dashboard/page.tsx:152` | `addToast("Failed to log dose", "error")` |
-| 7 | `alert("Failed to create patient.")` | `app/dashboard/doctor/schedule/page.tsx:208` | `addToast("Failed to create patient", "error")` |
-| 8 | `alert("End time must be after start time.")` | `app/dashboard/doctor/schedule/page.tsx:214` | `addToast("End time must be after start time", "warning")` |
-| 9 | `alert("Time slot conflicts...")` | `app/dashboard/doctor/schedule/page.tsx:225` | `addToast("Time slot conflicts with existing appointment", "warning")` |
-| 10 | `alert("Failed to create appointment.")` | `app/dashboard/doctor/schedule/page.tsx:248` | `addToast("Failed to create appointment", "error")` |
-| 11 | `alert("End time must be after start time.")` | `app/dashboard/patient/book-appointment/page.tsx:145` | `addToast("End time must be after start time", "warning")` |
-| 12 | `alert("Patient profile not found...")` | `app/dashboard/patient/book-appointment/page.tsx:156` | `addToast("Patient profile not found", "error")` |
-| 13 | `alert(err?.message \|\| "Failed to book appointment.")` | `app/dashboard/patient/book-appointment/page.tsx:180` | `addToast(err?.message \|\| "Failed to book appointment", "error")` |
-| 14 | `alert("Failed to place order. Please try again.")` | `app/zobraipharm/checkout/page.tsx:151` | `addToast("Failed to place order. Please try again.", "error")` |
+| #   | Current Code                                             | File:Line                                             | Replacement                                                            |
+| --- | -------------------------------------------------------- | ----------------------------------------------------- | ---------------------------------------------------------------------- |
+| 4   | `alert("DocAssist Help Center is online.")`              | `app/dashboard/layout.tsx:398`                        | Already fixed in P2-2                                                  |
+| 5   | `alert('Dose logged successfully for ${med.name}!')`     | `app/dashboard/page.tsx:149`                          | `addToast("Dose logged for ${med.name}", "success")`                   |
+| 6   | `alert("Failed to log dose.")`                           | `app/dashboard/page.tsx:152`                          | `addToast("Failed to log dose", "error")`                              |
+| 7   | `alert("Failed to create patient.")`                     | `app/dashboard/doctor/schedule/page.tsx:208`          | `addToast("Failed to create patient", "error")`                        |
+| 8   | `alert("End time must be after start time.")`            | `app/dashboard/doctor/schedule/page.tsx:214`          | `addToast("End time must be after start time", "warning")`             |
+| 9   | `alert("Time slot conflicts...")`                        | `app/dashboard/doctor/schedule/page.tsx:225`          | `addToast("Time slot conflicts with existing appointment", "warning")` |
+| 10  | `alert("Failed to create appointment.")`                 | `app/dashboard/doctor/schedule/page.tsx:248`          | `addToast("Failed to create appointment", "error")`                    |
+| 11  | `alert("End time must be after start time.")`            | `app/dashboard/patient/book-appointment/page.tsx:145` | `addToast("End time must be after start time", "warning")`             |
+| 12  | `alert("Patient profile not found...")`                  | `app/dashboard/patient/book-appointment/page.tsx:156` | `addToast("Patient profile not found", "error")`                       |
+| 13  | `alert(err?.message \|\| "Failed to book appointment.")` | `app/dashboard/patient/book-appointment/page.tsx:180` | `addToast(err?.message \|\| "Failed to book appointment", "error")`    |
+| 14  | `alert("Failed to place order. Please try again.")`      | `app/zobraipharm/checkout/page.tsx:151`               | `addToast("Failed to place order. Please try again.", "error")`        |
 
 **Files changed**:
+
 - `hooks/useToast.ts` (NEW — toast context + provider)
 - `components/ui/toast.tsx` (already created in P2-1, wire into context)
 - `app/dashboard/layout.tsx` (wrap with ToastProvider)
@@ -505,6 +553,7 @@ Then replace each `alert()` call:
 **Why**: 29+ silent `catch {}` blocks swallow errors with zero user feedback (UI Audit #15-#29).
 
 **For each block, apply this pattern**:
+
 ```typescript
 // BEFORE:
 try { ... } catch { /* silent */ }
@@ -519,17 +568,20 @@ try { ... } catch (err) {
 Priority order (fix in this sequence):
 
 **High priority (user-visible impact)**:
+
 - `app/dashboard/role-select/page.tsx:54` — Role fetch fails → user stuck on role-select screen with no feedback. **Fix**: Show error toast + "Retry" button
 - `app/dashboard/voice/page.tsx:107` — Voice transcription fails → user sees no feedback, thinks it's still listening. **Fix**: Show "Speech recognition failed" toast
 - `app/dashboard/pharmacy/page.tsx:181` — Tracking lookup fails → user sees nothing. **Fix**: Show "Failed to look up tracking ID" toast
 - `app/zobraipharm/layout.tsx:216` — Cart loading fails → cart shows empty. **Fix**: Log error + show "Could not load cart" toast
 
 **Medium priority (data staleness)**:
+
 - `app/dashboard/workout/page.tsx:127,260,373,404,432` — 5 silent catches. **Fix**: Add toast per operation
 - `app/dashboard/sleep/page.tsx:93,260,314,336,409,430,448,502,546` — 9 silent catches. **Fix**: Add toast per operation
 - `app/dashboard/voice/page.tsx:525,645,672,754` — 4 additional silent catches
 
 **Lower priority (config/utility)**:
+
 - `lib/medications.ts:146` — parse error returns fallback. **Fix**: `console.warn` only
 - `lib/auth-utils.ts:49` — JWT error returns generic message. **Fix**: Already adequate
 - `lib/alarm-queue.ts:33` — schedule parse returns empty. **Fix**: `console.warn` only
@@ -553,18 +605,18 @@ Priority order (fix in this sequence):
 
 **Page-by-page**:
 
-| # | Page | Loading | Empty | Error | Details |
-|---|------|---------|-------|-------|---------|
-| 58 | `app/dashboard/analytics/page.tsx` | ❌ | ❌ | ❌ | Currently hardcoded demo data. Replace with real Supabase fetch. Loading = Skeleton charts. Empty = "No health data yet — sync your devices". Error = "Failed to load analytics" + Retry |
-| 59 | `app/dashboard/vitals/page.tsx` | ✅ Has | ❌ | ❌ | Add EmptyState: "No vitals recorded. Start tracking your health." Add ErrorState with retry |
-| 60 | `app/dashboard/meditation/page.tsx` | ❌ | ❌ | ❌ | Loading = skeleton cards. Empty = "No meditation exercises available" + Browse library CTA. Error = retry |
-| 61 | `app/dashboard/voice/page.tsx` | ❌ | ❌ | ❌ | Empty = "Start speaking to begin voice transcription" with microphone illustration. Loading = pulsing waveform. Error = retry |
-| 62 | `app/dashboard/doctor/page.tsx` | ❌ | ❌ | ❌ | Empty patient list = "No patients registered yet". Empty visits = "No past visits". Error per section = inline retry |
-| 63 | `app/dashboard/doctor/messages/page.tsx` | ❌ | ❌ | ❌ | Empty = "No conversations yet" |
-| 64 | `app/dashboard/doctor/prescriptions/page.tsx` | ❌ | ✅ Has | ❌ | Add ErrorState with retry |
-| 65 | `app/dashboard/doctor/patients/page.tsx` | ❌ | ✅ Has | ❌ | Add ErrorState with retry |
-| 66 | `app/dashboard/pharmacy/catalog/page.tsx` | ❌ | ❌ | ❌ | Loading = skeleton table. Empty = "No catalog items. Add your first product." Error = retry |
-| 67 | `app/dashboard/pharmacy/inventory/page.tsx` | ❌ | ❌ | ❌ | Loading = skeleton rows. Empty = "Inventory is empty. Import or add items." Error = retry |
+| #   | Page                                          | Loading | Empty  | Error | Details                                                                                                                                                                                  |
+| --- | --------------------------------------------- | ------- | ------ | ----- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 58  | `app/dashboard/analytics/page.tsx`            | ❌      | ❌     | ❌    | Currently hardcoded demo data. Replace with real Supabase fetch. Loading = Skeleton charts. Empty = "No health data yet — sync your devices". Error = "Failed to load analytics" + Retry |
+| 59  | `app/dashboard/vitals/page.tsx`               | ✅ Has  | ❌     | ❌    | Add EmptyState: "No vitals recorded. Start tracking your health." Add ErrorState with retry                                                                                              |
+| 60  | `app/dashboard/meditation/page.tsx`           | ❌      | ❌     | ❌    | Loading = skeleton cards. Empty = "No meditation exercises available" + Browse library CTA. Error = retry                                                                                |
+| 61  | `app/dashboard/voice/page.tsx`                | ❌      | ❌     | ❌    | Empty = "Start speaking to begin voice transcription" with microphone illustration. Loading = pulsing waveform. Error = retry                                                            |
+| 62  | `app/dashboard/doctor/page.tsx`               | ❌      | ❌     | ❌    | Empty patient list = "No patients registered yet". Empty visits = "No past visits". Error per section = inline retry                                                                     |
+| 63  | `app/dashboard/doctor/messages/page.tsx`      | ❌      | ❌     | ❌    | Empty = "No conversations yet"                                                                                                                                                           |
+| 64  | `app/dashboard/doctor/prescriptions/page.tsx` | ❌      | ✅ Has | ❌    | Add ErrorState with retry                                                                                                                                                                |
+| 65  | `app/dashboard/doctor/patients/page.tsx`      | ❌      | ✅ Has | ❌    | Add ErrorState with retry                                                                                                                                                                |
+| 66  | `app/dashboard/pharmacy/catalog/page.tsx`     | ❌      | ❌     | ❌    | Loading = skeleton table. Empty = "No catalog items. Add your first product." Error = retry                                                                                              |
+| 67  | `app/dashboard/pharmacy/inventory/page.tsx`   | ❌      | ❌     | ❌    | Loading = skeleton rows. Empty = "Inventory is empty. Import or add items." Error = retry                                                                                                |
 
 **Important**: Do NOT use inline divs for these states. Use the reusable `Skeleton`, `EmptyState` components from P2-1.
 
@@ -579,14 +631,15 @@ Priority order (fix in this sequence):
 **Why**: `setTimeout` auto-confirms orders, hardcoded demo data masquerades as real, dead components exist (UI Audit #70-#73, #81-#82).
 
 **What to do**:
+
 1. `app/dashboard/pharmacy/page.tsx:490-492` — Remove `setTimeout(() => updateOrderStatus(orderId, "CONFIRMED"), 5000)`. Replace with: after vendor manually confirms, send real notification to patient. If no vendor action within 24h, show stale indicator
 2. `app/dashboard/analytics/page.tsx:14-22` — Replace hardcoded vital readings with real Supabase fetch from `vital_signs` table:
    ```typescript
    const { data } = await supabase
-     .from('vital_signs')
-     .select('*')
-     .eq('patient_id', userId)
-     .order('created_at', { ascending: false })
+     .from("vital_signs")
+     .select("*")
+     .eq("patient_id", userId)
+     .order("created_at", { ascending: false })
      .limit(30);
    ```
 3. `app/dashboard/medications/PhoneValidator.tsx` — Mark as `@deprecated` or remove if unreferenced
@@ -594,6 +647,7 @@ Priority order (fix in this sequence):
 5. `app/dashboard/pharmacy/page.tsx:45-96` — Remove `DEMO_VENDORS` array. Query real vendors from `pharmacy_profiles` table. If 0 results, show EmptyState "No vendors registered yet"
 
 **Files changed**:
+
 - `app/dashboard/pharmacy/page.tsx:490-492` (remove setTimeout)
 - `app/dashboard/analytics/page.tsx:14-22` (replace with DB fetch)
 - `app/zobraipharm/product/[slug]/page.tsx:308-327` (remove dead code)
@@ -604,11 +658,12 @@ Priority order (fix in this sequence):
 
 ---
 
-### Step 7 — Fix any Type Suppressions & console.* in Production (P2-7)
+### Step 7 — Fix any Type Suppressions & console.\* in Production (P2-7)
 
 **Why**: 50+ `any` type suppressions and 130+ `console.*` calls in production code (UI Audit #30-#57). Causes unpredictable runtime behavior.
 
 **What to do**:
+
 1. Fix `any` types in these high-impact files (define proper interfaces):
    - `app/dashboard/doctor/page.tsx:73,131,133,322,532,569,935,1020` — Define `DoctorProfile`, `Patient`, `PrescribedMedication` interfaces (most already exist in `lib/medications.ts`, just use them)
    - `app/dashboard/page.tsx:40,41,73,182,350,623` — Define `DashboardData` interface
@@ -621,14 +676,14 @@ Priority order (fix in this sequence):
      ```typescript
      export const logger = {
        info: (msg: string, data?: Record<string, unknown>) => {
-         if (process.env.NODE_ENV === 'development') console.log(`[INFO] ${msg}`, data);
+         if (process.env.NODE_ENV === "development") console.log(`[INFO] ${msg}`, data);
        },
        error: (msg: string, data?: Record<string, unknown>) => {
          console.error(`[ERROR] ${msg}`, data);
          // In production, send to error tracking
        },
        warn: (msg: string, data?: Record<string, unknown>) => {
-         if (process.env.NODE_ENV === 'development') console.warn(`[WARN] ${msg}`, data);
+         if (process.env.NODE_ENV === "development") console.warn(`[WARN] ${msg}`, data);
        },
      };
      ```
@@ -636,6 +691,7 @@ Priority order (fix in this sequence):
 3. Prioritize files with user-facing impact: doctor page, medication page, pharmacy page, checkout
 
 **Files changed**:
+
 - All files listed in UI Audit #30-#57
 - `lib/logger.ts` (NEW)
 
@@ -648,6 +704,7 @@ Priority order (fix in this sequence):
 **Why**: Phone validation shows error but allows save in edge cases (#5). No double-tap protection on dose log (#6).
 
 **What to do**:
+
 1. `app/dashboard/medications/page.tsx:256-268` — Phone validation:
    - Add `disabled` prop to save button that's `true` when `phoneError !== null`
    - Add `aria-invalid` attribute to phone input
@@ -660,6 +717,7 @@ Priority order (fix in this sequence):
    - Re-enable button on success OR error (show error toast on failure)
 
 **Files changed**:
+
 - `app/dashboard/medications/page.tsx:256-268` (phone validation hardening)
 - `app/dashboard/medications/page.tsx:392-461` (double-tap protection)
 
@@ -672,6 +730,7 @@ Priority order (fix in this sequence):
 **Why**: `/dashboard/doctor/prescriptions/` shows prescriptions but has zero actionable buttons (#3 from pharmacy pipeline). Cannot send to pharmacy or edit from list.
 
 **What to do**:
+
 1. Add these columns/buttons to the prescriptions table:
    - **Status badge**: color-coded (draft=grey, active=green, expired=red, etc.)
    - **Actions column**:
@@ -683,6 +742,7 @@ Priority order (fix in this sequence):
 3. Add error state with retry button
 
 **Files changed**:
+
 - `app/dashboard/doctor/prescriptions/page.tsx` (major rewrite — add action buttons, states)
 
 **Commit message**: `feat(ui): add action buttons and states to prescriptions list`
@@ -694,14 +754,15 @@ Priority order (fix in this sequence):
 **Why**: `/zobraipharm/` uses hardcoded 12 products. After P3 creates `vendor_products` table, switch to dynamic query.
 
 **What to do**:
+
 1. Refactor `/zobraipharm/page.tsx`:
    - Remove import of hardcoded `PRODUCTS` from `lib/pharmacy-store-data.ts`
    - Fetch from Supabase:
      ```typescript
      const { data: products } = await supabase
-       .from('vendor_products')
-       .select('*, pharmacy_profiles(business_name, rating, delivery_radius_km, pincode)')
-       .eq('is_available', true);
+       .from("vendor_products")
+       .select("*, pharmacy_profiles(business_name, rating, delivery_radius_km, pincode)")
+       .eq("is_available", true);
      ```
    - Detect user pincode (from profile or geolocation API)
    - Filter products to those within delivery radius
@@ -712,6 +773,7 @@ Priority order (fix in this sequence):
    - Error: "Failed to load products" with retry
 
 **Files changed**:
+
 - `app/zobraipharm/page.tsx` (refactor to dynamic query)
 - `app/zobraipharm/product/[slug]/page.tsx` (refactor — fetch single product from `vendor_products` + show price comparison across vendors)
 - `lib/vendor-store-data.ts` (NEW — shared types, P3 also uses this)
@@ -723,6 +785,7 @@ Priority order (fix in this sequence):
 ## PERSON 3 — Backend API & Pharmacy Pipeline
 
 ### Identity Badge
+
 ```
 Name: Backend & Pharmacy Pipeline Engineer
 Scope: app/api/, supabase/functions/, new pharmacy routes, order routing engine
@@ -730,6 +793,7 @@ Goal: Build all API endpoints and backend logic for the pharmacy marketplace pip
 ```
 
 ### Prerequisite Check (Complete Before Starting)
+
 - [ ] Read all migration files in `supabase/migrations/` — understand schema
 - [ ] Read `app/api/store/orders/route.ts` — understand store order API pattern
 - [ ] Read `app/api/orders/status/route.ts` — understand order status API
@@ -747,7 +811,9 @@ Goal: Build all API endpoints and backend logic for the pharmacy marketplace pip
 **What to do**:
 
 #### 1.1 Deepgram Token Auth
+
 **File**: `app/api/deepgram/token/route.ts:5-16`
+
 ```typescript
 // BEFORE: returns API key to any GET request
 export async function GET() {
@@ -755,11 +821,11 @@ export async function GET() {
 }
 
 // AFTER: requires valid auth
-import { verifyAuth } from '@/lib/auth-utils';
+import { verifyAuth } from "@/lib/auth-utils";
 
 export async function GET(req: NextRequest) {
   const authResult = await verifyAuth(req);
-  if ('error' in authResult) {
+  if ("error" in authResult) {
     return NextResponse.json({ error: authResult.error }, { status: authResult.status });
   }
   return NextResponse.json({ key: process.env.DEEPGRAM_API_KEY });
@@ -767,19 +833,24 @@ export async function GET(req: NextRequest) {
 ```
 
 #### 1.2 Fix orders/status Route to Use supabaseAdmin
+
 **File**: `app/api/orders/status/route.ts:2`
+
 ```typescript
 // BEFORE: import { supabase } from '@/lib/supabase';  // anon key client
 // AFTER: import { supabaseAdmin } from '@/lib/supabase';  // service_role key
 ```
+
 - Replace all `supabase.` calls with `supabaseAdmin.` in this file
 - Keep `verifyAuth` for user authentication (who is making the request)
 - Add role check: only `pharmacy_vendor` can update status; `patient` can only read
 
 #### 1.3 Add Rate Limiting Middleware
+
 Create `lib/rate-limit.ts`:
+
 ```typescript
-import { LRUCache } from 'lru-cache';
+import { LRUCache } from "lru-cache";
 
 const rateLimitMap = new LRUCache<string, number>({ max: 500, ttl: 60000 });
 
@@ -792,18 +863,20 @@ export function rateLimit(ip: string, limit: number = 10, windowMs: number = 600
 ```
 
 Apply to ALL API routes — create a helper:
+
 ```typescript
 // In lib/api-utils.ts
 export function withRateLimit(req: NextRequest, limit = 30): NextResponse | null {
-  const ip = req.headers.get('x-forwarded-for') || 'unknown';
+  const ip = req.headers.get("x-forwarded-for") || "unknown";
   if (!rateLimit(ip, limit)) {
-    return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+    return NextResponse.json({ error: "Too many requests" }, { status: 429 });
   }
   return null;
 }
 ```
 
 Add to every route handler:
+
 ```typescript
 export async function POST(req: NextRequest) {
   const rateLimitError = withRateLimit(req);
@@ -813,6 +886,7 @@ export async function POST(req: NextRequest) {
 ```
 
 **Routes needing rate limiting (start with these, add more later)**:
+
 - `/api/deepgram/token` — 10 req/min
 - `/api/gemini/chat` — 20 req/min
 - `/api/gemini/meals` — 10 req/min
@@ -824,6 +898,7 @@ export async function POST(req: NextRequest) {
 - `/api/user/register-role` — 3 req/min
 
 **Files changed**:
+
 - `app/api/deepgram/token/route.ts` (add auth)
 - `app/api/orders/status/route.ts` (switch to supabaseAdmin, add role check)
 - `lib/rate-limit.ts` (NEW — LRU cache rate limiter)
@@ -841,7 +916,9 @@ export async function POST(req: NextRequest) {
 **What to do**:
 
 #### 2.1 Schema: Add `onboarding_completed` column
+
 Create `supabase/migrations/20260621000001_pharmacy_onboarding.sql`:
+
 ```sql
 alter table pharmacy_profiles add column if not exists onboarding_completed boolean not null default false;
 alter table pharmacy_profiles add column if not exists license_document_url text;
@@ -850,12 +927,15 @@ alter table pharmacy_profiles add column if not exists workspace_name text;
 ```
 
 #### 2.2 Create Onboarding API
+
 Create `app/api/pharmacy/onboarding/route.ts`:
+
 - `GET` — Return current vendor profile (or 404 if not set up)
 - `POST` — Create/update `pharmacy_profiles` with onboarding data
 - `PUT` — Update step data (multi-step form saves progressively)
 
 **Request body (POST)**:
+
 ```json
 {
   "businessName": "City Pharmacy",
@@ -873,13 +953,17 @@ Create `app/api/pharmacy/onboarding/route.ts`:
 ```
 
 #### 2.3 Fix Vendor Registration in Pharmacy Page
+
 **File**: `app/dashboard/pharmacy/page.tsx:613-633`
+
 - Replace `supabase.from('vendors').insert(...)` with `supabase.from('pharmacy_profiles').insert(...)`
 - Use `vendorToDb()` mapping from `lib/medications.ts` for snake_case conversion
 - After insert, mark `onboarding_completed = true` if all required fields present
 
 #### 2.4 Add Onboarding Redirect Guard
+
 **File**: `app/dashboard/pharmacy/page.tsx:135-137`:
+
 ```typescript
 useEffect(() => {
   if (role === "pharmacy_vendor") {
@@ -889,19 +973,20 @@ useEffect(() => {
 
 async function checkOnboarding() {
   const { data } = await supabase
-    .from('pharmacy_profiles')
-    .select('onboarding_completed')
-    .eq('user_id', userId)
+    .from("pharmacy_profiles")
+    .select("onboarding_completed")
+    .eq("user_id", userId)
     .single();
   if (!data?.onboarding_completed) {
-    router.replace('/dashboard/pharmacy/onboarding');
+    router.replace("/dashboard/pharmacy/onboarding");
   } else {
-    router.replace('/dashboard/pharmacy/inventory');
+    router.replace("/dashboard/pharmacy/inventory");
   }
 }
 ```
 
 **Files changed**:
+
 - `supabase/migrations/20260621000001_pharmacy_onboarding.sql` (NEW)
 - `app/api/pharmacy/onboarding/route.ts` (NEW)
 - `app/dashboard/pharmacy/page.tsx:613-633` (fix vendor registration)
@@ -918,7 +1003,9 @@ async function checkOnboarding() {
 **What to do**:
 
 #### 3.1 Create vendor_products migration
+
 Create `supabase/migrations/20260621000002_vendor_products.sql`:
+
 ```sql
 create table if not exists vendor_products (
   id                uuid primary key default gen_random_uuid(),
@@ -963,7 +1050,9 @@ create policy "Anyone can view available products"
 ```
 
 #### 3.2 Create Products API
+
 Create `app/api/vendor/products/route.ts`:
+
 - `GET` — List vendor's own products (vendor) or all available (patient/doctor)
   - Query params: `?category=`, `?search=`, `?available=true`
 - `POST` — Create new product
@@ -974,7 +1063,9 @@ Create `app/api/vendor/products/route.ts`:
 - `DELETE /[id]` — Delete product
 
 #### 3.3 Create Image Upload API
+
 Create `app/api/vendor/products/upload/route.ts`:
+
 - `POST` — Upload product image
   - Accepts multipart/form-data with image file
   - Validates file type (jpg, png, webp)
@@ -985,7 +1076,9 @@ Create `app/api/vendor/products/upload/route.ts`:
 - Store URL in `vendor_products.image_url`
 
 #### 3.4 Create Stock Sync Trigger
+
 Create `supabase/migrations/20260621000003_auto_sync_triggers.sql`:
+
 ```sql
 -- When pharmacy_inventory changes, auto-update vendor_products
 create or replace function sync_inventory_to_vendor_products()
@@ -1008,6 +1101,7 @@ create trigger trg_sync_inventory_to_vendor_products
 ```
 
 **Files changed**:
+
 - `supabase/migrations/20260621000002_vendor_products.sql` (NEW)
 - `supabase/migrations/20260621000003_auto_sync_triggers.sql` (NEW)
 - `app/api/vendor/products/route.ts` (NEW)
@@ -1134,10 +1228,12 @@ export async function POST(req: NextRequest) {
 **Also create**: `GET /api/doctor/pharmacies` — Returns list of active pharmacies with their inventory matching a specific drug list, for the pharmacy selector dropdown.
 
 Create `app/api/doctor/pharmacies/route.ts`:
+
 - Query params: `?drug_ids=id1,id2&pincode=560001`
 - Returns pharmacies that have ALL specified drugs in stock + within delivery radius
 
 **Files changed**:
+
 - `app/api/doctor/send-to-pharmacy/route.ts` (NEW)
 - `app/api/doctor/pharmacies/route.ts` (NEW)
 
@@ -1152,9 +1248,10 @@ Create `app/api/doctor/pharmacies/route.ts`:
 **What to do**:
 
 Create `supabase/functions/order-router/index.ts` (Edge Function):
+
 ```typescript
 interface RoutingRequest {
-  orderType: 'store' | 'prescription';
+  orderType: "store" | "prescription";
   orderId: string;
   patientPincode: string;
   items: { drugName: string; quantity: number }[];
@@ -1173,6 +1270,7 @@ interface RoutingRequest {
 ```
 
 Create `app/api/orders/routing/route.ts`:
+
 - `POST /api/orders/routing` — Get route suggestions for an order
   - Body: `{ pincode: string, items: { drugId: string, quantity: number }[] }`
   - Response: `{ pharmacies: [{ id, name, distance, rating, totalPrice, estimatedDelivery }] }`
@@ -1181,6 +1279,7 @@ Create `app/api/orders/routing/route.ts`:
   - Updates `store_orders.pharmacy_id` or `orders.pharmacy_id`
 
 **Files changed**:
+
 - `supabase/functions/order-router/index.ts` (NEW)
 - `app/api/orders/routing/route.ts` (NEW)
 - `app/api/orders/routing/assign/route.ts` (NEW)
@@ -1196,6 +1295,7 @@ Create `app/api/orders/routing/route.ts`:
 **What to do**:
 
 Create `app/api/pharmacy/orders/route.ts`:
+
 ```typescript
 // GET /api/pharmacy/orders — List all orders for authenticated vendor's pharmacy
 // Returns unified feed of store_orders + prescription orders
@@ -1203,33 +1303,33 @@ Create `app/api/pharmacy/orders/route.ts`:
 
 export async function GET(req: NextRequest) {
   const auth = await verifyAuth(req);
-  if ('error' in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
+  if ("error" in auth) return NextResponse.json({ error: auth.error }, { status: auth.status });
 
   // Get vendor's pharmacy profile
   const { data: profile } = await supabase
-    .from('pharmacy_profiles')
-    .select('id')
-    .eq('user_id', auth.user.id)
+    .from("pharmacy_profiles")
+    .select("id")
+    .eq("user_id", auth.user.id)
     .single();
 
   // Fetch store orders assigned to this pharmacy
   const { data: storeOrders } = await supabaseAdmin
-    .from('store_orders')
-    .select('*, store_order_items(*)')
-    .eq('pharmacy_id', profile.id)
-    .order('created_at', { ascending: false });
+    .from("store_orders")
+    .select("*, store_order_items(*)")
+    .eq("pharmacy_id", profile.id)
+    .order("created_at", { ascending: false });
 
   // Fetch prescription orders assigned to this pharmacy
   const { data: prescriptionOrders } = await supabaseAdmin
-    .from('orders')
-    .select('*, prescriptions(*, prescription_items(*)), patient_profiles(full_name, email, phone)')
-    .eq('pharmacy_id', profile.id)
-    .order('created_at', { ascending: false });
+    .from("orders")
+    .select("*, prescriptions(*, prescription_items(*)), patient_profiles(full_name, email, phone)")
+    .eq("pharmacy_id", profile.id)
+    .order("created_at", { ascending: false });
 
   // Merge and tag source
   const unified = [
-    ...storeOrders.map(o => ({ ...o, source: 'store' })),
-    ...prescriptionOrders.map(o => ({ ...o, source: 'prescription' })),
+    ...storeOrders.map((o) => ({ ...o, source: "store" })),
+    ...prescriptionOrders.map((o) => ({ ...o, source: "prescription" })),
   ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
   return NextResponse.json(unified);
@@ -1237,6 +1337,7 @@ export async function GET(req: NextRequest) {
 ```
 
 Create `app/api/pharmacy/orders/[id]/status/route.ts`:
+
 ```typescript
 // PUT /api/pharmacy/orders/[id]/status — Update order status
 // Body: { status: 'confirmed' | 'preparing' | 'dispatched' | 'delivered', note?: string }
@@ -1249,6 +1350,7 @@ Create `app/api/pharmacy/orders/[id]/status/route.ts`:
 ```
 
 **Files changed**:
+
 - `app/api/pharmacy/orders/route.ts` (NEW)
 - `app/api/pharmacy/orders/[id]/status/route.ts` (NEW)
 - `app/api/pharmacy/orders/[id]/route.ts` (NEW — order detail)
@@ -1264,6 +1366,7 @@ Create `app/api/pharmacy/orders/[id]/status/route.ts`:
 **What to do**:
 
 Create `app/api/orders/[id]/confirm/route.ts`:
+
 ```typescript
 // POST /api/orders/[id]/confirm
 // Body: { deliveryAddress: string, city: string, pincode: string, phone: string }
@@ -1274,6 +1377,7 @@ Create `app/api/orders/[id]/confirm/route.ts`:
 ```
 
 Create `app/api/payments/initiate/route.ts`:
+
 ```typescript
 // POST /api/payments/initiate
 // Body: { orderId: string, amount: number, provider: 'razorpay' | 'phonepe' }
@@ -1283,6 +1387,7 @@ Create `app/api/payments/initiate/route.ts`:
 ```
 
 Create `app/api/payments/callback/route.ts`:
+
 ```typescript
 // POST /api/payments/callback — Webhook from payment gateway
 // 1. Verify webhook signature
@@ -1292,6 +1397,7 @@ Create `app/api/payments/callback/route.ts`:
 ```
 
 **Files changed**:
+
 - `app/api/orders/[id]/confirm/route.ts` (NEW)
 - `app/api/payments/initiate/route.ts` (NEW)
 - `app/api/payments/callback/route.ts` (NEW)
@@ -1308,6 +1414,7 @@ Create `app/api/payments/callback/route.ts`:
 **What to do**:
 
 Create `supabase/functions/auto-refill-check/index.ts`:
+
 ```typescript
 // Runs every 6 hours
 // 1. Query pharmacy_inventory where stock <= auto_refill_threshold AND auto_refill_threshold IS NOT NULL
@@ -1322,6 +1429,7 @@ Create `supabase/functions/auto-refill-check/index.ts`:
 Deploy via Supabase CLI: `supabase functions deploy auto-refill-check --schedule "0 */6 * * *"`
 
 **Files changed**:
+
 - `supabase/functions/auto-refill-check/index.ts` (NEW)
 - `supabase/functions/auto-refill-check/deno.json` (NEW)
 
@@ -1336,17 +1444,19 @@ Deploy via Supabase CLI: `supabase functions deploy auto-refill-check --schedule
 **What to do**:
 
 Create `supabase/functions/auto-reassign-order/index.ts`:
+
 ```typescript
 // Triggered when vendor rejects an order (via webhook or DB trigger)
 // 1. Mark current assignment as rejected
 // 2. Find next-best pharmacy from routing algorithm
 // 3. If found: reassign order, notify new vendor
-// 4. If NOT found: notify patient "No pharmacy available in your area. 
+// 4. If NOT found: notify patient "No pharmacy available in your area.
 //    We'll notify you when one becomes available."
 // 5. Track reassignment history in order_events
 ```
 
 Add SLA escalation: `supabase/functions/escalate-stale-orders/index.ts`:
+
 ```typescript
 // Runs every 30 minutes
 // 1. Find orders with status 'pending' and created_at > 4 hours ago
@@ -1356,6 +1466,7 @@ Add SLA escalation: `supabase/functions/escalate-stale-orders/index.ts`:
 ```
 
 **Files changed**:
+
 - `supabase/functions/auto-reassign-order/index.ts` (NEW)
 - `supabase/functions/escalate-stale-orders/index.ts` (NEW)
 
@@ -1366,6 +1477,7 @@ Add SLA escalation: `supabase/functions/escalate-stale-orders/index.ts`:
 ## PERSON 4 — Testing, Security, Schema Migrations & Reviews
 
 ### Identity Badge
+
 ```
 Name: Test & Security Engineer
 Scope: __tests__/, supabase/migrations/, .env.local, RLS policies, review system
@@ -1373,6 +1485,7 @@ Goal: Write comprehensive tests, fix security issues, build review system, handl
 ```
 
 ### Prerequisite Check (Complete Before Starting)
+
 - [ ] Read `__tests__/doctor-edge-cases.test.ts` — understand current test patterns
 - [ ] Read all migration files in `supabase/migrations/` — understand full schema
 - [ ] Read `.env.local` — understand which keys are exposed
@@ -1386,7 +1499,9 @@ Goal: Write comprehensive tests, fix security issues, build review system, handl
 **Why**: 9+ production API keys committed to repo (UI Audit #92). Full admin access exposed.
 
 **What to do**:
+
 1. Create `.env.local.example` with placeholder values:
+
 ```
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
@@ -1399,6 +1514,7 @@ VAPID_PUBLIC_KEY=your-vapid-public-key
 VAPID_PRIVATE_KEY=your-vapid-private-key
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=your-vapid-public-key
 ```
+
 2. Remove `.env.local` from git tracking (add to `.gitignore` if not already):
    - Check if `.env.local` is in `.gitignore`. If not, add it.
    - Run `git rm --cached .env.local` to remove from tracking
@@ -1406,13 +1522,13 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY=your-vapid-public-key
    ```typescript
    // In lib/env-validator.ts (NEW)
    const requiredVars = [
-     'NEXT_PUBLIC_SUPABASE_URL',
-     'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-     'SUPABASE_SERVICE_ROLE_KEY',
+     "NEXT_PUBLIC_SUPABASE_URL",
+     "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+     "SUPABASE_SERVICE_ROLE_KEY",
    ];
-   const missing = requiredVars.filter(v => !process.env[v]);
+   const missing = requiredVars.filter((v) => !process.env[v]);
    if (missing.length > 0) {
-     console.error(`Missing required env vars: ${missing.join(', ')}`);
+     console.error(`Missing required env vars: ${missing.join(", ")}`);
      // Don't crash in dev, but show warning banner
    }
    ```
@@ -1420,6 +1536,7 @@ NEXT_PUBLIC_VAPID_PUBLIC_KEY=your-vapid-public-key
 5. Rotate ALL exposed keys in the respective dashboards (Supabase, Deepgram, Gemini, Telegram)
 
 **Files changed**:
+
 - `.env.local.example` (NEW — template with placeholders)
 - `.gitignore` (add `.env.local` if missing)
 - `lib/env-validator.ts` (NEW)
@@ -1516,6 +1633,7 @@ create policy "Vendor can update own profile"
 **Also write RLS tests** — See Step 5 (P4-5) for the RLS test patterns.
 
 **Files changed**:
+
 - `supabase/migrations/20260621000005_pharmacy_rls_fixes.sql` (NEW)
 
 **Commit message**: `feat(rls): multi-vendor RLS policies for orders, store_orders, pharmacy_profiles`
@@ -1531,109 +1649,124 @@ create policy "Vendor can update own profile"
 Create these test files:
 
 #### 3.1 Sync Queue Tests
+
 `app/__tests__/sync-queue.test.ts`:
+
 ```typescript
-describe('SyncQueue', () => {
-  test('enqueue adds item to queue');
-  test('drain processes all items in FIFO order');
-  test('retry limit stops infinite retries after 3 attempts');
-  test('exponential backoff increases delay between retries');
-  test('queue size limit rejects oldest entries when > 1000');
-  test('delete operations are processed (not silently skipped)');
-  test('vector clock conflict resolution — higher clock wins');
-  test('vector clock tiebreaker — delete > update > insert');
-  test('permanently failed item is removed and doesn\'t block queue');
-  test('localStorage QuotaExceededError is handled gracefully');
+describe("SyncQueue", () => {
+  test("enqueue adds item to queue");
+  test("drain processes all items in FIFO order");
+  test("retry limit stops infinite retries after 3 attempts");
+  test("exponential backoff increases delay between retries");
+  test("queue size limit rejects oldest entries when > 1000");
+  test("delete operations are processed (not silently skipped)");
+  test("vector clock conflict resolution — higher clock wins");
+  test("vector clock tiebreaker — delete > update > insert");
+  test("permanently failed item is removed and doesn't block queue");
+  test("localStorage QuotaExceededError is handled gracefully");
 });
 ```
 
 #### 3.2 Notification Dispatch Tests
+
 `app/__tests__/notifications.test.ts`:
+
 ```typescript
-describe('NotificationDispatch', () => {
-  test('dispatch sends push notification to registered devices');
-  test('TOCTOU race prevented — duplicate delivery idempotency');
-  test('Expo token expiry deactivates device');
-  test('sent_via tracking correctly records successful transports');
-  test('privacy filter excludes sensitive categories from paired devices');
-  test('notification pagination — cursor-based fetch returns all pages');
-  test('dispatch with no devices returns gracefully');
-  test('rate limit hit returns 429');
+describe("NotificationDispatch", () => {
+  test("dispatch sends push notification to registered devices");
+  test("TOCTOU race prevented — duplicate delivery idempotency");
+  test("Expo token expiry deactivates device");
+  test("sent_via tracking correctly records successful transports");
+  test("privacy filter excludes sensitive categories from paired devices");
+  test("notification pagination — cursor-based fetch returns all pages");
+  test("dispatch with no devices returns gracefully");
+  test("rate limit hit returns 429");
 });
 ```
 
 #### 3.3 API Auth Tests
+
 `app/__tests__/api-auth.test.ts`:
+
 ```typescript
-describe('APIAuth', () => {
-  test('/api/deepgram/token returns 401 without auth');
-  test('/api/deepgram/token returns key with valid auth');
-  test('/api/orders/status uses supabaseAdmin for writes');
-  test('/api/orders/status rejects non-pharmacy_vendor status updates');
-  test('/api/store/orders rejects unauthenticated requests');
-  test('/api/doctor/send-to-pharmacy rejects non-doctor roles');
-  test('rate limiting returns 429 after threshold exceeded');
-  test('rate limiting resets after window expires');
+describe("APIAuth", () => {
+  test("/api/deepgram/token returns 401 without auth");
+  test("/api/deepgram/token returns key with valid auth");
+  test("/api/orders/status uses supabaseAdmin for writes");
+  test("/api/orders/status rejects non-pharmacy_vendor status updates");
+  test("/api/store/orders rejects unauthenticated requests");
+  test("/api/doctor/send-to-pharmacy rejects non-doctor roles");
+  test("rate limiting returns 429 after threshold exceeded");
+  test("rate limiting resets after window expires");
 });
 ```
 
 #### 3.4 Medication CRUD Tests
+
 `app/__tests__/medications.test.ts`:
+
 ```typescript
-describe('MedicationCRUD', () => {
-  test('create medication inserts into DB with snake_case columns');
-  test('update medication preserves unchanged fields');
-  test('delete medication removes record and cascades to logs');
-  test('medication_log query filters by user_id (no data leak)');
-  test('double-tap prevention — rapid clicks create single log entry');
-  test('phone validation rejects invalid formats');
-  test('endDate enforcement — expired medications flagged');
+describe("MedicationCRUD", () => {
+  test("create medication inserts into DB with snake_case columns");
+  test("update medication preserves unchanged fields");
+  test("delete medication removes record and cascades to logs");
+  test("medication_log query filters by user_id (no data leak)");
+  test("double-tap prevention — rapid clicks create single log entry");
+  test("phone validation rejects invalid formats");
+  test("endDate enforcement — expired medications flagged");
 });
 ```
 
 #### 3.5 Pharmacy Pipeline Tests
+
 `app/__tests__/pharmacy-pipeline.test.ts`:
+
 ```typescript
-describe('PharmacyPipeline', () => {
-  test('vendor onboarding creates pharmacy_profiles record');
-  test('vendor registration writes to pharmacy_profiles not vendors');
-  test('send prescription to pharmacy creates orders record');
-  test('send prescription generates valid tracking ID');
-  test('patient confirms prescription order updates status');
-  test('order routing assigns to nearest pharmacy with stock');
-  test('vendor rejection triggers auto-reassignment');
-  test('vendor acceptance creates order_events entry');
-  test('auto-refill creates refill_orders below threshold');
-  test('duplicate auto-refill prevented by idempotency check');
+describe("PharmacyPipeline", () => {
+  test("vendor onboarding creates pharmacy_profiles record");
+  test("vendor registration writes to pharmacy_profiles not vendors");
+  test("send prescription to pharmacy creates orders record");
+  test("send prescription generates valid tracking ID");
+  test("patient confirms prescription order updates status");
+  test("order routing assigns to nearest pharmacy with stock");
+  test("vendor rejection triggers auto-reassignment");
+  test("vendor acceptance creates order_events entry");
+  test("auto-refill creates refill_orders below threshold");
+  test("duplicate auto-refill prevented by idempotency check");
 });
 ```
 
 #### 3.6 Pairing Flow Tests
+
 `app/__tests__/pairing.test.ts`:
+
 ```typescript
-describe('PairingFlow', () => {
-  test('pairing code generation creates unique code');
-  test('TOCTOU race prevented — DB-level uniqueness constraint');
-  test('pairing code claim links devices correctly');
-  test('expired pairing code cannot be claimed');
-  test('paired notification delivery respects privacy filter');
+describe("PairingFlow", () => {
+  test("pairing code generation creates unique code");
+  test("TOCTOU race prevented — DB-level uniqueness constraint");
+  test("pairing code claim links devices correctly");
+  test("expired pairing code cannot be claimed");
+  test("paired notification delivery respects privacy filter");
 });
 ```
 
 #### 3.7 RLS Policy Tests
+
 `app/__tests__/rls-policies.test.ts`:
+
 ```typescript
-describe('RLSPolicies', () => {
-  test('patient cannot see other patients\' medication_logs');
-  test('vendor cannot see other vendors\' orders');
-  test('doctor cannot see patients from other doctors');
-  test('unauthenticated user cannot read any table');
-  test('pharmacy_vendor can update own orders only');
-  test('patient can read own prescription orders');
+describe("RLSPolicies", () => {
+  test("patient cannot see other patients' medication_logs");
+  test("vendor cannot see other vendors' orders");
+  test("doctor cannot see patients from other doctors");
+  test("unauthenticated user cannot read any table");
+  test("pharmacy_vendor can update own orders only");
+  test("patient can read own prescription orders");
 });
 ```
 
 **Files changed**:
+
 - `app/__tests__/sync-queue.test.ts` (NEW)
 - `app/__tests__/notifications.test.ts` (NEW)
 - `app/__tests__/api-auth.test.ts` (NEW)
@@ -1654,7 +1787,9 @@ describe('RLSPolicies', () => {
 **What to do**:
 
 #### 4.1 Create reviews migration
+
 Create `supabase/migrations/20260621000006_product_reviews.sql`:
+
 ```sql
 create table if not exists product_reviews (
   id              uuid primary key default gen_random_uuid(),
@@ -1693,7 +1828,9 @@ create policy "Users can update own reviews"
 ```
 
 #### 4.2 Create Reviews API
+
 Create `app/api/reviews/route.ts`:
+
 - `POST /api/reviews` — Submit review
   - Body: `{ orderId, productId, medicationId, pharmacyId, rating, title, review }`
   - Auto-sets `is_verified_purchase = true` if user has a completed order for this item
@@ -1704,11 +1841,14 @@ Create `app/api/reviews/route.ts`:
 - `GET /api/reviews?medicationId=xxx` — Get reviews for a medication
 
 Create `app/api/reviews/[id]/route.ts`:
+
 - `PUT /api/reviews/[id]` — Update own review
 - `DELETE /api/reviews/[id]` — Delete own review
 
 #### 4.3 Create Review Request Edge Function
+
 Create `supabase/functions/request-review/index.ts`:
+
 ```typescript
 // Runs daily
 // 1. Find orders where status = 'delivered' AND updated_at > 3 days ago
@@ -1718,7 +1858,9 @@ Create `supabase/functions/request-review/index.ts`:
 ```
 
 #### 4.4 Create Review Aggregation Trigger
+
 Create migration `20260621000007_review_rating_trigger.sql`:
+
 ```sql
 -- Auto-update pharmacy_profiles.rating when new review added
 create or replace function update_pharmacy_rating()
@@ -1741,6 +1883,7 @@ create trigger trg_update_pharmacy_rating
 ```
 
 **Files changed**:
+
 - `supabase/migrations/20260621000006_product_reviews.sql` (NEW)
 - `supabase/migrations/20260621000007_review_rating_trigger.sql` (NEW)
 - `app/api/reviews/route.ts` (NEW)
@@ -1758,24 +1901,29 @@ create trigger trg_update_pharmacy_rating
 **What to do**:
 
 #### 5.1 Expired Medication Enforcement (#34)
+
 Create `supabase/functions/enforce-expired-medications/index.ts`:
+
 ```typescript
 // Runs daily
 // 1. Find medications where end_date < now() AND is_active = true
 // 2. Set is_active = false
-// 3. Create notification: "Your prescription for [medication] has expired. 
+// 3. Create notification: "Your prescription for [medication] has expired.
 //    Please consult your doctor for a renewal."
 // 4. Cancel any pending alarms for expired medications
 // 5. Log the deactivation for audit
 ```
 
 Also add UI in `app/dashboard/medications/page.tsx`:
+
 - Show "Expired" badge on medication cards where `endDate < now()`
 - Add "Renew Prescription" button that links to doctor dashboard
 - Filter option: show/hide expired medications
 
 #### 5.2 Emergency Escalation Implementation (#33)
+
 Create `supabase/functions/emergency-escalation/index.ts`:
+
 ```typescript
 // Runs every 15 minutes
 // 1. Query medication_logs for status = 'missed' in last 15 min
@@ -1789,15 +1937,18 @@ Create `supabase/functions/emergency-escalation/index.ts`:
 ```
 
 Also update medication form UI to properly test the escalation:
+
 - Replace `handleTestSMS` with actual test that triggers a real (but flagged) escalation event
 - Add "Test Emergency Escalation" button with confirmation dialog
 
 #### 5.3 Fix handleTestSMS (#35)
+
 **File**: `app/dashboard/medications/page.tsx:463-490`:
+
 ```typescript
 // BEFORE: creates a log entry with status 'pending', never sends anything
-// AFTER: 
-// 1. Show confirmation dialog: "This will send a test notification to your 
+// AFTER:
+// 1. Show confirmation dialog: "This will send a test notification to your
 //    emergency contact. Continue?"
 // 2. On confirm: call a test endpoint that triggers the notification pipeline
 // 3. Show result toast: "Test alert sent to [contact name] at [phone]"
@@ -1805,19 +1956,24 @@ Also update medication form UI to properly test the escalation:
 ```
 
 #### 5.4 Pairing Code TOCTOU Fix (#27)
+
 **File**: `app/api/notifications/pairing/init/route.ts:16-34`:
+
 - Add DB-level unique constraint on `pairing_codes(code)` where `claimed_at IS NULL`
 - Use `INSERT ... ON CONFLICT DO NOTHING` in code
 - If insert returns no rows, generate a new code and retry (up to 3 times)
 
 #### 5.5 sent_via Tracking Fix (#26)
+
 **File**: `app/api/notifications/dispatch/route.ts:157-160`:
+
 - On partial delivery failure (web success, mobile fail):
   - Update `sent_via = array_append(sent_via, 'web_push')` ONLY for successful transports
   - Keep failed transports in `sent_via` as `null` entries so retry logic can target them
   - Add max retry: after 3 failed attempts for a transport type, mark as `'failed'` permanently
 
 **Files changed**:
+
 - `supabase/functions/enforce-expired-medications/index.ts` (NEW)
 - `supabase/functions/emergency-escalation/index.ts` (NEW)
 - `app/dashboard/medications/page.tsx` (expired badge, renewal link, emergency test fix)
@@ -1834,6 +1990,7 @@ Also update medication form UI to properly test the escalation:
 **Why**: French comments in English codebase (UI Audit #74-#76). Placeholder fallback values silently fail (UI Audit #77-#78).
 
 **What to do**:
+
 1. `lib/validation.ts:6,22,36,100-112` — Translate French comments to English
    - `Valides` → `Valid formats:`
    - `Exemples valides:` → `Valid examples:`
@@ -1846,6 +2003,7 @@ Also update medication form UI to properly test the escalation:
    - Add a UI banner warning when env vars are missing (development only)
 
 **Files changed**:
+
 - `lib/validation.ts` (translate French comments)
 - `lib/supabase.ts:3,7` (remove placeholder values, add validation)
 
@@ -1858,7 +2016,9 @@ Also update medication form UI to properly test the escalation:
 **Why**: No user-facing message when API quota exhausted (UI Audit #91).
 
 **What to do**:
+
 1. Create `components/ui/rate-limit-banner.tsx`:
+
 ```typescript
 function RateLimitBanner({ resetIn }: { resetIn: number }) {
   return (
@@ -1876,11 +2036,13 @@ function RateLimitBanner({ resetIn }: { resetIn: number }) {
   );
 }
 ```
+
 2. Add rate limit detection to `lib/rate-limit.ts` (if P3 has created it):
    - Return `retryAfter` timestamp in the error response
 3. Create a global `RateLimitProvider` that intercepts 429 responses and shows the banner
 
 **Files changed**:
+
 - `components/ui/rate-limit-banner.tsx` (NEW)
 - `hooks/useRateLimit.ts` (NEW — context provider that listens for 429 responses)
 
@@ -1949,12 +2111,12 @@ Phase 6 (Week 5-6)
 
 ## Conflict Prevention Rules
 
-| Rule | Description |
-|------|-------------|
-| **No two people edit the same file in the same week** | Each phase only assigns one person per file |
-| **API contracts first, UI second** | P3 must finalize API response shapes before P2 builds UI against them. Use versioned types in `lib/vendor-store-data.ts` |
-| **Migrations last** | P4 runs all migrations after P3 confirms schema. Do NOT merge migrations before P3 branch is stable |
-| **Mobile listens, web broadcasts** | P1's Realtime subscription doesn't modify web code — reads medication_log inserts that already exist |
-| **Shared lib coordination** | If P2 or P3 needs to modify a shared file that P1 extracted (e.g., `packages/shared/`), they must coordinate via the extracted types, not edit the shared package directly |
-| **Test after fix** | P4 writes tests AFTER each person's fix branch merges. Test files reference the final implementation |
-| **No .env.local changes after P4-1** | Once P4-1 removes keys from git, no one should commit `.env.local` changes |
+| Rule                                                  | Description                                                                                                                                                                |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **No two people edit the same file in the same week** | Each phase only assigns one person per file                                                                                                                                |
+| **API contracts first, UI second**                    | P3 must finalize API response shapes before P2 builds UI against them. Use versioned types in `lib/vendor-store-data.ts`                                                   |
+| **Migrations last**                                   | P4 runs all migrations after P3 confirms schema. Do NOT merge migrations before P3 branch is stable                                                                        |
+| **Mobile listens, web broadcasts**                    | P1's Realtime subscription doesn't modify web code — reads medication_log inserts that already exist                                                                       |
+| **Shared lib coordination**                           | If P2 or P3 needs to modify a shared file that P1 extracted (e.g., `packages/shared/`), they must coordinate via the extracted types, not edit the shared package directly |
+| **Test after fix**                                    | P4 writes tests AFTER each person's fix branch merges. Test files reference the final implementation                                                                       |
+| **No .env.local changes after P4-1**                  | Once P4-1 removes keys from git, no one should commit `.env.local` changes                                                                                                 |
