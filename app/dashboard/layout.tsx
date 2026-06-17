@@ -27,7 +27,7 @@ import {
   Sparkles,
   ShoppingBag,
   Moon,
-  FileText,
+  FolderOpen,
   Package,
   BookOpen,
   ClipboardList,
@@ -318,6 +318,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link
               href="/dashboard/doctor"
               title="Dashboard"
+              aria-label="Dashboard"
               className={cn(
                 "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
                 pathname === "/dashboard/doctor"
@@ -332,6 +333,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link
               href="/dashboard/doctor/schedule"
               title="Schedule"
+              aria-label="Schedule"
               className={cn(
                 "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
                 pathname === "/dashboard/doctor/schedule"
@@ -346,6 +348,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link
               href="/dashboard/doctor/messages"
               title="Messages"
+              aria-label="Messages"
               className={cn(
                 "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
                 pathname === "/dashboard/doctor/messages"
@@ -360,6 +363,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link
               href="/dashboard/doctor/prescriptions"
               title="Prescriptions"
+              aria-label="Prescriptions"
               className={cn(
                 "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
                 pathname === "/dashboard/doctor/prescriptions"
@@ -367,13 +371,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   : "text-[#434750] hover:bg-[#d3e4fe]/30 hover:scale-105"
               )}
             >
-              <FileText className="w-5 h-5" />
+              <ClipboardList className="w-5 h-5" />
             </Link>
 
             {/* group (Patients view) */}
             <Link
               href="/dashboard/doctor/patients"
               title="Patients"
+              aria-label="Patients"
               className={cn(
                 "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
                 pathname === "/dashboard/doctor/patients"
@@ -388,6 +393,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link
               href="/dashboard/doctor/analytics"
               title="Analytics"
+              aria-label="Analytics"
               className={cn(
                 "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
                 pathname === "/dashboard/doctor/analytics"
@@ -402,6 +408,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <Link
               href="/dashboard/doctor/records"
               title="Records"
+              aria-label="Records"
               className={cn(
                 "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
                 pathname === "/dashboard/doctor/records"
@@ -409,24 +416,26 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                   : "text-[#434750] hover:bg-[#d3e4fe]/30 hover:scale-105"
               )}
             >
-              <FileText className="w-5 h-5" />
+              <FolderOpen className="w-5 h-5" />
             </Link>
           </div>
 
           <div className="flex flex-col gap-4 mt-auto items-center">
             {/* help_outline */}
-            <button
-              onClick={() => alert("DocAssist Help Center is online.")}
+            <Link
+              href="/resources/help-center"
               title="Help"
+              aria-label="Help Center"
               className="text-[#434750] p-3 hover:bg-slate-100/50 rounded-xl transition-all duration-200 cursor-pointer"
             >
               <CircleHelp className="w-5 h-5" />
-            </button>
+            </Link>
 
             {/* settings / report -> mapped to /dashboard/settings or /dashboard/doctor/settings */}
             <Link
               href={role === "doctor" ? "/dashboard/doctor/settings" : "/dashboard/settings"}
               title="Settings"
+              aria-label="Settings"
               className={cn(
                 "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
                 pathname === "/dashboard/settings" || pathname === "/dashboard/doctor/settings"
@@ -450,6 +459,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
             <button
               onClick={handleLogout}
               title="Sign Out"
+              aria-label="Sign Out"
               className="text-[#434750] p-3 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all duration-200 cursor-pointer"
             >
               <LogOut className="w-5 h-5" />

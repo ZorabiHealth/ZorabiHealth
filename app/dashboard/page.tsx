@@ -40,6 +40,7 @@ export default function DashboardOverview() {
   const [session, setSession] = useState<any>(null);
   const [missedMeds, setMissedMeds] = useState<any[]>([]);
   const [loginTime, setLoginTime] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
     const saved = localStorage.getItem("zh_login_time");
@@ -116,6 +117,12 @@ export default function DashboardOverview() {
     return () => clearInterval(interval);
   }, []);
 
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
   const handleTakeMissedMed = async (med: any) => {
     if (!session?.user?.id) return;
     const now = new Date();
@@ -146,10 +153,10 @@ export default function DashboardOverview() {
 
       // Filter local state
       setMissedMeds((prev) => prev.filter((m) => !(m.id === med.id && m.time === med.time)));
-      alert(`Dose logged successfully for ${med.name}!`);
+      setToast({ message: `Dose logged successfully for ${med.name}!`, type: "success" });
     } catch (e) {
       console.error(e);
-      alert("Failed to log dose.");
+      setToast({ message: "Failed to log dose.", type: "error" });
     }
   };
 
@@ -391,6 +398,21 @@ export default function DashboardOverview() {
       className="w-full min-h-full bg-[#f0f5ff] flex flex-col animate-slide-up p-6"
       data-purpose="overview-grid"
     >
+      {toast && (
+        <div
+          className={`fixed top-6 right-6 z-50 rounded-2xl px-6 py-4 flex items-center gap-3 shadow-xl transition-all ${
+            toast.type === "success" ? "bg-emerald-600 text-white" : "bg-red-600 text-white"
+          }`}
+        >
+          {toast.type === "success" ? (
+            <HeartPulse className="w-5 h-5" />
+          ) : (
+            <AlertCircle className="w-5 h-5" />
+          )}
+          <span className="font-bold text-sm">{toast.message}</span>
+        </div>
+      )}
+
       {/* Dynamic Missed Medication Sync Alerts */}
       <AnimatePresence>
         {missedMeds.length > 0 && (

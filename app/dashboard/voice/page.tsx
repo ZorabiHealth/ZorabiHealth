@@ -882,7 +882,8 @@ export default function VoiceAgentPage() {
             {
               icon: <Keyboard className="w-4 h-4" />,
               onClick: () => setShowTextMode(!showTextMode),
-              active: false,
+              active: showTextMode,
+              activeClass: "bg-blue-50 text-blue-600",
               defaultClass: "text-slate-500 hover:text-slate-700 hover:bg-white/60",
               title: "Toggle text input",
             },
@@ -1251,43 +1252,45 @@ export default function VoiceAgentPage() {
             </motion.div>
           )}
 
-          <motion.form
-            onSubmit={handleTextSubmit}
-            className="flex items-center gap-2 bg-white/70 backdrop-blur-2xl border border-white/60 rounded-2xl px-3 py-2 shadow-sm"
-            whileHover={{ boxShadow: "0 4px 24px rgba(59,130,246,0.1)" }}
-            transition={{ duration: 0.2 }}
-          >
-            <motion.button
-              type="button"
-              onClick={isActive ? stopListening : startListening}
-              className={`p-2 rounded-xl transition-all ${isActive ? "bg-red-500 text-white shadow-sm" : "text-slate-400 hover:text-blue-500 hover:bg-blue-50"}`}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
+          {showTextMode && (
+            <motion.form
+              onSubmit={handleTextSubmit}
+              className="flex items-center gap-2 bg-white/70 backdrop-blur-2xl border border-white/60 rounded-2xl px-3 py-2 shadow-sm"
+              whileHover={{ boxShadow: "0 4px 24px rgba(59,130,246,0.1)" }}
+              transition={{ duration: 0.2 }}
             >
-              {isActive ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </motion.button>
-
-            <div className="w-px h-5 bg-slate-200/60" />
-
-            <Input
-              value={textInput}
-              onChange={(e) => setTextInput(e.target.value)}
-              placeholder={isActive ? "Listening..." : "Ask anything about your health..."}
-              className="flex-1 text-sm border-0 bg-transparent px-1 py-0 outline-none focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none h-8 placeholder:text-slate-400"
-              disabled={isActive}
-            />
-
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={!textInput.trim() || isActive}
-                className="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-sm disabled:opacity-30 h-8 px-3"
+              <motion.button
+                type="button"
+                onClick={isActive ? stopListening : startListening}
+                className={`p-2 rounded-xl transition-all ${isActive ? "bg-red-500 text-white shadow-sm" : "text-slate-400 hover:text-blue-500 hover:bg-blue-50"}`}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
               >
-                <Send className="w-3.5 h-3.5" />
-              </Button>
-            </motion.div>
-          </motion.form>
+                {isActive ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+              </motion.button>
+
+              <div className="w-px h-5 bg-slate-200/60" />
+
+              <Input
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder={isActive ? "Listening..." : "Ask anything about your health..."}
+                className="flex-1 text-sm border-0 bg-transparent px-1 py-0 outline-none focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none h-8 placeholder:text-slate-400"
+                disabled={isActive}
+              />
+
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={!textInput.trim() || isActive}
+                  className="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-sm disabled:opacity-30 h-8 px-3"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </Button>
+              </motion.div>
+            </motion.form>
+          )}
 
           {(errorMsg || micAllowed === false) && (
             <motion.div
