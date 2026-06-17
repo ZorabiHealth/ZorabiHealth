@@ -166,6 +166,7 @@ const demoData = {
       ],
     },
     { title: "Pricing", url: "/pricing" },
+    { title: "PharmStore", url: "/zobraipharm" },
   ],
   mobileExtraLinks: [
     { name: "Clinical Safety", url: "/resources/clinical-verification" },

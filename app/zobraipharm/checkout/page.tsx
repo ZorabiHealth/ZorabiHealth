@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
-import Image from "next/image";
+import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -21,14 +20,11 @@ import {
   Truck,
   Clock,
   AlertTriangle,
+  Loader2,
 } from "lucide-react";
-import {
-  PRODUCTS,
-  loadCart,
-  saveCart,
-  type PharmProduct,
-  type CartItem,
-} from "@/lib/pharmacy-store-data";
+import { cleanAndValidatePhone } from "@/lib/validation";
+import { loadCart, saveCart, type PharmProduct, type CartItem } from "@/lib/pharmacy-store-data";
+import { fetchStoreProducts } from "@/lib/store-products";
 
 type Step = "cart" | "details" | "payment" | "review";
 
@@ -47,18 +43,12 @@ const STEPS: { key: Step; label: string }[] = [
   { key: "review", label: "Review" },
 ];
 
-function getProductMap(): Record<string, PharmProduct> {
-  const map: Record<string, PharmProduct> = {};
-  PRODUCTS.forEach((p) => {
-    map[p.id] = p;
-  });
-  return map;
-}
-
 export default function CheckoutPage() {
   const router = useRouter();
   const [step, setStep] = useState<Step>("cart");
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
+  const [products, setProducts] = useState<PharmProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [form, setForm] = useState<FormData>({
     name: "",
     phone: "",
@@ -71,9 +61,19 @@ export default function CheckoutPage() {
 
   useEffect(() => {
     setCartItems(loadCart());
+    fetchStoreProducts().then((data) => {
+      setProducts(data);
+      setLoadingProducts(false);
+    });
   }, []);
 
-  const productMap = getProductMap();
+  const productMap = useMemo(() => {
+    const map: Record<string, PharmProduct> = {};
+    products.forEach((p) => {
+      map[p.id] = p;
+    });
+    return map;
+  }, [products]);
 
   const enrichedItems = cartItems
     .map((ci) => {
@@ -107,8 +107,14 @@ export default function CheckoutPage() {
   const validateForm = (): boolean => {
     const err: Partial<Record<keyof FormData, string>> = {};
     if (!form.name.trim()) err.name = "Name is required";
-    if (!form.phone.trim() || !/^\+?\d{10,15}$/.test(form.phone.trim()))
-      err.phone = "Valid phone number required";
+    if (form.phone.trim()) {
+      const phoneVal = cleanAndValidatePhone(form.phone);
+      if (!phoneVal.isValid) {
+        err.phone = phoneVal.error || "Valid phone number required";
+      }
+    } else {
+      err.phone = "Phone number is required";
+    }
     if (!form.address.trim()) err.address = "Address is required";
     if (!form.city.trim()) err.city = "City is required";
     if (!form.pincode.trim() || !/^\d{6}$/.test(form.pincode.trim()))
@@ -154,10 +160,21 @@ export default function CheckoutPage() {
       router.push(`/zobraipharm/confirmation?id=${data.id}`);
     } catch (err) {
       console.error("[checkout] Place order error:", err);
-      alert("Failed to place order. Please try again.");
+      const { showToast } = await import("@/components/ui/toast");
+      showToast("Failed to place order. Please try again.", "error");
       setSubmitting(false);
     }
   };
+
+  // Loading state
+  if (loadingProducts) {
+    return (
+      <div className="mx-auto flex min-h-[60vh] max-w-3xl flex-col items-center justify-center px-4 text-center">
+        <Loader2 className="mb-4 h-8 w-8 animate-spin text-emerald-600" />
+        <p className="text-sm text-slate-500">Loading cart...</p>
+      </div>
+    );
+  }
 
   // Empty cart state
   if (cartItems.length === 0 && step === "cart") {
@@ -233,12 +250,10 @@ export default function CheckoutPage() {
                   className="flex gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
                 >
                   <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-emerald-50/50 p-3">
-                    <Image
+                    <img
                       src={item.product.image}
                       alt={item.product.name}
-                      width={80}
-                      height={80}
-                      className="object-contain"
+                      className="h-[80px] w-[80px] object-contain"
                     />
                   </div>
                   <div className="flex flex-1 flex-col justify-between">

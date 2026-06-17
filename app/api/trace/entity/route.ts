@@ -1,8 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { verifyAuth, getAdminClient } from "@/lib/auth-utils";
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const { searchParams } = new URL(req.url);
     const entityId = searchParams.get("id");
     const trackingId = searchParams.get("tracking_id");
@@ -14,31 +19,31 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const admin = getAdminClient();
     let result;
 
     if (entityId) {
-      const { data, error } = await supabase.rpc("trace_entity", { entity_id: entityId });
+      const { data, error } = await admin.rpc("trace_entity", { entity_id: entityId });
       if (error) throw error;
       result = data;
     } else {
-      // Look up by tracking_id across all tables
       const lookups = await Promise.all([
-        supabase
+        admin
           .from("appointments")
           .select("id, tracking_id, patient_id, status")
           .eq("tracking_id", trackingId)
           .maybeSingle(),
-        supabase
+        admin
           .from("prescriptions")
           .select("id, tracking_id, patient_id, status")
           .eq("tracking_id", trackingId)
           .maybeSingle(),
-        supabase
+        admin
           .from("refill_orders")
           .select("id, tracking_id, user_id, status")
           .eq("tracking_id", trackingId)
           .maybeSingle(),
-        supabase
+        admin
           .from("orders")
           .select("id, tracking_id, patient_id, status")
           .eq("tracking_id", trackingId)
@@ -54,7 +59,7 @@ export async function GET(req: NextRequest) {
       }
 
       const entity = found.data;
-      const { data: traced, error: traceErr } = await supabase.rpc("trace_entity", {
+      const { data: traced, error: traceErr } = await admin.rpc("trace_entity", {
         entity_id: entity.id,
       });
       if (traceErr) throw traceErr;
@@ -65,7 +70,23 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "Entity not found" }, { status: 404 });
     }
 
-    return NextResponse.json(result[0], { status: 200 });
+    const entityData = result[0];
+    if (entityData.patient_id && entityData.patient_id !== auth.user.id) {
+      const { data: userRole } = await admin
+        .from("user_roles")
+        .select("role")
+        .eq("user_id", auth.user.id)
+        .single();
+      if (
+        userRole?.role !== "doctor" &&
+        userRole?.role !== "admin" &&
+        entityData.patient_id !== auth.user.id
+      ) {
+        return NextResponse.json({ error: "Not authorized to view this entity" }, { status: 403 });
+      }
+    }
+
+    return NextResponse.json(entityData, { status: 200 });
   } catch (err) {
     console.error("[trace] Error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

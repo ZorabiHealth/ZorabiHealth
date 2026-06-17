@@ -21,14 +21,6 @@ interface Medication {
   current_stock: number;
 }
 
-interface MedicationLog {
-  id: string;
-  medication_id: string;
-  status: string;
-  scheduled_at: string;
-  snoozed_until: string | null;
-}
-
 export function MedicationAlarmAlerter() {
   const [activeAlarms, setActiveAlarms] = useState<
     { med: Medication; time: string; logId?: string }[]
@@ -49,7 +41,9 @@ export function MedicationAlarmAlerter() {
     if (audioCtxRef.current) {
       try {
         audioCtxRef.current.close();
-      } catch {}
+      } catch {
+        console.warn("[catch] Non-critical operation failed at medication-alarm-alerter.tsx");
+      }
       audioCtxRef.current = null;
     }
   };
@@ -278,7 +272,7 @@ export function MedicationAlarmAlerter() {
       logsChannel.unsubscribe();
       medsChannel.unsubscribe();
     };
-  }, [session?.user?.id]);
+  }, [session?.user?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleTakeNow = async (alarm: { med: Medication; time: string; logId?: string }) => {
     if (!session?.user?.id) return;
@@ -344,7 +338,7 @@ export function MedicationAlarmAlerter() {
       }
 
       updateLocal();
-    } catch (e) {
+    } catch {
       queueOfflineAction({
         table: "medication_logs",
         action: alarm.logId ? "update" : "insert",
@@ -412,7 +406,7 @@ export function MedicationAlarmAlerter() {
       }
 
       updateLocal();
-    } catch (e) {
+    } catch {
       queueOfflineAction({
         table: "medication_logs",
         action: alarm.logId ? "update" : "insert",

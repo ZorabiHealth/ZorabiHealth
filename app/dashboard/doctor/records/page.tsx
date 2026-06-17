@@ -15,6 +15,7 @@ import {
   Loader2,
   Stethoscope,
   AlertCircle,
+  Plus,
 } from "lucide-react";
 
 interface PatientProfile {
@@ -89,6 +90,12 @@ export default function DoctorRecords() {
   const [expandedPrescription, setExpandedPrescription] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [doctorProfileId, setDoctorProfileId] = useState<string | null>(null);
+
+  const [showAddCondition, setShowAddCondition] = useState(false);
+  const [newCondition, setNewCondition] = useState("");
+  const [newDiagnosedDate, setNewDiagnosedDate] = useState("");
+  const [newConditionNotes, setNewConditionNotes] = useState("");
+  const [savingCondition, setSavingCondition] = useState(false);
 
   useEffect(() => {
     if (!authLoading && !userId) {
@@ -175,6 +182,36 @@ export default function DoctorRecords() {
       setError(err.message || "Failed to fetch patient records");
     } finally {
       setLoadingRecords(false);
+    }
+  };
+
+  const handleAddCondition = async () => {
+    if (!selectedPatient || !newCondition.trim()) return;
+    setSavingCondition(true);
+    try {
+      const { data, error } = await supabase
+        .from("patient_medical_history")
+        .insert({
+          patient_id: selectedPatient.id,
+          condition: newCondition.trim(),
+          diagnosed_date: newDiagnosedDate || null,
+          notes: newConditionNotes.trim() || null,
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setMedicalHistory((prev) => [data, ...prev]);
+      setNewCondition("");
+      setNewDiagnosedDate("");
+      setNewConditionNotes("");
+      setShowAddCondition(false);
+    } catch (err: any) {
+      setError(err.message || "Failed to add condition");
+    } finally {
+      setSavingCondition(false);
     }
   };
 
@@ -330,6 +367,56 @@ export default function DoctorRecords() {
                   {/* History Tab */}
                   {activeTab === "history" && (
                     <div>
+                      <div className="flex items-center justify-between mb-4">
+                        <h3 className="text-base font-semibold text-gray-900">Medical History</h3>
+                        <button
+                          onClick={() => setShowAddCondition(!showAddCondition)}
+                          className="text-sm font-medium text-primary flex items-center gap-1 hover:underline"
+                        >
+                          <Plus className="w-4 h-4" />{" "}
+                          {showAddCondition ? "Cancel" : "Add Condition"}
+                        </button>
+                      </div>
+
+                      {showAddCondition && (
+                        <div className="mb-4 p-4 bg-white rounded-xl border border-gray-200 space-y-3">
+                          <input
+                            type="text"
+                            value={newCondition}
+                            onChange={(e) => setNewCondition(e.target.value)}
+                            placeholder="Condition name (e.g. Type 2 Diabetes)"
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                          />
+                          <div className="grid grid-cols-2 gap-3">
+                            <input
+                              type="date"
+                              value={newDiagnosedDate}
+                              onChange={(e) => setNewDiagnosedDate(e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary"
+                            />
+                            <button
+                              onClick={handleAddCondition}
+                              disabled={savingCondition || !newCondition.trim()}
+                              className="w-full bg-primary text-white py-2 rounded-lg text-sm font-medium hover:bg-primary/90 transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                            >
+                              {savingCondition ? (
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                              ) : (
+                                <Plus className="w-4 h-4" />
+                              )}
+                              {savingCondition ? "Saving..." : "Add"}
+                            </button>
+                          </div>
+                          <textarea
+                            value={newConditionNotes}
+                            onChange={(e) => setNewConditionNotes(e.target.value)}
+                            placeholder="Additional notes (optional)"
+                            rows={2}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary resize-none"
+                          />
+                        </div>
+                      )}
+
                       {medicalHistory.length === 0 ? (
                         <EmptyState
                           icon={<FileText className="w-10 h-10" />}

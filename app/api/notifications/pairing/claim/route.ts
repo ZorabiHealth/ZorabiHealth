@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
-    const { code } = await req.json();
+    const { code, device_name } = await req.json();
     if (!code) {
       return NextResponse.json({ error: "Missing pairing code" }, { status: 400 });
     }
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest) {
       .insert({
         web_user_id: webUserId,
         mobile_user_id: mobileUserId,
+        device_name: device_name || "Paired Device",
       })
       .select("id")
       .single();

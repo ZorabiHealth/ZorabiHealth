@@ -121,7 +121,7 @@ export default function RoleSelectPage() {
         }
       }
 
-      router.push("/dashboard");
+      router.push(role === "doctor" ? "/dashboard/doctor" : "/dashboard");
     } catch (err) {
       console.error("Failed to set role:", err);
       setSaving(null);

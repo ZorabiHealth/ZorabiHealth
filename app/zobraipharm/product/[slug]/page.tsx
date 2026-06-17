@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
-import Image from "next/image";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import {
@@ -19,13 +18,17 @@ import {
   HeartPulse,
   Plus,
   Minus,
+  Loader2,
 } from "lucide-react";
-import { getProductBySlug, PRODUCTS, loadCart, saveCart } from "@/lib/pharmacy-store-data";
+import { loadCart, saveCart, type PharmProduct } from "@/lib/pharmacy-store-data";
+import { fetchProductBySlug, fetchStoreProducts } from "@/lib/store-products";
 
 export default function ProductDetailPage() {
   const params = useParams();
   const slug = params.slug as string;
-  const product = getProductBySlug(slug);
+  const [product, setProduct] = useState<PharmProduct | null>(null);
+  const [products, setProducts] = useState<PharmProduct[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [cart, setCart] = useState<Record<string, number>>(() => {
     const items = loadCart();
@@ -35,6 +38,25 @@ export default function ProductDetailPage() {
     });
     return map;
   });
+
+  useEffect(() => {
+    Promise.all([fetchProductBySlug(slug), fetchStoreProducts()]).then(
+      ([fetchedProduct, fetchedProducts]) => {
+        setProduct(fetchedProduct);
+        setProducts(fetchedProducts);
+        setLoading(false);
+      }
+    );
+  }, [slug]);
+
+  if (loading) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600" />
+        <p className="mt-3 text-sm text-slate-500">Loading product...</p>
+      </div>
+    );
+  }
 
   if (!product) {
     return (
@@ -67,9 +89,9 @@ export default function ProductDetailPage() {
     saveCart(Object.entries(next).map(([productId, quantity]) => ({ productId, quantity })));
   };
 
-  const related = PRODUCTS.filter(
-    (p) => p.category === product.category && p.id !== product.id
-  ).slice(0, 4);
+  const related = products
+    .filter((p) => p.category === product.category && p.id !== product.id)
+    .slice(0, 4);
 
   const discount = Math.round(((product.mrp - product.price) / product.mrp) * 100);
 
@@ -90,13 +112,10 @@ export default function ProductDetailPage() {
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Image */}
         <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-3xl bg-gradient-to-b from-emerald-50/80 to-white p-8 shadow-sm lg:sticky lg:top-24">
-          <Image
+          <img
             src={product.image}
             alt={product.name}
-            width={380}
-            height={380}
-            className="object-contain transition-all duration-500 hover:scale-110"
-            priority
+            className="h-[380px] w-[380px] object-contain transition-all duration-500 hover:scale-110"
           />
           {discount > 0 && (
             <span className="absolute right-4 top-4 rounded-full bg-emerald-500 px-3 py-1 text-xs font-bold text-white shadow-lg">
@@ -281,12 +300,10 @@ export default function ProductDetailPage() {
                   className="group rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:shadow-md"
                 >
                   <div className="mb-3 flex aspect-square items-center justify-center rounded-xl bg-emerald-50/50 p-4">
-                    <Image
+                    <img
                       src={rp.image}
                       alt={rp.name}
-                      width={120}
-                      height={120}
-                      className="object-contain transition-transform group-hover:scale-110"
+                      className="h-[120px] w-[120px] object-contain transition-transform group-hover:scale-110"
                     />
                   </div>
                   <p className="text-[10px] font-medium uppercase tracking-wider text-emerald-600">

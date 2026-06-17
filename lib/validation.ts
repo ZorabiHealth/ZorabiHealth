@@ -3,48 +3,48 @@
 /**
  * MED001: E.164 Phone Validation
  *
- * Valides phone numbers in E.164 international format
+ * Validates phone numbers in E.164 international format
  * Used for contact alerts and phone-based notifications
  *
  * Format: +[country code][number]
- * Exemples valides:
+ * Valid examples:
  * - +33612345678 (France)
- * - +216XXXXXXXX (Tunisie)
+ * - +216XXXXXXXX (Tunisia)
  * - +1234567890 (USA)
  *
- * Exemples invalides:
- * - 06 12 34 56 78 (espaces)
- * - +33 6 12 34 56 78 (espaces)
- * - 1234567 (pas de +)
+ * Invalid examples:
+ * - 06 12 34 56 78 (spaces)
+ * - +33 6 12 34 56 78 (spaces)
+ * - 1234567 (no + prefix)
  */
 
 /**
- * Valide un numéro de téléphone au format E.164 pur
- * @param phone - Numéro de téléphone à valider
- * @returns true si le format est correct, false sinon
+ * Validates a phone number in pure E.164 format
+ * @param phone - Phone number to validate
+ * @returns true if format is correct, false otherwise
  */
 export function validateE164Phone(phone: string): boolean {
   // Regex E.164: +[1-9]d{1,14}
-  // + : doit commencer par +
-  // [1-9] : première digit doit être 1-9
-  // \d{1,14} : suivi de 1 à 14 chiffres
+  // + : must start with +
+  // [1-9] : first digit must be 1-9
+  // \d{1,14} : followed by 1 to 14 digits
   const e164Regex = /^\+[1-9]\d{1,14}$/;
   return e164Regex.test(phone);
 }
 
 /**
- * Nettoie un numéro de téléphone et le valide
- * Enlève les espaces, tirets, parenthèses avant validation
+ * Cleans a phone number and validates it
+ * Removes spaces, dashes, parentheses before validation
  *
- * @param phone - Numéro de téléphone à nettoyer et valider
- * @returns Objet avec isValid, cleanedPhone (si valide), et error (si invalide)
+ * @param phone - Phone number to clean and validate
+ * @returns Object with isValid, cleanedPhone (if valid), and error (if invalid)
  */
 export function cleanAndValidatePhone(phone: string): {
   isValid: boolean;
   cleanedPhone?: string;
   error?: string;
 } {
-  // Vérifier que c'est pas vide
+  // Check it's not empty
   if (!phone || phone.trim() === "") {
     return {
       isValid: false,
@@ -54,10 +54,10 @@ export function cleanAndValidatePhone(phone: string): {
 
   const trimmed = phone.trim();
 
-  // Enlever espaces, tirets, parenthèses, etc.
+  // Remove spaces, dashes, parentheses, etc.
   const cleaned = trimmed.replace(/[\s\-\(\)]/g, "");
 
-  // Vérifier qu'il commence par +
+  // Verify it starts with +
   if (!cleaned.startsWith("+")) {
     return {
       isValid: false,
@@ -65,7 +65,7 @@ export function cleanAndValidatePhone(phone: string): {
     };
   }
 
-  // Valider le format E.164
+  // Validate E.164 format
   if (validateE164Phone(cleaned)) {
     return {
       isValid: true,
@@ -73,7 +73,7 @@ export function cleanAndValidatePhone(phone: string): {
     };
   }
 
-  // Si ça arrive ici = format invalide
+  // If we reach here = invalid format
   return {
     isValid: false,
     error: "Invalid phone format. Use E.164: +[country code][number] (1-15 digits total)",
@@ -81,8 +81,8 @@ export function cleanAndValidatePhone(phone: string): {
 }
 
 /**
- * Fonction pour tester rapidement
- * Exemples d'utilisation:
+ * Quick test function
+ * Usage examples:
  *
  * const result1 = cleanAndValidatePhone("+33 6 12 34 56 78");
  * if (result1.isValid) {

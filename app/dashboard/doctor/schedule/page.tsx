@@ -235,7 +235,8 @@ export default function DoctorSchedule() {
       setNewPatientPhone("");
     } catch (err) {
       console.error("Failed to create patient:", err);
-      alert("Failed to create patient.");
+      const { showToast } = await import("@/components/ui/toast");
+      showToast("Failed to create patient.", "error");
     } finally {
       setCreatingPatient(false);
     }
@@ -244,7 +245,8 @@ export default function DoctorSchedule() {
   const createAppointment = async () => {
     if (!selectedPatient || !doctorProfileId) return;
     if (apptEnd <= apptStart) {
-      alert("End time must be after start time.");
+      const { showToast } = await import("@/components/ui/toast");
+      showToast("End time must be after start time.", "error");
       return;
     }
 
@@ -259,7 +261,8 @@ export default function DoctorSchedule() {
       (a) => a.start_time < apptEnd && a.end_time > apptStart
     );
     if (hasConflict) {
-      alert("Time slot conflicts with an existing appointment.");
+      const { showToast } = await import("@/components/ui/toast");
+      showToast("Time slot conflicts with an existing appointment.", "warning");
       return;
     }
 
@@ -282,7 +285,8 @@ export default function DoctorSchedule() {
       loadAppointments();
     } catch (err) {
       console.error("Failed to create appointment:", err);
-      alert("Failed to create appointment. Please try again.");
+      const { showToast } = await import("@/components/ui/toast");
+      showToast("Failed to create appointment. Please try again.", "error");
     } finally {
       setSaving(false);
     }
@@ -865,7 +869,7 @@ export default function DoctorSchedule() {
                   <label className="text-xs font-semibold text-slate-600 mb-1 block">Type</label>
                   <select
                     value={apptType}
-                    onChange={(e) => setApptType(e.target.value as any)}
+                    onChange={(e) => setApptType(e.target.value as "video" | "physical" | "chat")}
                     className="w-full px-3 py-2.5 rounded-xl bg-slate-50 border border-slate-200 text-sm"
                   >
                     <option value="physical">In-Clinic</option>

@@ -233,7 +233,9 @@ const Navbar1 = ({
                 alt={logo.alt}
                 width={160}
                 height={45}
-                className="object-contain h-10 w-auto"
+                className="object-contain"
+                style={{ width: "auto", height: "2.5rem" }}
+                priority
                 unoptimized
               />
             </Link>
@@ -270,7 +272,9 @@ const Navbar1 = ({
               alt={logo.alt}
               width={140}
               height={40}
-              className="object-contain h-9 w-auto"
+              className="object-contain"
+              style={{ width: "auto", height: "2.25rem" }}
+              priority
               unoptimized
             />
           </Link>
@@ -293,7 +297,9 @@ const Navbar1 = ({
                       alt={logo.alt}
                       width={140}
                       height={40}
-                      className="object-contain h-9 w-auto"
+                      className="object-contain"
+                      style={{ width: "auto", height: "2.25rem" }}
+                      priority
                       unoptimized
                     />
                   </Link>

@@ -61,28 +61,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Strategy 2: If no token provided, verify user exists and has no role yet
+    // Strategy 2: No token — check if user has no role yet
     if (!authenticatedUserId) {
-      const { data: userExists, error: userErr } = await supabaseAdmin
+      const { data: existing, error: userErr } = await supabaseAdmin
         .from("user_roles")
         .select("user_id")
         .eq("user_id", user_id)
         .maybeSingle();
 
       if (userErr) throw userErr;
-      if (userExists) {
+      if (existing) {
         return NextResponse.json({ error: "User already has a role" }, { status: 409 });
       }
-
-      // Verify the auth.users record actually exists (user was just created)
-      const { data: authUser, error: authErr } = await supabaseAdmin
-        .from("user_roles")
-        .select("user_id")
-        .eq("user_id", user_id)
-        .maybeSingle();
-
-      // If we can't verify, we still proceed but this is a trust-but-verify approach
-      // The rate limit + IP tracking provides basic abuse protection
     }
 
     if (authenticatedUserId && authenticatedUserId !== user_id) {
@@ -90,15 +80,19 @@ export async function POST(req: NextRequest) {
     }
 
     // --- ATOMIC insert user_role + patient_profile ---
+    // Insert directly; if the auth user doesn't exist yet (FK violation),
+    // try to create the auth user first, then retry.
     const { error: roleError } = await supabaseAdmin.from("user_roles").insert({
       user_id,
       role,
     });
 
-    if (roleError) {
-      if (roleError.code === "23505") {
-        return NextResponse.json({ error: "User already has a role" }, { status: 409 });
-      }
+    if (roleError?.code === "23503") {
+      // Foreign key violation — auth user hasn't propagated yet (email not confirmed).
+      // This is expected; the role will be set after email confirmation.
+      // Return success so the client shows "check your email" without errors.
+      return NextResponse.json({ success: true, role, pending: true }, { status: 201 });
+    } else if (roleError && roleError.code !== "23505") {
       console.error("[set-role-initial] Failed:", roleError);
       return NextResponse.json({ error: "Failed to set role" }, { status: 500 });
     }

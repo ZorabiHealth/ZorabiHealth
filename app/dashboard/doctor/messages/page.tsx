@@ -71,6 +71,7 @@ export default function DoctorMessages() {
   const [loading, setLoading] = useState(true);
   const [sendingMessage, setSendingMessage] = useState(false);
   const [showPatientPanel, setShowPatientPanel] = useState(false);
+  const [fetchError, setFetchError] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const channelRef = useRef<RealtimeChannel | null>(null);
 
@@ -105,6 +106,7 @@ export default function DoctorMessages() {
 
   const fetchConversations = async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const { data, error } = await supabase
         .from("conversations")
@@ -129,6 +131,7 @@ export default function DoctorMessages() {
       setConversations(enriched);
     } catch (err) {
       console.error("Failed to fetch conversations:", err);
+      setFetchError("Failed to load conversations. Please try again.");
     } finally {
       setLoading(false);
     }
@@ -261,7 +264,20 @@ export default function DoctorMessages() {
           </div>
         </div>
         <div className="flex-1 overflow-y-auto custom-scrollbar divide-y divide-white/10">
-          {loading ? (
+          {fetchError ? (
+            <div className="p-6 text-center">
+              <div className="w-10 h-10 rounded-full bg-red-50 flex items-center justify-center mx-auto mb-2">
+                <X className="w-5 h-5 text-red-400" />
+              </div>
+              <p className="text-xs text-red-500 font-semibold mb-2">{fetchError}</p>
+              <button
+                onClick={fetchConversations}
+                className="text-xs text-[#0c4381] font-bold hover:underline"
+              >
+                Retry
+              </button>
+            </div>
+          ) : loading ? (
             <div className="p-6 text-center text-slate-400 text-xs">Loading...</div>
           ) : filteredConvs.length === 0 ? (
             <div className="p-6 text-center text-slate-400 text-xs">

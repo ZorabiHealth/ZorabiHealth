@@ -125,6 +125,7 @@ export interface VoiceMessage {
   timestamp: string;
   intent?: string;
   actionTaken?: string;
+  audio_url?: string;
 }
 
 // ─── localStorage Keys ───────────────────────────────────────

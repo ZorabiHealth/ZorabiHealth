@@ -6,7 +6,7 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { ShoppingCart, Menu, X, Pill, HeartPulse, User, LogIn } from "lucide-react";
-import { loadCart } from "@/lib/pharmacy-store-data";
+import { loadCart, type CartItem } from "@/lib/pharmacy-store-data";
 
 interface AuthUser {
   id: string;
@@ -26,9 +26,16 @@ export function useStoreAuth() {
 
 function ZoraipharmHeader() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { user, loading } = useStoreAuth();
-  const cart = loadCart();
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const { user } = useStoreAuth();
   const cartCount = cart.reduce((s, i) => s + i.quantity, 0);
+
+  useEffect(() => {
+    setCart(loadCart());
+    const onFocus = () => setCart(loadCart());
+    window.addEventListener("focus", onFocus);
+    return () => window.removeEventListener("focus", onFocus);
+  }, []);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-emerald-100/60 bg-white/95 backdrop-blur-md">
@@ -37,9 +44,10 @@ function ZoraipharmHeader() {
           <Image
             src="/logo/image/logo.png"
             alt="ZorabiHealth"
-            width={130}
-            height={36}
+            width={100}
+            height={28}
             className="object-contain"
+            priority
           />
           <span className="hidden text-xs font-medium text-emerald-700 md:inline-block">
             Pharmacy

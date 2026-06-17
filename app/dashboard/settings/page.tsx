@@ -63,6 +63,25 @@ export default function SettingsPage() {
   const [generatingCode, setGeneratingCode] = useState(false);
   const [codeExpiresIn, setCodeExpiresIn] = useState(0);
 
+  const fetchDevices = React.useCallback(async () => {
+    try {
+      const {
+        data: { session: fresh },
+      } = await supabase.auth.refreshSession();
+      const token = fresh?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/notifications/devices", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.devices) setPairedDevices(json.devices);
+    } catch (e) {
+      console.error("Failed to fetch paired devices:", e);
+    } finally {
+      setLoadingDevices(false);
+    }
+  }, []);
+
   useEffect(() => {
     const fetchSession = async () => {
       try {
@@ -86,28 +105,9 @@ export default function SettingsPage() {
     fetchSession();
   }, []);
 
-  // Fetch devices + subscribe to Realtime for live updates
+  // Fetch devices + Realtime subscription + polling fallback
   useEffect(() => {
     if (!session) return;
-
-    const fetchDevices = async () => {
-      try {
-        const {
-          data: { session: fresh },
-        } = await supabase.auth.refreshSession();
-        const token = fresh?.access_token;
-        if (!token) return;
-        const res = await fetch("/api/notifications/devices", {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        const json = await res.json();
-        if (json.devices) setPairedDevices(json.devices);
-      } catch (e) {
-        console.error("Failed to fetch paired devices:", e);
-      } finally {
-        setLoadingDevices(false);
-      }
-    };
 
     fetchDevices();
 
@@ -127,10 +127,14 @@ export default function SettingsPage() {
       )
       .subscribe();
 
+    // Poll every 5s as fallback (catches any missed Realtime events)
+    const pollInterval = setInterval(fetchDevices, 5000);
+
     return () => {
       deviceChannel.unsubscribe();
+      clearInterval(pollInterval);
     };
-  }, [session]);
+  }, [session, fetchDevices]);
 
   const handleSaveSettings = (e: React.FormEvent) => {
     e.preventDefault();
@@ -517,12 +521,20 @@ export default function SettingsPage() {
                 <div className="h-10 w-10 rounded-xl bg-brand-50 flex items-center justify-center">
                   <Smartphone className="text-brand-500 h-5.5 w-5.5" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <h3 className="text-lg font-black text-slate-800">Paired Devices</h3>
                   <p className="text-slate-500 text-xs font-semibold">
                     Devices linked to your account for notifications and sync.
                   </p>
                 </div>
+                <button
+                  onClick={fetchDevices}
+                  disabled={loadingDevices}
+                  className="bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-bold py-2 px-3 rounded-xl text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingDevices ? "animate-spin" : ""}`} />
+                  Refresh
+                </button>
               </div>
 
               <div className="bg-slate-50 rounded-3xl border border-slate-100 divide-y divide-slate-100">

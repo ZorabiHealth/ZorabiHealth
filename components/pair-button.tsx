@@ -40,6 +40,7 @@ export function PairButton() {
       const json = await res.json();
       if (json.devices) setPairedDevices(json.devices);
     } catch {
+      console.warn("[catch] Non-critical operation failed at pair-button.tsx");
     } finally {
       setLoadingDevices(false);
     }
@@ -76,6 +77,7 @@ export function PairButton() {
         setCodeExpiresIn(json.expires_in || 600);
       }
     } catch {
+      console.warn("[catch] Non-critical operation failed at pair-button.tsx");
     } finally {
       setGenerating(false);
     }

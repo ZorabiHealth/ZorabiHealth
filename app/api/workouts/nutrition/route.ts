@@ -1,21 +1,17 @@
-import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
+import { NextRequest, NextResponse } from "next/server";
+import { verifyAuth, getAdminClient } from "@/lib/auth-utils";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-);
-
-export async function GET(req: Request) {
-  const { searchParams } = new URL(req.url);
-  const userId = searchParams.get("userId");
-  const date = searchParams.get("date");
-
-  if (!userId) {
-    return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+export async function GET(req: NextRequest) {
+  const auth = await verifyAuth(req);
+  if ("error" in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
   }
 
-  let query = supabase.from("nutrition_logs").select("*").eq("user_id", userId);
+  const { searchParams } = new URL(req.url);
+  const date = searchParams.get("date");
+
+  const admin = getAdminClient();
+  let query = admin.from("nutrition_logs").select("*").eq("user_id", auth.user.id);
   if (date) {
     const dayStart = new Date(date + "T00:00:00Z").toISOString();
     const dayEnd = new Date(date + "T23:59:59.999Z").toISOString();
@@ -26,10 +22,15 @@ export async function GET(req: Request) {
   return NextResponse.json({ data });
 }
 
-export async function POST(req: Request) {
+export async function POST(req: NextRequest) {
+  const auth = await verifyAuth(req);
+  if ("error" in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const body = await req.json();
   const mapped = {
-    user_id: body.user_id,
+    user_id: auth.user.id,
     name: body.name,
     meal_type: body.meal_type || "snack",
     calories: body.calories || 0,
@@ -41,16 +42,33 @@ export async function POST(req: Request) {
       : undefined,
     notes: body.notes,
   };
-  const { data, error } = await supabase.from("nutrition_logs").insert(mapped).select().single();
+
+  const admin = getAdminClient();
+  const { data, error } = await admin.from("nutrition_logs").insert(mapped).select().single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ data }, { status: 201 });
 }
 
-export async function DELETE(req: Request) {
+export async function DELETE(req: NextRequest) {
+  const auth = await verifyAuth(req);
+  if ("error" in auth) {
+    return NextResponse.json({ error: auth.error }, { status: auth.status });
+  }
+
   const { searchParams } = new URL(req.url);
   const id = searchParams.get("id");
   if (!id) return NextResponse.json({ error: "Missing id" }, { status: 400 });
-  const { error } = await supabase.from("nutrition_logs").delete().eq("id", id);
+
+  const admin = getAdminClient();
+  const { data: existing } = await admin
+    .from("nutrition_logs")
+    .select("id")
+    .eq("id", id)
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
+  if (!existing) return NextResponse.json({ error: "Not found" }, { status: 404 });
+
+  const { error } = await admin.from("nutrition_logs").delete().eq("id", id);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }

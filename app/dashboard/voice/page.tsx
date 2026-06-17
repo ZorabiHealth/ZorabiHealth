@@ -642,7 +642,9 @@ export default function VoiceAgentPage() {
               setTimeout(() => handleResp(generateLocalResponse(intent, transcript)), 500);
             }
           }
-        } catch {}
+        } catch {
+          console.warn("[catch] Non-critical operation failed at page.tsx");
+        }
       };
       ws.onerror = () => {
         setErrorMsg("WebSocket connection failed. Verify Deepgram key.");
@@ -669,7 +671,9 @@ export default function VoiceAgentPage() {
       if (audioContextRef.current && audioContextRef.current.state !== "closed") {
         audioContextRef.current.close().catch(() => {});
       }
-    } catch {}
+    } catch {
+      console.warn("[catch] Non-critical operation failed at page.tsx");
+    }
     audioContextRef.current = null;
     wsRef.current = null;
     mediaRecorderRef.current = null;
@@ -754,7 +758,9 @@ export default function VoiceAgentPage() {
     if (navigator.onLine) {
       try {
         await supabase.from("voice_messages").delete().eq("user_id", userId);
-      } catch {}
+      } catch {
+        console.warn("[catch] Non-critical operation failed at page.tsx");
+      }
     }
   };
 
@@ -1133,9 +1139,7 @@ export default function VoiceAgentPage() {
                             <Sparkles className="w-2.5 h-2.5" /> {msg.intent.replace(/_/g, " ")}
                           </motion.div>
                         )}
-                        {(msg as any).audio_url && (
-                          <AudioPlayerButton audioUrl={(msg as any).audio_url!} />
-                        )}
+                        {msg.audio_url && <AudioPlayerButton audioUrl={msg.audio_url} />}
                       </motion.div>
                     </div>
                   </motion.div>

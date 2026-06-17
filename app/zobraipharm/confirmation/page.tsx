@@ -1,7 +1,6 @@
 "use client";
 
 import React, { Suspense, useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -150,7 +149,7 @@ function ConfirmationContent() {
     );
   }
 
-  const currentIndex = STATUS_ORDER.indexOf(order.status as any);
+  const currentIndex = STATUS_ORDER.indexOf(order.status as (typeof STATUS_ORDER)[number]);
 
   const fallbackDate = new Date(new Date(order.created_at).getTime() + 2 * 24 * 60 * 60 * 1000);
   const estDate = new Date(

@@ -16,6 +16,8 @@ import {
   Loader2,
   UserPlus,
   HeartPulse,
+  Plus,
+  Save,
 } from "lucide-react";
 
 interface PatientProfile {
@@ -55,6 +57,12 @@ export default function DoctorPatients() {
   const [loadingDetails, setLoadingDetails] = useState(false);
 
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+
+  const [showAddCondition, setShowAddCondition] = useState(false);
+  const [newCondition, setNewCondition] = useState("");
+  const [newDiagnosedDate, setNewDiagnosedDate] = useState("");
+  const [newConditionNotes, setNewConditionNotes] = useState("");
+  const [savingCondition, setSavingCondition] = useState(false);
 
   useEffect(() => {
     if (authLoading) return;
@@ -146,6 +154,38 @@ export default function DoctorPatients() {
       p.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       (p.email || "").toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const handleAddCondition = async () => {
+    if (!selectedPatient || !newCondition.trim()) return;
+    setSavingCondition(true);
+    try {
+      const { data, error } = await supabase
+        .from("patient_medical_history")
+        .insert({
+          patient_id: selectedPatient.id,
+          condition: newCondition.trim(),
+          diagnosed_date: newDiagnosedDate || null,
+          notes: newConditionNotes.trim() || null,
+          is_active: true,
+        })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setMedicalHistory((prev) => [data, ...prev]);
+      setNewCondition("");
+      setNewDiagnosedDate("");
+      setNewConditionNotes("");
+      setShowAddCondition(false);
+      setToast({ message: "Condition added successfully.", type: "success" });
+    } catch (err) {
+      console.error("Failed to add condition:", err);
+      setToast({ message: "Failed to add condition.", type: "error" });
+    } finally {
+      setSavingCondition(false);
+    }
+  };
 
   const formatDate = (dateStr: string) =>
     new Date(dateStr).toLocaleDateString("en-US", {
@@ -322,11 +362,59 @@ export default function DoctorPatients() {
 
                 {/* Medical History */}
                 <div className="glass-panel rounded-2xl border border-white/40 shadow-sm overflow-hidden">
-                  <div className="p-4 border-b border-white/30">
+                  <div className="p-4 border-b border-white/30 flex items-center justify-between">
                     <h3 className="text-sm font-semibold text-slate-700 flex items-center gap-2">
                       <FileText className="w-4 h-4 text-[#0c4381]" /> Medical History
                     </h3>
+                    <button
+                      onClick={() => setShowAddCondition(!showAddCondition)}
+                      className="text-xs font-semibold text-[#0c4381] flex items-center gap-1 hover:underline"
+                    >
+                      <Plus className="w-3.5 h-3.5" /> {showAddCondition ? "Cancel" : "Add"}
+                    </button>
                   </div>
+
+                  {showAddCondition && (
+                    <div className="p-4 border-b border-white/20 bg-slate-50/50">
+                      <div className="space-y-3">
+                        <input
+                          type="text"
+                          value={newCondition}
+                          onChange={(e) => setNewCondition(e.target.value)}
+                          placeholder="Condition name (e.g. Type 2 Diabetes)"
+                          className="w-full px-3 py-2 rounded-xl bg-white border border-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-[#0c4381]/20"
+                        />
+                        <div className="grid grid-cols-2 gap-3">
+                          <input
+                            type="date"
+                            value={newDiagnosedDate}
+                            onChange={(e) => setNewDiagnosedDate(e.target.value)}
+                            className="w-full px-3 py-2 rounded-xl bg-white border border-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-[#0c4381]/20"
+                          />
+                          <button
+                            onClick={handleAddCondition}
+                            disabled={savingCondition || !newCondition.trim()}
+                            className="w-full bg-[#0c4381] text-white py-2 rounded-xl text-xs font-bold hover:bg-[#093262] transition-colors flex items-center justify-center gap-1.5 disabled:opacity-50"
+                          >
+                            {savingCondition ? (
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            ) : (
+                              <Save className="w-3.5 h-3.5" />
+                            )}
+                            {savingCondition ? "Saving..." : "Save"}
+                          </button>
+                        </div>
+                        <textarea
+                          value={newConditionNotes}
+                          onChange={(e) => setNewConditionNotes(e.target.value)}
+                          placeholder="Additional notes (optional)"
+                          rows={2}
+                          className="w-full px-3 py-2 rounded-xl bg-white border border-white/40 text-sm focus:outline-none focus:ring-2 focus:ring-[#0c4381]/20 resize-none"
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {loadingDetails ? (
                     <div className="p-6 text-center text-slate-400 text-sm flex items-center justify-center gap-2">
                       <Loader2 className="w-4 h-4 animate-spin" /> Loading...

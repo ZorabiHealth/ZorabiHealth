@@ -7,6 +7,7 @@ const supabaseAnonKey =
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
   "";
 const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+const jwtSecret = process.env.SUPABASE_JWT_SECRET || "";
 
 export interface AuthUser {
   id: string;
@@ -19,6 +20,13 @@ function getTokenFromRequest(req: NextRequest): string | null {
   return authHeader.slice(7);
 }
 
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms)),
+  ]);
+}
+
 export async function verifyAuth(
   req: NextRequest
 ): Promise<{ user: AuthUser; token: string } | { error: string; status: number }> {
@@ -26,8 +34,6 @@ export async function verifyAuth(
   if (!token) {
     return { error: "Missing or invalid Authorization header", status: 401 };
   }
-
-  const jwtSecret = process.env.SUPABASE_JWT_SECRET;
 
   if (jwtSecret) {
     try {
@@ -56,18 +62,27 @@ export async function verifyAuth(
     auth: { persistSession: false, autoRefreshToken: false },
   });
 
-  const {
-    data: { user },
-    error: userError,
-  } = await supabase.auth.getUser();
-  if (userError || !user) {
-    return { error: "Unauthorized", status: 401 };
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const {
+        data: { user },
+        error: userError,
+      } = await withTimeout(supabase.auth.getUser(), 8000);
+      if (userError || !user) {
+        return { error: "Unauthorized", status: 401 };
+      }
+      return {
+        user: { id: user.id, email: user.email },
+        token,
+      };
+    } catch (err) {
+      lastError = err;
+      if (attempt < 2) await new Promise((r) => setTimeout(r, 1000 * (attempt + 1)));
+    }
   }
-
-  return {
-    user: { id: user.id, email: user.email },
-    token,
-  };
+  console.error("verifyAuth failed after 3 attempts:", lastError);
+  return { error: "Authentication service unavailable", status: 401 };
 }
 
 export function getAdminClient() {

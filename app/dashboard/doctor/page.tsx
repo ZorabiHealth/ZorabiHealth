@@ -784,9 +784,58 @@ export default function DoctorDashboard() {
               priority: "normal",
             }));
             await supabase.from("notifications").insert(notificationData);
+
+            // Also create an order in the orders table for each pharmacy
+            // This ensures the order appears in the pharmacy's orders dashboard
+            for (const pharmacy of pharmacies) {
+              const totalAmount = prescribedMeds.reduce(
+                (sum, m) => sum + (parseFloat(m.dosage) || 0) * (m.morning + m.afternoon + m.night),
+                0
+              );
+              const { data: patientProfile } = await supabase
+                .from("patient_profiles")
+                .select("address, phone, email")
+                .eq("id", activePatient.id)
+                .single();
+
+              const { data: orderRecord, error: orderErr } = await supabase
+                .from("orders")
+                .insert({
+                  prescription_id: rx.id,
+                  pharmacy_id: pharmacy.id,
+                  patient_id: activePatient.id,
+                  doctor_id: doctorProfile.id,
+                  status: "PENDING",
+                  total_amount: Math.max(totalAmount, 0),
+                  delivery_address: patientProfile?.address || "To be confirmed",
+                  patient_phone: patientProfile?.phone || "",
+                  patient_email: patientProfile?.email || "",
+                  notes: prescriptionSummary,
+                })
+                .select()
+                .single();
+
+              if (orderErr) {
+                console.warn(
+                  "[Doctor] Failed to create order for pharmacy:",
+                  pharmacy.business_name,
+                  orderErr
+                );
+              } else if (orderRecord) {
+                // Create initial order event
+                await supabase
+                  .from("order_events")
+                  .insert({
+                    order_id: orderRecord.id,
+                    status: "PENDING",
+                    note: `Prescription finalized by Dr. ${doctorProfile.name || "Doctor"}`,
+                  })
+                  .throwOnError();
+              }
+            }
           }
         } catch (pharmErr) {
-          console.error("Pharmacy notification failed (non-blocking):", pharmErr);
+          console.error("Pharmacy notification + order creation failed (non-blocking):", pharmErr);
         }
       }
     } catch (err) {

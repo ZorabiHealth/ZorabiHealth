@@ -1,5 +1,13 @@
 "use client";
 
+import {
+  buildScheduleFromRemote as sharedBuildScheduleFromRemote,
+  syncOfflineQueue as sharedSyncOfflineQueue,
+  rejectOldestEntries,
+  resolveConflicts,
+} from "@zorabihealth/shared";
+import type { RemoteMedication, MedicationLog, SyncQueueItem } from "@zorabihealth/shared";
+
 export interface AlarmEntry {
   medication_id: string;
   medication_name: string;
@@ -85,94 +93,61 @@ export async function scheduleBrowserAlarm(
 // ─── Build schedule from remote data ──────────────────────────
 
 export function buildScheduleFromRemote(
-  medications: {
-    id: string;
-    name: string;
-    dosage: string;
-    current_stock: number;
-    scheduled_times: string[];
-  }[],
-  existingLogs: {
-    medication_id: string;
-    status: string;
-    scheduled_at: string;
-    snoozed_until: string | null;
-    id: string;
-  }[]
+  medications: RemoteMedication[],
+  existingLogs: MedicationLog[]
 ): AlarmEntry[] {
-  const today = new Date();
-  const todayStr = today.toISOString().split("T")[0];
-  const entries: AlarmEntry[] = [];
+  return sharedBuildScheduleFromRemote(medications, existingLogs) as AlarmEntry[];
+}
 
-  for (const med of medications) {
-    for (const timeStr of med.scheduled_times) {
-      const [hours, minutes] = timeStr.split(":").map(Number);
-      const scheduledDate = new Date();
-      scheduledDate.setHours(hours, minutes, 0, 0);
+// ─── Lock Utility ─────────────────────────────────────────────
+const ALARM_LOCK_KEY = "zh_alarm_lock";
+const ALARM_LOCK_TIMEOUT = 5000;
 
-      const matchingLog = existingLogs.find((log) => {
-        if (log.medication_id !== med.id) return false;
-        const logDate = new Date(log.scheduled_at);
-        const hh = String(logDate.getHours()).padStart(2, "0");
-        const mm = String(logDate.getMinutes()).padStart(2, "0");
-        return `${hh}:${mm}` === timeStr;
-      });
-
-      let status: AlarmEntry["status"] = "pending";
-      let logId: string | null = null;
-      let snoozedUntil: string | null = null;
-
-      if (matchingLog) {
-        logId = matchingLog.id;
-        snoozedUntil = matchingLog.snoozed_until;
-
-        if (matchingLog.status === "taken") {
-          status = "taken";
-        } else if (matchingLog.status === "snoozed") {
-          if (matchingLog.snoozed_until && new Date(matchingLog.snoozed_until) > new Date()) {
-            status = "snoozed";
-          } else {
-            status = "pending";
-          }
-        } else if (matchingLog.status === "missed" || matchingLog.status === "pending") {
-          status = "pending";
-        }
-      } else if (scheduledDate.getTime() <= Date.now()) {
-        status = "pending";
-      } else {
-        status = "scheduled";
-      }
-
-      entries.push({
-        medication_id: med.id,
-        medication_name: med.name,
-        dosage: med.dosage,
-        current_stock: med.current_stock,
-        scheduled_time: timeStr,
-        scheduled_date: todayStr,
-        status,
-        log_id: logId,
-        snoozed_until: snoozedUntil,
-      });
-    }
+function acquireAlarmLock(): boolean {
+  const now = Date.now();
+  const existing = localStorage.getItem(ALARM_LOCK_KEY);
+  if (existing) {
+    try {
+      const lock = JSON.parse(existing) as { ts: number; id: string };
+      if (now - lock.ts < ALARM_LOCK_TIMEOUT && lock.id !== globalThis.__alarm_lock_id)
+        return false;
+    } catch {}
   }
+  const lockId = `alock-${Math.random().toString(36).substring(2, 9)}`;
+  globalThis.__alarm_lock_id = lockId;
+  localStorage.setItem(ALARM_LOCK_KEY, JSON.stringify({ ts: now, id: lockId }));
+  return true;
+}
 
-  return entries;
+declare global {
+  interface Window {
+    __alarm_lock_id?: string;
+  }
+}
+
+function releaseAlarmLock(): void {
+  localStorage.removeItem(ALARM_LOCK_KEY);
 }
 
 // ─── Offline Queue ────────────────────────────────────────────
+
+const DEVICE_ID = typeof window !== "undefined" ? "web" : "unknown";
 
 export function queueOfflineAction(action: Omit<OfflineAction, "id" | "created_at">) {
   if (typeof window === "undefined") return;
   try {
     const raw = localStorage.getItem(STORAGE_KEY_QUEUE) || "[]";
-    const queue: OfflineAction[] = JSON.parse(raw);
-    queue.push({
+    const queue: SyncQueueItem[] = JSON.parse(raw);
+    const newItem: SyncQueueItem = {
       ...action,
       id: `offline-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      vector_clock: Date.now(),
+      device_id: DEVICE_ID,
+      retry_count: 0,
       created_at: new Date().toISOString(),
-    });
-    localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(queue));
+    };
+    const merged = resolveConflicts(queue, newItem);
+    localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(rejectOldestEntries(merged)));
   } catch (e) {
     console.warn("[AlarmQueue] Failed to queue offline action:", e);
   }
@@ -180,34 +155,41 @@ export function queueOfflineAction(action: Omit<OfflineAction, "id" | "created_a
 
 export async function syncOfflineQueue(): Promise<void> {
   if (typeof window === "undefined") return;
+  if (!acquireAlarmLock()) return;
   try {
     const raw = localStorage.getItem(STORAGE_KEY_QUEUE) || "[]";
-    const queue: OfflineAction[] = JSON.parse(raw);
+    const queue: SyncQueueItem[] = JSON.parse(raw);
     if (queue.length === 0) return;
 
-    const { supabase } = await import("@/lib/supabase");
-    const remaining: OfflineAction[] = [];
+    const { supabase } = await dynamicImportSupabase();
+    const remaining = await sharedSyncOfflineQueue(queue, supabase);
+    localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(rejectOldestEntries(remaining)));
 
-    for (const item of queue) {
+    if (remaining.length < queue.length) {
       try {
-        if (item.action === "update") {
-          const { error } = await supabase
-            .from(item.table)
-            .update(item.payload)
-            .eq("id", item.payload.id);
-          if (error) throw error;
-        } else if (item.action === "insert") {
-          const { error } = await supabase.from(item.table).insert(item.payload);
-          if (error) throw error;
-        }
+        const channel = supabase.channel("sync-broadcast");
+        channel.send({
+          type: "broadcast",
+          event: "sync_complete",
+          payload: { device_id: DEVICE_ID, timestamp: new Date().toISOString() },
+        });
+        channel.unsubscribe();
       } catch (e) {
-        console.warn(`[AlarmQueue] Failed to sync item ${item.id}:`, e);
-        remaining.push(item);
+        console.warn("[AlarmQueue] Broadcast failed:", e);
       }
     }
-
-    localStorage.setItem(STORAGE_KEY_QUEUE, JSON.stringify(remaining));
   } catch (e) {
     console.warn("[AlarmQueue] Sync failed:", e);
+  } finally {
+    releaseAlarmLock();
   }
+}
+
+let _supabaseModule: { supabase: typeof import("@/lib/supabase").supabase } | null = null;
+
+async function dynamicImportSupabase() {
+  if (!_supabaseModule) {
+    _supabaseModule = await import("@/lib/supabase");
+  }
+  return _supabaseModule;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Pill,
   Plus,
@@ -20,6 +20,7 @@ import {
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Medication,
   MedicationLog,
@@ -75,9 +76,21 @@ export default function MedicationsPage() {
   const [editingMed, setEditingMed] = useState<Medication | null>(null);
   const [sendingTestSMS, setSendingTestSMS] = useState<string | null>(null);
   const [smsResult, setSmsResult] = useState<{ id: string; ok: boolean; msg: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    variant?: "danger" | "warning" | "default";
+    onConfirm: () => void;
+    onCancel: () => void;
+  }>({ open: false, title: "", message: "", onConfirm: () => {}, onCancel: () => {} });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
   const [phoneError, setPhoneError] = useState<string | null>(null);
   const [emergencyPhoneError, setEmergencyPhoneError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showExpired, setShowExpired] = useState(false);
 
   // Sync state
   const [sessionUserId, setSessionUserId] = useState<string | null>(null);
@@ -219,13 +232,15 @@ export default function MedicationsPage() {
     }
   };
 
-  useEffect(() => {
-    queueMicrotask(() => loadData().catch(console.error));
+  const loadDataRef = useRef(loadData);
 
-    // Listen to network status change
+  useEffect(() => {
+    loadDataRef.current = loadData;
+    queueMicrotask(() => loadDataRef.current().catch(console.error));
+
     const handleOnline = () => {
       setSyncStatus("syncing");
-      loadData().catch(console.error);
+      loadDataRef.current().catch(console.error);
     };
     const handleOffline = () => setSyncStatus("offline");
 
@@ -235,7 +250,7 @@ export default function MedicationsPage() {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getScheduledTimes = (): string[] => {
     const freq = form.frequency;
@@ -247,6 +262,7 @@ export default function MedicationsPage() {
 
   const handleSaveMed = async () => {
     if (!form.name || !form.dosage) return;
+    if (isSaving) return;
 
     let hasError = false;
     let validatedPhone = form.phoneForAlerts;
@@ -282,6 +298,7 @@ export default function MedicationsPage() {
 
     if (hasError) return;
 
+    setIsSaving(true);
     const times = getScheduledTimes();
     const now = new Date().toISOString();
     const {
@@ -363,9 +380,13 @@ export default function MedicationsPage() {
 
     resetForm();
     setTab("list");
+    setIsSaving(false);
   };
 
   const handleDelete = async (id: string) => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+
     // Optimistic delete
     const updated = meds.filter((m) => m.id !== id);
     setMeds(updated);
@@ -387,6 +408,7 @@ export default function MedicationsPage() {
       queueSyncItem({ table: "medications", action: "delete", payload: { id } });
       setSyncStatus("offline");
     }
+    setIsDeleting(false);
   };
 
   const handleLogTaken = async (med: Medication) => {
@@ -461,32 +483,59 @@ export default function MedicationsPage() {
   };
 
   const handleTestSMS = async (med: Medication) => {
-    setSendingTestSMS(med.id);
-    setSmsResult(null);
-    try {
-      // Trigger a test alarm by creating a log scheduled 5 minutes ago with status pending
-      const testTime = new Date(Date.now() - 5 * 60 * 1000);
-      const { error } = await supabase.from("medication_logs").insert({
-        medication_id: med.id,
-        medication_name: med.name,
-        scheduled_at: testTime.toISOString(),
-        status: "pending",
-        dose: med.dosage,
-        note: "System Test Alarm Event",
-      });
-
-      if (error) throw error;
-
-      setSmsResult({
-        id: med.id,
-        ok: true,
-        msg: "Test alarm triggered! Modal should appear shortly on all active devices.",
-      });
-    } catch (err: any) {
-      setSmsResult({ id: med.id, ok: false, msg: err.message || "Failed to trigger test alarm" });
-    } finally {
-      setSendingTestSMS(null);
+    // Check for emergency contact before proceeding
+    if (!med.emergencyContact?.phone || !med.emergencyContact?.name) {
+      const { showToast } = await import("@/components/ui/toast");
+      showToast("No emergency contact configured. Go to Settings to add one.", "warning");
+      return;
     }
+
+    setConfirmDialog({
+      open: true,
+      title: "Test Emergency Escalation",
+      message: `This will send a test notification to ${med.emergencyContact?.name} at ${med.emergencyContact?.phone}. Continue?`,
+      confirmLabel: "Send Test",
+      variant: "warning",
+      onConfirm: async () => {
+        setConfirmDialog({ ...confirmDialog, open: false });
+        setSendingTestSMS(med.id);
+        setSmsResult(null);
+        try {
+          const testTime = new Date(Date.now() - 5 * 60 * 1000);
+          const { error } = await supabase.from("medication_logs").insert({
+            medication_id: med.id,
+            medication_name: med.name,
+            scheduled_at: testTime.toISOString(),
+            status: "pending",
+            dose: med.dosage,
+            note: "System Test Alarm Event",
+          });
+
+          if (error) throw error;
+
+          const { showToast } = await import("@/components/ui/toast");
+          showToast(
+            `Test alert sent to ${med.emergencyContact?.name} at ${med.emergencyContact?.phone}`,
+            "success"
+          );
+
+          setSmsResult({
+            id: med.id,
+            ok: true,
+            msg: `Test alert sent to ${med.emergencyContact?.name} at ${med.emergencyContact?.phone}`,
+          });
+        } catch (err: any) {
+          setSmsResult({
+            id: med.id,
+            ok: false,
+            msg: err.message || "Failed to trigger test alarm",
+          });
+        } finally {
+          setSendingTestSMS(null);
+        }
+      },
+      onCancel: () => setConfirmDialog({ ...confirmDialog, open: false }),
+    });
   };
 
   const startEdit = (med: Medication) => {
@@ -605,6 +654,14 @@ export default function MedicationsPage() {
             My Meds ({meds.filter((m) => m.isActive).length})
           </Button>
           <Button
+            variant={showExpired ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowExpired(!showExpired)}
+            className="text-xs rounded-xl shadow-sm"
+          >
+            {showExpired ? "Hide Expired" : "Show Expired"}
+          </Button>
+          <Button
             variant={tab === "add" ? "default" : "outline"}
             size="sm"
             onClick={() => {
@@ -655,7 +712,7 @@ export default function MedicationsPage() {
             <motion.div layout className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               <AnimatePresence mode="popLayout">
                 {meds
-                  .filter((m) => m.isActive)
+                  .filter((m) => showExpired || m.isActive)
                   .map((med) => (
                     <motion.div
                       key={med.id}
@@ -667,6 +724,13 @@ export default function MedicationsPage() {
                       className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col gap-3 group relative overflow-hidden"
                     >
                       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      {med.endDate && new Date(med.endDate) < new Date() && (
+                        <div className="absolute top-3 right-3">
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">
+                            Expired
+                          </span>
+                        </div>
+                      )}
                       {/* Top row */}
                       <div className="flex items-start justify-between">
                         <div>
@@ -737,6 +801,16 @@ export default function MedicationsPage() {
                         Refill alert at {med.refillAt} pills left
                       </div>
 
+                      {/* Renew Prescription */}
+                      {med.endDate && new Date(med.endDate) < new Date() && (
+                        <button
+                          onClick={() => (window.location.href = "/dashboard/doctor")}
+                          className="w-full bg-red-50 text-red-600 border border-red-200 py-2 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          Renew Prescription
+                        </button>
+                      )}
+
                       {/* SMS Alert */}
                       <div className="border-t border-slate-100 pt-3.5 mt-1 flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-xs">
@@ -798,7 +872,7 @@ export default function MedicationsPage() {
                   ))}
               </AnimatePresence>
 
-              {meds.filter((m) => m.isActive).length === 0 && (
+              {meds.filter((m) => showExpired || m.isActive).length === 0 && (
                 <div className="col-span-3 text-center py-20 text-slate-400 bg-white rounded-3xl border border-slate-100 shadow-sm">
                   <Pill className="w-12 h-12 mx-auto mb-3 opacity-30 text-blue-500 animate-bounce" />
                   <p className="font-bold text-slate-600 text-lg">No Medications Found</p>
@@ -1178,6 +1252,16 @@ export default function MedicationsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel={confirmDialog.confirmLabel}
+        variant={confirmDialog.variant}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={confirmDialog.onCancel}
+      />
     </div>
   );
 }

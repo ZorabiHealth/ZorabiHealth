@@ -10,6 +10,9 @@ import { MedicationAlarmAlerter } from "@/components/medication-alarm-alerter";
 import { useNotifications } from "@/hooks/useNotifications";
 import { NotificationToast } from "@/components/notification-toast";
 import { PairButton } from "@/components/pair-button";
+import { ToastContainer } from "@/components/ui/toast";
+import { NetworkBanner } from "@/components/ui/network-banner";
+import { DoctorSidebar } from "@/components/doctor-sidebar";
 import { cn } from "@/lib/utils";
 import {
   HeartPulse,
@@ -118,14 +121,19 @@ const pharmacyNavItems: NavItem[] = [
     icon: Package,
   },
   {
-    name: "Active Orders",
-    href: "/dashboard/pharmacy",
+    name: "Orders",
+    href: "/dashboard/pharmacy/orders",
     icon: ClipboardList,
   },
   {
     name: "Drug Catalog",
     href: "/dashboard/pharmacy/catalog",
     icon: BookOpen,
+  },
+  {
+    name: "Products",
+    href: "/dashboard/pharmacy/products",
+    icon: ShoppingBag,
   },
   {
     name: "Settings",
@@ -165,9 +173,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
   useEffect(() => {
     const checkUser = async () => {
-      const isPlaceholder =
-        !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-        process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder-url.supabase.co");
+      const isPlaceholder = !process.env.NEXT_PUBLIC_SUPABASE_URL;
 
       if (isPlaceholder) {
         setCheckingAuth(false);
@@ -182,13 +188,15 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           router.push("/login");
         } else {
           setCheckingAuth(false);
-          pendo.identify({
-            visitor: {
-              id: session.user.id,
-              email: session.user.email || "",
-              full_name: session.user.user_metadata?.full_name || "",
-            },
-          });
+          if (typeof pendo !== "undefined" && pendo?.identify) {
+            pendo.identify({
+              visitor: {
+                id: session.user.id,
+                email: session.user.email || "",
+                full_name: session.user.user_metadata?.full_name || "",
+              },
+            });
+          }
         }
       } catch (err) {
         console.error("[ZorabiHealth Auth] Failed to check user session:", err);
@@ -224,14 +232,14 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const currentNavItems = getNavItemsForRole();
 
   const handleLogout = async () => {
-    const isPlaceholder =
-      !process.env.NEXT_PUBLIC_SUPABASE_URL ||
-      process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder-url.supabase.co");
+    const isPlaceholder = !process.env.NEXT_PUBLIC_SUPABASE_URL;
 
     if (!isPlaceholder) {
       await supabase.auth.signOut();
     }
-    pendo.clearSession();
+    if (typeof pendo !== "undefined" && pendo?.clearSession) {
+      pendo.clearSession();
+    }
     router.push("/");
   };
 
@@ -294,168 +302,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (role === "doctor") {
     return (
       <div className="flex h-screen w-screen overflow-hidden clinical-bg-gradient font-sans">
-        {/* Doctor-specific Rail Sidebar */}
-        <aside className="fixed left-0 top-0 h-full z-40 bg-[#f8f9ff]/70 backdrop-blur-2xl border-r border-white/20 shadow-sm w-20 flex flex-col items-center py-6 shrink-0">
-          {/* Zorabi Logo */}
-          <Link
-            href="/dashboard/doctor"
-            className="mb-8 hover:scale-105 transition-transform cursor-pointer block"
-          >
-            <Image
-              src="/logo/image/logo.png"
-              alt="ZorabiHealth"
-              width={50}
-              height={50}
-              className="object-contain"
-              style={{ width: "auto", height: "auto" }}
-              loading="eager"
-              unoptimized
-            />
-          </Link>
-
-          <div className="flex flex-col gap-6 flex-grow items-center">
-            {/* grid_view (Clinical Pad / Dashboard Workspace) */}
-            <Link
-              href="/dashboard/doctor"
-              title="Dashboard"
-              className={cn(
-                "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
-                pathname === "/dashboard/doctor"
-                  ? "bg-[#0c4381] text-white shadow-md shadow-blue-500/20 scale-105"
-                  : "text-[#434750] hover:bg-[#d3e4fe]/30 hover:scale-105"
-              )}
-            >
-              <LayoutGrid className="w-5 h-5" />
-            </Link>
-
-            {/* calendar_today (Schedule view) */}
-            <Link
-              href="/dashboard/doctor/schedule"
-              title="Schedule"
-              className={cn(
-                "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
-                pathname === "/dashboard/doctor/schedule"
-                  ? "bg-[#0c4381] text-white shadow-md shadow-blue-500/20 scale-105"
-                  : "text-[#434750] hover:bg-[#d3e4fe]/30 hover:scale-105"
-              )}
-            >
-              <Calendar className="w-5 h-5" />
-            </Link>
-
-            {/* chat (Messages view) */}
-            <Link
-              href="/dashboard/doctor/messages"
-              title="Messages"
-              className={cn(
-                "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
-                pathname === "/dashboard/doctor/messages"
-                  ? "bg-[#0c4381] text-white shadow-md shadow-blue-500/20 scale-105"
-                  : "text-[#434750] hover:bg-[#d3e4fe]/30 hover:scale-105"
-              )}
-            >
-              <MessageSquare className="w-5 h-5" />
-            </Link>
-
-            {/* stethoscope (Prescriptions List) */}
-            <Link
-              href="/dashboard/doctor/prescriptions"
-              title="Prescriptions"
-              className={cn(
-                "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
-                pathname === "/dashboard/doctor/prescriptions"
-                  ? "bg-[#0c4381] text-white shadow-md shadow-blue-500/20 scale-105"
-                  : "text-[#434750] hover:bg-[#d3e4fe]/30 hover:scale-105"
-              )}
-            >
-              <FileText className="w-5 h-5" />
-            </Link>
-
-            {/* group (Patients view) */}
-            <Link
-              href="/dashboard/doctor/patients"
-              title="Patients"
-              className={cn(
-                "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
-                pathname === "/dashboard/doctor/patients"
-                  ? "bg-[#0c4381] text-white shadow-md shadow-blue-500/20 scale-105"
-                  : "text-[#434750] hover:bg-[#d3e4fe]/30 hover:scale-105"
-              )}
-            >
-              <Users className="w-5 h-5" />
-            </Link>
-
-            {/* bar_chart (Analytics view) */}
-            <Link
-              href="/dashboard/doctor/analytics"
-              title="Analytics"
-              className={cn(
-                "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
-                pathname === "/dashboard/doctor/analytics"
-                  ? "bg-[#0c4381] text-white shadow-md shadow-blue-500/20 scale-105"
-                  : "text-[#434750] hover:bg-[#d3e4fe]/30 hover:scale-105"
-              )}
-            >
-              <BarChart3 className="w-5 h-5" />
-            </Link>
-
-            {/* article (Records view) */}
-            <Link
-              href="/dashboard/doctor/records"
-              title="Records"
-              className={cn(
-                "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
-                pathname === "/dashboard/doctor/records"
-                  ? "bg-[#0c4381] text-white shadow-md shadow-blue-500/20 scale-105"
-                  : "text-[#434750] hover:bg-[#d3e4fe]/30 hover:scale-105"
-              )}
-            >
-              <FileText className="w-5 h-5" />
-            </Link>
-          </div>
-
-          <div className="flex flex-col gap-4 mt-auto items-center">
-            {/* help_outline */}
-            <button
-              onClick={() => alert("DocAssist Help Center is online.")}
-              title="Help"
-              className="text-[#434750] p-3 hover:bg-slate-100/50 rounded-xl transition-all duration-200 cursor-pointer"
-            >
-              <CircleHelp className="w-5 h-5" />
-            </button>
-
-            {/* settings / report -> mapped to /dashboard/settings or /dashboard/doctor/settings */}
-            <Link
-              href={role === "doctor" ? "/dashboard/doctor/settings" : "/dashboard/settings"}
-              title="Settings"
-              className={cn(
-                "p-3 rounded-xl transition-all duration-200 hover:scale-105 cursor-pointer",
-                pathname === "/dashboard/settings" || pathname === "/dashboard/doctor/settings"
-                  ? "bg-[#0c4381] text-white shadow-md shadow-blue-500/20 scale-105"
-                  : "text-[#434750] hover:bg-slate-100/50 hover:scale-105"
-              )}
-            >
-              <Settings className="w-5 h-5" />
-            </Link>
-
-            {/* Doctor Profile Avatar */}
-            <div className="w-10 h-10 rounded-full overflow-hidden border-2 border-white shadow-md">
-              <img
-                src="/images/doctor1.jpg"
-                alt="Doctor Profile"
-                className="w-full h-full object-cover border-blue-500"
-              />
-            </div>
-
-            {/* Logout */}
-            <button
-              onClick={handleLogout}
-              title="Sign Out"
-              className="text-[#434750] p-3 hover:bg-red-50 hover:text-red-600 rounded-xl transition-all duration-200 cursor-pointer"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        </aside>
+        <DoctorSidebar
+          onSwitchToPatient={() => {
+            router.push("/dashboard");
+          }}
+        />
 
         {/* Main Content shifted to the right by 80px (w-20) */}
         <main
@@ -466,6 +317,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </main>
         <MedicationAlarmAlerter />
         <NotificationToast notifications={inAppNotifications} onDismiss={dismissNotification} />
+        <ToastContainer />
+        <NetworkBanner />
       </div>
     );
   }
@@ -574,6 +427,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       </main>
       <MedicationAlarmAlerter />
       <NotificationToast notifications={inAppNotifications} onDismiss={dismissNotification} />
+      <ToastContainer />
+      <NetworkBanner />
     </div>
   );
 }

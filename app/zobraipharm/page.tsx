@@ -1,7 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
-import Image from "next/image";
+import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
 import {
   Pill,
@@ -24,14 +23,10 @@ import {
   Stethoscope,
   Activity,
   Brain,
+  Loader2,
 } from "lucide-react";
-import {
-  PRODUCTS,
-  CATEGORIES,
-  type PharmProduct,
-  loadCart,
-  saveCart,
-} from "@/lib/pharmacy-store-data";
+import { CATEGORIES, type PharmProduct, loadCart, saveCart } from "@/lib/pharmacy-store-data";
+import { fetchStoreProducts } from "@/lib/store-products";
 
 const categoryIcons: Record<string, React.ReactNode> = {
   "All Products": <Package className="h-4 w-4" />,
@@ -173,12 +168,10 @@ function ProductCard({
         href={`/zobraipharm/product/${product.id}`}
         className="relative flex aspect-square items-center justify-center bg-gradient-to-b from-emerald-50/50 to-white p-6"
       >
-        <Image
+        <img
           src={product.image}
           alt={product.name}
-          width={200}
-          height={200}
-          className="object-contain transition-transform duration-500 group-hover:scale-110"
+          className="h-[200px] w-[200px] object-contain transition-transform duration-500 group-hover:scale-110"
         />
         {product.isPinned && (
           <span className="absolute left-2 top-2 rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-semibold text-amber-800">
@@ -275,6 +268,8 @@ function TrendingBanner() {
 }
 
 export default function ZoraipharmPage() {
+  const [products, setProducts] = useState<PharmProduct[]>([]);
+  const [loadingProducts, setLoadingProducts] = useState(true);
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
   const [cart, setCart] = useState<Record<string, number>>(() => {
@@ -286,8 +281,15 @@ export default function ZoraipharmPage() {
     return map;
   });
 
+  useEffect(() => {
+    fetchStoreProducts().then((data) => {
+      setProducts(data);
+      setLoadingProducts(false);
+    });
+  }, []);
+
   const filtered = useMemo(() => {
-    let list = PRODUCTS;
+    let list = products;
     if (activeCategory !== "all") {
       list = list.filter((p) => p.category === activeCategory);
     }
@@ -302,7 +304,7 @@ export default function ZoraipharmPage() {
       );
     }
     return list;
-  }, [activeCategory, searchQuery]);
+  }, [activeCategory, searchQuery, products]);
 
   const handleAddToCart = (productId: string) => {
     const next = { ...cart };
@@ -311,7 +313,10 @@ export default function ZoraipharmPage() {
     saveCart(Object.entries(next).map(([productId, quantity]) => ({ productId, quantity })));
   };
 
-  const pinned = PRODUCTS.filter((p) => p.isPinned);
+  const showFeatured = activeCategory === "all" && !searchQuery;
+  const pinned = products.filter((p) => p.isPinned);
+  const nonPinned = products.filter((p) => !p.isPinned);
+  const displayList = showFeatured && pinned.length > 0 ? nonPinned : filtered;
 
   return (
     <>
@@ -320,66 +325,75 @@ export default function ZoraipharmPage() {
       <CategoryNav active={activeCategory} onSelect={setActiveCategory} />
       <TrendingBanner />
 
-      <section id="products" className="py-6">
-        <div className="mx-auto max-w-7xl px-4 md:px-6 lg:px-8">
-          <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-xl font-bold text-slate-800">
-                {activeCategory === "all" ? "All Medications" : activeCategory}
-              </h2>
-              <p className="text-sm text-slate-500">{filtered.length} products found</p>
-            </div>
-            <div className="relative w-full sm:w-72">
-              <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search medicines..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
-              />
-            </div>
-          </div>
-
-          {activeCategory === "all" && !searchQuery && pinned.length > 0 && (
-            <div className="mb-8">
-              <div className="mb-3 flex items-center gap-2">
-                <Star className="h-4 w-4 text-amber-500" />
-                <h3 className="text-sm font-semibold text-slate-700">Featured Products</h3>
+      {loadingProducts ? (
+        <section className="py-20 text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-emerald-600" />
+          <p className="mt-3 text-sm text-slate-500">Loading products...</p>
+        </section>
+      ) : (
+        <section id="products" className="py-6">
+          <div className="mx-auto max-w-7xl px-4 md:px-6 lg:px-8">
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-xl font-bold text-slate-800">
+                  {activeCategory === "all" ? "All Medications" : activeCategory}
+                </h2>
+                <p className="text-sm text-slate-500">{filtered.length} products found</p>
               </div>
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                {pinned.map((product) => (
-                  <ProductCard
-                    key={product.id}
-                    product={product}
-                    cart={cart}
-                    onAddToCart={handleAddToCart}
-                  />
-                ))}
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="text"
+                  placeholder="Search medicines..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 placeholder-slate-400 outline-none transition-all focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                />
               </div>
             </div>
-          )}
 
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-            {filtered.map((product) => (
-              <ProductCard
-                key={product.id}
-                product={product}
-                cart={cart}
-                onAddToCart={handleAddToCart}
-              />
-            ))}
-          </div>
+            {showFeatured && pinned.length > 0 && (
+              <div className="mb-8">
+                <div className="mb-3 flex items-center gap-2">
+                  <Star className="h-4 w-4 text-amber-500" />
+                  <h3 className="text-sm font-semibold text-slate-700">Featured Products</h3>
+                </div>
+                <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+                  {pinned.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      cart={cart}
+                      onAddToCart={handleAddToCart}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
 
-          {filtered.length === 0 && (
-            <div className="flex flex-col items-center justify-center py-20 text-center">
-              <Package className="mb-4 h-12 w-12 text-slate-300" />
-              <p className="text-lg font-medium text-slate-600">No products found</p>
-              <p className="text-sm text-slate-400">Try adjusting your search or category filter</p>
+            <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+              {displayList.map((product) => (
+                <ProductCard
+                  key={product.id}
+                  product={product}
+                  cart={cart}
+                  onAddToCart={handleAddToCart}
+                />
+              ))}
             </div>
-          )}
-        </div>
-      </section>
+
+            {displayList.length === 0 && (
+              <div className="flex flex-col items-center justify-center py-20 text-center">
+                <Package className="mb-4 h-12 w-12 text-slate-300" />
+                <p className="text-lg font-medium text-slate-600">No products found</p>
+                <p className="text-sm text-slate-400">
+                  Try adjusting your search or category filter
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+      )}
     </>
   );
 }

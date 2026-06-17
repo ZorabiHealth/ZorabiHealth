@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { verifyAuth } from "@/lib/auth-utils";
+import { verifyAuth, getAdminClient } from "@/lib/auth-utils";
 
 const VALID_STATUSES = [
   "PENDING",
@@ -161,6 +161,11 @@ export async function POST(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   try {
+    const auth = await verifyAuth(req);
+    if ("error" in auth) {
+      return NextResponse.json({ error: auth.error }, { status: auth.status });
+    }
+
     const { searchParams } = new URL(req.url);
     const tracking_id = searchParams.get("tracking_id");
 
@@ -171,8 +176,10 @@ export async function GET(req: NextRequest) {
       );
     }
 
+    const admin = getAdminClient();
+
     // Try v1 refill_orders
-    const { data: refillOrder, error: refillErr } = await supabase
+    const { data: refillOrder, error: refillErr } = await admin
       .from("refill_orders")
       .select(
         `
@@ -187,6 +194,9 @@ export async function GET(req: NextRequest) {
     if (refillErr) throw refillErr;
 
     if (refillOrder) {
+      if (refillOrder.user_id !== auth.user.id) {
+        return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+      }
       return NextResponse.json(
         {
           order_type: "refill",
@@ -196,7 +206,6 @@ export async function GET(req: NextRequest) {
           quantity: refillOrder.quantity,
           vendor_name: refillOrder.vendor_name,
           status: refillOrder.status,
-          delivery_address: refillOrder.delivery_address,
           estimated_delivery: refillOrder.estimated_delivery,
           total_price: refillOrder.total_price,
           prescription_tracking_id: (refillOrder as any).prescription?.tracking_id ?? null,
@@ -212,7 +221,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Try v2 orders
-    const { data: v2Order, error: v2Err } = await supabase
+    const { data: v2Order, error: v2Err } = await admin
       .from("orders")
       .select(
         `
@@ -228,6 +237,9 @@ export async function GET(req: NextRequest) {
     if (v2Err) throw v2Err;
 
     if (v2Order) {
+      if (v2Order.patient_id !== auth.user.id) {
+        return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+      }
       return NextResponse.json(
         {
           order_type: "pharmacy_order",

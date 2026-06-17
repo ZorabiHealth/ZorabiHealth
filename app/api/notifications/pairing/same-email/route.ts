@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: auth.error }, { status: auth.status });
     }
 
+    const { device_name } = await req.json();
     const admin = getAdminClient();
     const userId = auth.user.id;
 
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest) {
       .insert({
         web_user_id: userId,
         mobile_user_id: userId,
+        device_name: device_name || "Same Account",
       })
       .select("id")
       .single();

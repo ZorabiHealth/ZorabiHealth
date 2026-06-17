@@ -151,7 +151,8 @@ export default function BookAppointment() {
   const handleBook = async () => {
     if (!selectedDoctor || !userId) return;
     if (bookingEnd <= bookingStart) {
-      alert("End time must be after start time.");
+      const { showToast } = await import("@/components/ui/toast");
+      showToast("End time must be after start time.", "error");
       return;
     }
 
@@ -164,7 +165,8 @@ export default function BookAppointment() {
         .single();
 
       if (!patientProfile) {
-        alert("Patient profile not found. Please complete your profile first.");
+        const { showToast } = await import("@/components/ui/toast");
+        showToast("Patient profile not found. Please complete your profile first.", "error");
         setSaving(false);
         return;
       }
@@ -188,7 +190,8 @@ export default function BookAppointment() {
       }, 2000);
     } catch (err: any) {
       console.error("Failed to book appointment:", err);
-      alert(err?.message || "Failed to book appointment. Please try again.");
+      const { showToast } = await import("@/components/ui/toast");
+      showToast(err?.message || "Failed to book appointment. Please try again.", "error");
     } finally {
       setSaving(false);
     }

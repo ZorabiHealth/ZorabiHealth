@@ -16,12 +16,16 @@ export interface InAppNotification {
 }
 
 export function useNotifications() {
-  const [permission, setPermission] = useState<NotificationPermission | "unsupported">("default");
+  const [permission, setPermission] = useState<NotificationPermission | "unsupported">(() => {
+    if (typeof window === "undefined") return "default";
+    if (!("Notification" in window)) return "unsupported";
+    return Notification.permission;
+  });
   const [inAppNotifications, setInAppNotifications] = useState<InAppNotification[]>([]);
   const [subscription, setSubscription] = useState<PushSubscription | null>(null);
   const registeredRef = useRef(false);
   const swRef = useRef<ServiceWorkerRegistration | null>(null);
-  const [initialized, setInitialized] = useState(false);
+  const [initialized] = useState(() => typeof window !== "undefined" && "Notification" in window);
 
   const registerDevice = useCallback(async () => {
     if (typeof window === "undefined" || registeredRef.current) return;
@@ -128,20 +132,6 @@ export function useNotifications() {
       cancelled = true;
       channel?.unsubscribe();
     };
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    if (!("Notification" in window)) {
-      setPermission("unsupported");
-      setInitialized(true);
-      return;
-    }
-    setPermission(Notification.permission);
-    setInitialized((prev) => {
-      if (!prev) return true;
-      return prev;
-    });
   }, []);
 
   const requestPermission = useCallback(async () => {

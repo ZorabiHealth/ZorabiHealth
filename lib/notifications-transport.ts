@@ -89,10 +89,37 @@ async function sendExpoPush(device: PushDevice, payload: PushPayload): Promise<S
 
     const result = await response.json();
     if (result.data?.status === "error") {
-      return { ok: false, statusCode: 400, error: result.data.message || "Expo push failed" };
+      const errorMsg = result.data.message || "";
+      if (errorMsg.includes("DeviceNotRegistered") || errorMsg.includes("InvalidCredentials")) {
+        console.warn(`[ExpoPush] Token expired for device ${device.id}: ${errorMsg}`);
+        return { ok: false, statusCode: 410, error: "DeviceNotRegistered" };
+      }
+      return { ok: false, statusCode: 400, error: errorMsg || "Expo push failed" };
     }
     return { ok: true };
   } catch (err: any) {
     return { ok: false, error: err.message || "Expo push request failed" };
+  }
+}
+
+export async function deactivateExpiredToken(token: string): Promise<void> {
+  try {
+    const { createClient } = await import("@supabase/supabase-js");
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
+    const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY || "";
+    if (!serviceKey || !supabaseUrl) return;
+
+    const admin = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+
+    await admin
+      .from("notification_devices")
+      .update({ is_active: false, last_active_at: new Date().toISOString() })
+      .eq("expo_push_token", token);
+
+    console.log(`[ExpoPush] Deactivated expired token: ${token.slice(0, 16)}...`);
+  } catch (e) {
+    console.error("[ExpoPush] Failed to deactivate token:", e);
   }
 }

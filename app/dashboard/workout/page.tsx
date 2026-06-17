@@ -1343,7 +1343,7 @@ export default function WorkoutDashboardPage() {
                 </div>
               </div>
               <button
-                onClick={handleAddMeal as any}
+                onClick={(e) => handleAddMeal(e)}
                 className="w-full bg-[#1e4a46] hover:bg-[#153633] text-white font-bold py-1.5 rounded-lg text-[9px] transition-colors cursor-pointer"
               >
                 Log Meal

@@ -4,7 +4,18 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Plus, FileText, ChevronRight, ChevronDown, Search } from "lucide-react";
+import {
+  Plus,
+  FileText,
+  ChevronRight,
+  ChevronDown,
+  Search,
+  Eye,
+  Printer,
+  Edit2,
+  FileDown,
+  Loader2,
+} from "lucide-react";
 
 interface Prescription {
   id: string;
@@ -228,6 +239,94 @@ export default function PrescriptionsPage() {
                     </div>
                     {isExpanded && (
                       <div className="px-4 pb-4 pt-1 bg-slate-50/60">
+                        {/* Action Buttons */}
+                        <div className="flex gap-2 mb-3 ml-12">
+                          <button
+                            onClick={() =>
+                              router.push(`/dashboard/doctor?patient_id=${rx.patient_id}`)
+                            }
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-[#0c4381] text-white text-[10px] font-semibold rounded-lg hover:bg-[#093262] transition-colors"
+                            title="Open in Prescription Pad"
+                          >
+                            <Eye className="w-3 h-3" /> View
+                          </button>
+                          <button
+                            onClick={() =>
+                              router.push(`/dashboard/doctor?patient_id=${rx.patient_id}`)
+                            }
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-amber-50 text-amber-700 text-[10px] font-semibold rounded-lg hover:bg-amber-100 border border-amber-200 transition-colors"
+                            title="Edit Prescription"
+                          >
+                            <Edit2 className="w-3 h-3" /> Edit
+                          </button>
+                          <button
+                            onClick={() => window.print()}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-slate-50 text-slate-600 text-[10px] font-semibold rounded-lg hover:bg-slate-100 border border-slate-200 transition-colors"
+                            title="Print Prescription"
+                          >
+                            <Printer className="w-3 h-3" /> Print
+                          </button>
+                          <button
+                            onClick={async () => {
+                              const { default: jsPDF } = await import("jspdf");
+                              const { default: autoTable } = await import("jspdf-autotable");
+                              const doc = new jsPDF({ unit: "mm", format: "a4" });
+                              const margin = 20;
+                              let y = margin;
+
+                              doc.setFontSize(16);
+                              doc.setTextColor(12, 67, 129);
+                              doc.setFont("helvetica", "bold");
+                              doc.text("Prescription", margin, y);
+                              y += 10;
+
+                              doc.setFontSize(10);
+                              doc.setTextColor(30, 41, 59);
+                              doc.text(`Diagnosis: ${rx.diagnosis}`, margin, y);
+                              y += 6;
+                              doc.text(
+                                `Patient: ${rx.patient_name} | Date: ${formatDate(rx.created_at)}`,
+                                margin,
+                                y
+                              );
+                              y += 10;
+
+                              if (rx.notes) {
+                                doc.setFontSize(9);
+                                doc.text(rx.notes, margin, y);
+                                y += 8;
+                              }
+
+                              if (rx.items && rx.items.length > 0) {
+                                autoTable(doc, {
+                                  head: [["Drug", "Dosage", "Frequency", "Duration", "Notes"]],
+                                  body: rx.items.map((item) => [
+                                    item.drug_name,
+                                    item.dosage,
+                                    item.frequency,
+                                    item.duration,
+                                    item.notes || "\u2014",
+                                  ]),
+                                  startY: y,
+                                  margin: { left: margin, right: margin },
+                                  styles: { fontSize: 9, cellPadding: 3 },
+                                  headStyles: {
+                                    fillColor: [12, 67, 129],
+                                    textColor: 255,
+                                    fontStyle: "bold",
+                                  },
+                                });
+                              }
+
+                              doc.save(`prescription-${rx.id.slice(0, 8)}.pdf`);
+                            }}
+                            className="inline-flex items-center gap-1 px-3 py-1.5 bg-emerald-50 text-emerald-700 text-[10px] font-semibold rounded-lg hover:bg-emerald-100 border border-emerald-200 transition-colors"
+                            title="Download PDF"
+                          >
+                            <FileDown className="w-3 h-3" /> PDF
+                          </button>
+                        </div>
+
                         {rx.notes && (
                           <p className="text-xs text-slate-500 mb-3 ml-12">{rx.notes}</p>
                         )}

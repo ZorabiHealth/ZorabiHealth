@@ -11,13 +11,13 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { user_id, title, body: messageBody, category, priority, data } = body;
+    const { title, body: messageBody, category, priority, data } = body;
 
     if (!title || !messageBody) {
       return NextResponse.json({ error: "title and body are required" }, { status: 400 });
     }
 
-    const targetUserId = user_id || auth.user.id;
+    const targetUserId = auth.user.id;
 
     const admin = getAdminClient();
 

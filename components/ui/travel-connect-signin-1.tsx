@@ -304,7 +304,16 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
                   token: accessToken,
                 }),
               });
-              if (res.ok) break;
+              if (res.ok) {
+                const data = await res.json();
+                if (data.pending) {
+                  // Role will be set after email confirmation — save for later
+                  try {
+                    localStorage.setItem("zh_pending_role", selectedRole);
+                  } catch {}
+                }
+                break;
+              }
               if (res.status === 409) {
                 console.warn("Role already exists for user — skipping");
                 break;

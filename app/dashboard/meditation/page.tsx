@@ -149,14 +149,18 @@ export default function MeditationPage() {
     oscillatorsRef.current.forEach((osc) => {
       try {
         osc.stop();
-      } catch {}
+      } catch {
+        console.warn("[catch] Non-critical operation failed at page.tsx");
+      }
     });
     oscillatorsRef.current = [];
 
     if (lfoRef.current) {
       try {
         lfoRef.current.stop();
-      } catch {}
+      } catch {
+        console.warn("[catch] Non-critical operation failed at page.tsx");
+      }
       lfoRef.current = null;
     }
 
@@ -278,7 +282,9 @@ export default function MeditationPage() {
     if (videoOscRef.current) {
       try {
         videoOscRef.current.stop();
-      } catch {}
+      } catch {
+        console.warn("[catch] Non-critical operation failed at page.tsx");
+      }
       videoOscRef.current = null;
     }
     if (videoCtxRef.current && videoCtxRef.current.state !== "closed") {
@@ -433,6 +439,7 @@ export default function MeditationPage() {
           width={80}
           height={24}
           style={{ height: 24, width: "auto" }}
+          priority
         />
       </div>
 
@@ -571,7 +578,7 @@ export default function MeditationPage() {
                   <Volume2 className="w-3.5 h-3.5 text-indigo-400" />
                   <select
                     value={ambientSound}
-                    onChange={(e) => setAmbientSound(e.target.value as any)}
+                    onChange={(e) => setAmbientSound(e.target.value as typeof ambientSound)}
                     className="bg-white/60 border border-white/40 text-slate-700 rounded-lg text-[9px] font-bold h-7 px-2 outline-none focus:border-indigo-300 cursor-pointer appearance-none"
                   >
                     <option value="None">Mute</option>

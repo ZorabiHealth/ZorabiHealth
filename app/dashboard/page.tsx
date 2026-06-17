@@ -146,10 +146,12 @@ export default function DashboardOverview() {
 
       // Filter local state
       setMissedMeds((prev) => prev.filter((m) => !(m.id === med.id && m.time === med.time)));
-      alert(`Dose logged successfully for ${med.name}!`);
+      const { showToast } = await import("@/components/ui/toast");
+      showToast(`Dose logged successfully for ${med.name}!`, "success");
     } catch (e) {
       console.error(e);
-      alert("Failed to log dose.");
+      const { showToast } = await import("@/components/ui/toast");
+      showToast("Failed to log dose.", "error");
     }
   };
 

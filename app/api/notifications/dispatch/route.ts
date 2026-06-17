@@ -1,13 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
+import crypto from "crypto";
 import { sendToDevice } from "@/lib/notifications-transport";
 import type { PushDevice } from "@/lib/notifications";
 
 export const dynamic = "force-dynamic";
 
+function verifyCronAuth(req: NextRequest): boolean {
+  const cronSecret = process.env.CRON_SECRET;
+  if (!cronSecret && !process.env.VERCEL) return true; // dev mode: allow
+  const header = req.headers.get("x-vercel-cron") || req.headers.get("x-cron-secret") || "";
+  if (header === "true" && cronSecret) return true;
+  if (cronSecret && header === cronSecret) return true;
+  if (cronSecret) {
+    const signature = req.headers.get("x-cron-signature") || "";
+    const expected = crypto.createHmac("sha256", cronSecret).update(req.url).digest("hex");
+    if (crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(expected))) return true;
+  }
+  return false;
+}
+
 export async function GET(req: NextRequest) {
-  // Protect cron endpoint via Vercel Cron header (skipped in dev)
-  if (process.env.VERCEL && req.headers.get("x-vercel-cron") !== "true") {
+  if (!verifyCronAuth(req)) {
     return NextResponse.json({ dispatched: 0, error: "Unauthorized" }, { status: 401 });
   }
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
@@ -84,12 +98,14 @@ export async function GET(req: NextRequest) {
 
     if (!devices || devices.length === 0) continue;
 
-    const sentTransports = new Set<string>(notif.sent_via || []);
+    const sentTransports = new Set<string>(
+      Array.isArray(notif.sent_via) ? notif.sent_via.filter(Boolean) : []
+    );
 
     for (const device of devices as PushDevice[]) {
       const { data: existingDelivery } = await admin
         .from("notification_delivery")
-        .select("id, status")
+        .select("id, status, retry_count")
         .eq("notification_id", notif.id)
         .eq("device_id", device.id)
         .eq("transport", device.transport)
@@ -140,13 +156,18 @@ export async function GET(req: NextRequest) {
           { onConflict: "notification_id,device_id,transport" }
         );
       } else {
+        const prevRetryCount = existingDelivery?.retry_count ?? 0;
+        const failedCount = prevRetryCount + 1;
+        const finalStatus = failedCount >= 3 ? "failed" : "failed_retryable";
+
         await admin.from("notification_delivery").upsert(
           {
             notification_id: notif.id,
             device_id: device.id,
             transport: device.transport,
-            status: "failed",
+            status: finalStatus,
             error_message: result.error || "Unknown error",
+            retry_count: failedCount,
             sent_at: new Date().toISOString(),
           },
           { onConflict: "notification_id,device_id,transport" }
@@ -154,10 +175,12 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    await admin
-      .from("notifications")
-      .update({ sent_via: Array.from(sentTransports) })
-      .eq("id", notif.id);
+    if (sentTransports.size > 0) {
+      await admin.rpc("append_notification_sent_via", {
+        p_notification_id: notif.id,
+        p_transports: Array.from(sentTransports),
+      });
+    }
   }
 
   return NextResponse.json({ dispatched: totalDispatched });

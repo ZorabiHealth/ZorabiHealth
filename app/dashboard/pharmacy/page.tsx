@@ -380,7 +380,6 @@ export default function PharmacyPage() {
 
   // ─── Vendor Matching ─────────────────────────────────────
   const matchVendors = (med: Medication): Vendor[] => {
-    const medKey = `${med.name} ${med.dosage}`.toLowerCase();
     return vendors
       .filter((v) => v.isActive)
       .filter((v) =>
