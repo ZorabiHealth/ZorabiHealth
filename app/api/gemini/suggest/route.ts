@@ -16,7 +16,7 @@ User context: symptoms="${symptoms || "none"}", last workout="${workout || "none
 
   try {
     const res = await fetch(
-     `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-lite:generateContent?key=${apiKey}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -27,9 +27,8 @@ User context: symptoms="${symptoms || "none"}", last workout="${workout || "none
     );
     const data = await res.json();
     console.log("[Gemini RAW]", JSON.stringify(data));
-const reply =
-      data.candidates?.[0]?.content?.parts?.[0]?.text ||
-      "Stay hydrated and keep moving today.";
+    const reply =
+      data.candidates?.[0]?.content?.parts?.[0]?.text || "Stay hydrated and keep moving today.";
     return NextResponse.json({ reply });
   } catch {
     return NextResponse.json({ reply: "Stay hydrated and keep moving today." });

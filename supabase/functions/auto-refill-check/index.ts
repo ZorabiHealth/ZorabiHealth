@@ -1,5 +1,8 @@
 ﻿import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+const supabase = createClient(
+  Deno.env.get("SUPABASE_URL")!,
+  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
+);
 Deno.serve(async () => {
   const now = new Date().toISOString();
   const weekAgo = new Date(Date.now() - 7 * 86_400_000).toISOString();
@@ -10,7 +13,9 @@ Deno.serve(async () => {
       .select("id, pharmacy_id, drug_id, stock, auto_refill_threshold, drug_catalog(name)")
       .not("auto_refill_threshold", "is", null);
 
-    for (const item of (lowStock ?? []).filter((i: any) => i.stock <= (i.auto_refill_threshold ?? 0))) {
+    for (const item of (lowStock ?? []).filter(
+      (i: any) => i.stock <= (i.auto_refill_threshold ?? 0)
+    )) {
       const drugName = item.drug_catalog?.name ?? "Unknown medication";
 
       const { data: existing } = await supabase
@@ -47,8 +52,13 @@ Deno.serve(async () => {
 
       processed++;
     }
-    return new Response(JSON.stringify({ success: true, processed }), { headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ success: true, processed }), {
+      headers: { "Content-Type": "application/json" },
+    });
   } catch (err) {
-    return new Response(JSON.stringify({ success: false, error: String(err) }), { status: 500, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ success: false, error: String(err) }), {
+      status: 500,
+      headers: { "Content-Type": "application/json" },
+    });
   }
 });
