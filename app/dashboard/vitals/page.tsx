@@ -1,20 +1,19 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import Image from "next/image";
 import {
   Activity,
   Plus,
-  AlertTriangle,
   Trash2,
   CheckCircle2,
-  UserCheck,
-  Info,
   CalendarDays,
   ShieldAlert,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { supabase } from "@/lib/supabase";
 
 interface SymptomLog {
   id: string;
@@ -24,25 +23,10 @@ interface SymptomLog {
   notes: string;
 }
 
-const initialLogs: SymptomLog[] = [
-  {
-    id: "1",
-    timestamp: "2026-06-04 09:12",
-    name: "Fatigue",
-    severity: "Mild",
-    notes: "Felt slightly fatigued after clinical rounds.",
-  },
-  {
-    id: "2",
-    timestamp: "2026-06-04 11:30",
-    name: "Palpitations",
-    severity: "Moderate",
-    notes: "Experienced mild chest palpitations after caffeine.",
-  },
-];
-
 export default function VitalsPage() {
-  const [logs, setLogs] = useState<SymptomLog[]>(initialLogs);
+  const [logs, setLogs] = useState<SymptomLog[]>([]);
+  const [userId, setUserId] = useState<string>("");
+  const [loading, setLoading] = useState(true);
 
   // Form State
   const [symptomName, setSymptomName] = useState("Palpitations");
@@ -50,33 +34,121 @@ export default function VitalsPage() {
   const [notes, setNotes] = useState("");
   const [showAlertModal, setShowAlertModal] = useState(false);
 
+  const fetchLogs = async (uid: string) => {
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("symptom_logs")
+        .select("*")
+        .eq("user_id", uid)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      if (data) {
+        setLogs(
+          data.map((item: any) => ({
+            id: item.id,
+            timestamp: new Date(item.created_at).toLocaleString([], {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            name: item.name,
+            severity: item.severity,
+            notes: item.notes,
+          }))
+        );
+      }
+    } catch (err) {
+      console.error("Failed to fetch symptom logs:", err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    const initSession = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const uid = session?.user?.id || "";
+      setUserId(uid);
+      fetchLogs(uid);
+    };
+    initSession();
+  }, []);
+
   // Submit Symptom Log
-  const handleLogSymptom = (e: React.FormEvent) => {
+  const handleLogSymptom = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!symptomName) return;
 
-    const date = new Date();
-    const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")} ${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
-
-    const newLog: SymptomLog = {
-      id: Math.random().toString(36).substring(7),
-      timestamp: formattedDate,
+    const payload = {
+      user_id: userId,
       name: symptomName,
       severity,
       notes: notes || "No additional comments logged.",
     };
 
-    setLogs((prev) => [newLog, ...prev]);
-    setNotes("");
-
-    // If severe, trigger alert modal
-    if (severity === "Severe") {
-      setShowAlertModal(true);
+    try {
+      const { data, error } = await supabase
+        .from("symptom_logs")
+        .insert([payload])
+        .select()
+        .single();
+      if (error) throw error;
+      if (data) {
+        setLogs((prev) => [
+          {
+            id: data.id,
+            timestamp: new Date(data.created_at).toLocaleString([], {
+              year: "numeric",
+              month: "2-digit",
+              day: "2-digit",
+              hour: "2-digit",
+              minute: "2-digit",
+            }),
+            name: data.name,
+            severity: data.severity,
+            notes: data.notes,
+          },
+          ...prev,
+        ]);
+        setNotes("");
+        if (severity === "Severe") {
+          setShowAlertModal(true);
+        }
+      }
+    } catch (err) {
+      console.error("Failed to log symptom entry:", err);
+      // Fallback local log
+      const date = new Date();
+      const formattedDate = `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, "0")}-${date.getDate().toString().padStart(2, "0")} ${date.getHours().toString().padStart(2, "0")}:${date.getMinutes().toString().padStart(2, "0")}`;
+      const newLog: SymptomLog = {
+        id: Math.random().toString(36).substring(7),
+        timestamp: formattedDate,
+        name: symptomName,
+        severity,
+        notes: notes || "No additional comments logged.",
+      };
+      setLogs((prev) => [newLog, ...prev]);
+      setNotes("");
+      if (severity === "Severe") {
+        setShowAlertModal(true);
+      }
     }
   };
 
-  const handleDeleteLog = (id: string) => {
-    setLogs((prev) => prev.filter((log) => log.id !== id));
+  const handleDeleteLog = async (id: string) => {
+    try {
+      const { error } = await supabase.from("symptom_logs").delete().eq("id", id);
+      if (error) throw error;
+      setLogs((prev) => prev.filter((log) => log.id !== id));
+    } catch (err) {
+      console.error("Failed to delete log from Supabase, removing locally:", err);
+      setLogs((prev) => prev.filter((log) => log.id !== id));
+    }
   };
 
   const severityStyles = {
@@ -199,7 +271,12 @@ export default function VitalsPage() {
           </div>
 
           <div className="flex-grow space-y-4 max-h-[500px] overflow-y-auto pr-2">
-            {logs.length === 0 ? (
+            {loading ? (
+              <div className="flex flex-col items-center justify-center py-20 text-slate-400">
+                <Loader2 className="h-10 w-10 text-brand-500 animate-spin mb-3" />
+                <p className="text-xs font-semibold">Retrieving clinical logs...</p>
+              </div>
+            ) : logs.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-20 text-slate-400">
                 <CheckCircle2 className="h-10 w-10 text-emerald-400 mb-3" />
                 <p className="text-xs font-semibold">
@@ -266,10 +343,12 @@ export default function VitalsPage() {
             {/* Doctor Contact Box */}
             <div className="bg-slate-50 border border-slate-100 p-4 rounded-2xl flex items-center gap-3 text-left mb-6">
               <div className="w-10 h-10 rounded-full overflow-hidden relative flex-shrink-0">
-                <img
+                <Image
                   src="/images/doctor3.jpg"
                   alt="Dr. Sarah Jenkins"
-                  className="object-cover w-full h-full"
+                  fill
+                  className="object-cover"
+                  sizes="40px"
                 />
               </div>
               <div>

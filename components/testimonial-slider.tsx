@@ -202,10 +202,12 @@ const TestimonialSlider: React.FC = () => {
                   <div className="mt-auto pt-4 border-t border-slate-100">
                     <div className="flex items-center">
                       <div className="w-10 h-10 rounded-full bg-slate-200 relative overflow-hidden">
-                        <img
+                        <Image
                           src={testimonial.avatar}
                           alt={testimonial.name}
-                          className="w-full h-full object-cover"
+                          fill
+                          className="object-cover"
+                          sizes="40px"
                         />
                       </div>
                       <div className="ml-3">

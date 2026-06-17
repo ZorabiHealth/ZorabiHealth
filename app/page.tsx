@@ -4,17 +4,41 @@ import React, { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
-  Book,
-  Sunset,
-  Trees,
-  Zap,
-  LayoutDashboard,
-  LineChart,
   Activity,
-  Leaf,
+  ArrowRight,
+  BookOpen,
+  Brain,
+  Calendar,
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardList,
   Dumbbell,
+  FileCode,
+  FileText,
+  FlaskConical,
+  FolderHeart,
+  HeartPulse,
+  LayoutDashboard,
+  Leaf,
+  LineChart,
+  Microscope,
+  Pill,
+  Play,
+  Pause,
+  Quote,
   Settings,
+  Shield,
+  ShoppingBasket,
+  Smartphone,
   Sparkles,
+  Star,
+  Stethoscope,
+  TrendingUp,
+  Upload,
+  Users,
+  Video,
+  Zap,
 } from "lucide-react";
 import { Navbar1 } from "@/components/shadcnblocks-com-navbar1";
 import TestimonialSlider from "@/components/testimonial-slider";
@@ -23,43 +47,85 @@ import { Features } from "@/components/features-10";
 
 const demoData = {
   logo: {
-    url: "#",
-    src: "https://www.shadcnblocks.com/images/block/block-1.svg",
-    alt: "zorabihealth",
-    title: "zorabihealth",
+    url: "/",
+    src: "/logo/image/logo.png",
+    alt: "ZorabiHealth",
+    title: "ZorabiHealth",
   },
   menu: [
-    {
-      title: "Home",
-      url: "#",
-    },
+    { title: "Home", url: "/" },
     {
       title: "Products",
       url: "#",
       items: [
+        { title: "Products", url: "#", isSection: true },
         {
-          title: "Blog",
-          description: "The latest industry news, updates, and info",
-          icon: <Book className="size-5 shrink-0" />,
-          url: "/blog",
+          title: "AI Voice Assistant",
+          description: "Speech-to-text wellness logging powered by Deepgram Nova-3.",
+          icon: <Sparkles className="size-5 shrink-0 text-violet-500" />,
+          url: "/dashboard/voice",
         },
         {
-          title: "Company",
-          description: "Our mission is to innovate and empower the world",
-          icon: <Trees className="size-5 shrink-0" />,
-          url: "/company",
+          title: "Automated Refills",
+          description: "Auto-vendor stock routing and real-time shipment dispatch.",
+          icon: <Activity className="size-5 shrink-0 text-emerald-500" />,
+          url: "/dashboard/pharmacy",
         },
         {
-          title: "Careers",
-          description: "Browse job listing and discover our workspace",
-          icon: <Sunset className="size-5 shrink-0" />,
-          url: "/careers",
+          title: "Push Notification Alerts",
+          description: "Real-time push alerts with clinical escalation triggers.",
+          icon: <Zap className="size-5 shrink-0 text-amber-500" />,
+          url: "/dashboard/medications",
+        },
+        { title: "Use Cases", url: "#", isSection: true },
+        {
+          title: "Chronic Care Management",
+          description: "End-to-end care coordination across specialties.",
+          icon: <HeartPulse className="size-5 shrink-0 text-rose-500" />,
+          url: "/use-cases/chronic-care-management",
         },
         {
-          title: "Support",
-          description: "Get in touch with our support team or visit our community forums",
-          icon: <Zap className="size-5 shrink-0" />,
-          url: "/support",
+          title: "Medication Adherence",
+          description: "Automated refill routing and compliance tracking.",
+          icon: <Pill className="size-5 shrink-0 text-emerald-500" />,
+          url: "/use-cases/medication-adherence",
+        },
+        {
+          title: "Remote Patient Monitoring",
+          description: "Real-time vitals and clinical telemetry dashboards.",
+          icon: <Microscope className="size-5 shrink-0 text-cyan-500" />,
+          url: "/use-cases/remote-patient-monitoring",
+        },
+        {
+          title: "Clinical Decision Support",
+          description: "AI-driven insights for care teams.",
+          icon: <Stethoscope className="size-5 shrink-0 text-blue-500" />,
+          url: "/use-cases/clinical-decision-support",
+        },
+        { title: "Documentation", url: "#", isSection: true },
+        {
+          title: "API Reference",
+          description: "REST and WebSocket endpoints for all platform services.",
+          icon: <FileCode className="size-5 shrink-0 text-indigo-500" />,
+          url: "/docs/api-reference",
+        },
+        {
+          title: "Integration Guide",
+          description: "Connect your EHR, pharmacy, and lab systems.",
+          icon: <BookOpen className="size-5 shrink-0 text-sky-500" />,
+          url: "/docs/integration-guide",
+        },
+        {
+          title: "SDK Quickstart",
+          description: "Client libraries for Python, TypeScript, and Swift.",
+          icon: <FlaskConical className="size-5 shrink-0 text-teal-500" />,
+          url: "/docs/sdk-quickstart",
+        },
+        {
+          title: "Compliance & Security",
+          description: "HIPAA, SOC 2, and data residency documentation.",
+          icon: <Shield className="size-5 shrink-0 text-slate-500" />,
+          url: "/docs/compliance-security",
         },
       ],
     },
@@ -68,45 +134,44 @@ const demoData = {
       url: "#",
       items: [
         {
+          title: "Patient Portal",
+          description: "Access your clinical indicators and telemetry logs.",
+          icon: <LayoutDashboard className="size-5 shrink-0 text-blue-500" />,
+          url: "/dashboard",
+        },
+        {
+          title: "Documentation",
+          description: "Guides, tutorials, and platform reference.",
+          icon: <FileText className="size-5 shrink-0 text-slate-500" />,
+          url: "/docs",
+        },
+        {
+          title: "API Reference",
+          description: "Full API specification with interactive playground.",
+          icon: <FileCode className="size-5 shrink-0 text-indigo-500" />,
+          url: "/docs/api-reference",
+        },
+        {
           title: "Help Center",
-          description: "Get all the answers you need right here",
-          icon: <Zap className="size-5 shrink-0" />,
-          url: "/help",
+          description: "FAQs, troubleshooting, and community forums.",
+          icon: <Users className="size-5 shrink-0 text-amber-500" />,
+          url: "/resources/help-center",
         },
         {
-          title: "Contact Us",
-          description: "We are here to help you with any questions you have",
-          icon: <Sunset className="size-5 shrink-0" />,
-          url: "/contact",
-        },
-        {
-          title: "Status",
-          description: "Check the current status of our services and APIs",
-          icon: <Trees className="size-5 shrink-0" />,
-          url: "/status",
-        },
-        {
-          title: "Terms of Service",
-          description: "Our terms and conditions for using our services",
-          icon: <Book className="size-5 shrink-0" />,
-          url: "/terms",
+          title: "Clinical Verification",
+          description: "Read about our compliance standards and HIPAA privacy alignment.",
+          icon: <Shield className="size-5 shrink-0 text-emerald-500" />,
+          url: "/resources/clinical-verification",
         },
       ],
     },
-    {
-      title: "Pricing",
-      url: "/pricing",
-    },
-    {
-      title: "Blog",
-      url: "/blog",
-    },
+    { title: "Pricing", url: "/pricing" },
   ],
   mobileExtraLinks: [
-    { name: "Press", url: "/press" },
-    { name: "Contact", url: "/contact" },
-    { name: "Imprint", url: "/imprint" },
-    { name: "Sitemap", url: "/sitemap" },
+    { name: "Clinical Safety", url: "/resources/clinical-verification" },
+    { name: "Help & Support", url: "/resources/help-center" },
+    { name: "API Docs", url: "/docs/api-reference" },
+    { name: "Status", url: "#" },
   ],
   auth: {
     login: { text: "Log in", url: "/login" },
@@ -116,6 +181,26 @@ const demoData = {
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("overview");
+
+  // Interactive mock states
+  const [analyticsMetric, setAnalyticsMetric] = useState("heartRate");
+  const [analyticsRange, setAnalyticsRange] = useState("7D");
+
+  const [selectedSymptoms, setSelectedSymptoms] = useState<string[]>([]);
+  const [symptomSeverity, setSymptomSeverity] = useState("Mild");
+  const [symptomLogs, setSymptomLogs] = useState([
+    { date: "Yesterday", detail: "Fatigue, Headache (Mild)", severity: "Mild" },
+    { date: "June 4", detail: "Insomnia (Moderate)", severity: "Moderate" },
+  ]);
+
+  const [isPlayingMeditation, setIsPlayingMeditation] = useState(false);
+  const [activeMeditationTrack, setActiveMeditationTrack] = useState("forest");
+
+  const [settingsSMS, setSettingsSMS] = useState(true);
+  const [settingsEscalation, setSettingsEscalation] = useState(true);
+  const [settingsHIPAA, setSettingsHIPAA] = useState(true);
+  const [settingsDeepgram, setSettingsDeepgram] = useState(false);
+  const [showSaveToast, setShowSaveToast] = useState(false);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -146,42 +231,57 @@ export default function Home() {
       {/* END: TopNavigation */}
 
       {/* BEGIN: HeroSection */}
-      <section className="grid grid-cols-12 gap-8 px-10 pb-20 items-center min-h-[calc(100vh-8rem)] relative bg-white overflow-hidden">
+      <section className="grid grid-cols-12 gap-8 px-10 pt-24 pb-20 items-center min-h-[calc(100vh-8rem)] relative bg-white overflow-hidden">
         {/* Left Column: Copy */}
         <div className="col-span-5 animate-on-scroll-left" data-purpose="hero-copy">
-          <h1 className="text-5xl font-bold leading-[1.1] mb-8 text-slate-900">
-            Predictive{" "}
-            <span className="bg-gradient-to-r from-brand-400 to-brand-600 bg-clip-text text-transparent">
-              GenAI
-            </span>{" "}
-            turns analysts into predictive{" "}
-            <span className="bg-gradient-to-r from-brand-400 to-brand-600 bg-clip-text text-transparent">
-              powerhouses
+          <div className="flex flex-col gap-4 mb-6">
+            <video
+              autoPlay
+              muted
+              loop
+              playsInline
+              className="w-24 h-24 rounded-2xl object-cover shadow-lg border border-brand-100"
+            >
+              <source src="/logo/video/logo_animation.mp4" type="video/mp4" />
+            </video>
+            <span className="text-sm font-semibold text-brand-600 uppercase tracking-wider">
+              Your Personal Health Companion
             </span>
+          </div>
+          <h1 className="text-5xl font-bold leading-[1.1] mb-8 text-slate-900">
+            Your{" "}
+            <span className="bg-gradient-to-r from-brand-400 to-brand-600 bg-clip-text text-transparent">
+              Health
+            </span>{" "}
+            Simplified, Your{" "}
+            <span className="bg-gradient-to-r from-brand-400 to-brand-600 bg-clip-text text-transparent">
+              Wellness
+            </span>{" "}
+            Amplified
           </h1>
           <ul className="space-y-4 mb-10">
             <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-50 text-xs bg-brand-50">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-600 text-xs bg-brand-50">
                 ✓
               </span>
               <span className="text-slate-600 font-medium">
-                Built for business and data analysts
+                AI voice assistant for instant symptom logging
               </span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-50 text-xs bg-brand-50">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-600 text-xs bg-brand-50">
                 ✓
               </span>
               <span className="text-slate-600 font-medium">
-                Blazing-fast predictions and seamless integrations
+                Automated pharmacy refill stock matching
               </span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-50 text-xs bg-brand-50">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-600 text-xs bg-brand-50">
                 ✓
               </span>
               <span className="text-slate-600 font-medium">
-                No ML experience or knowledge required
+                Push notification alerts & emergency escalation rules
               </span>
             </li>
           </ul>
@@ -189,7 +289,7 @@ export default function Home() {
             href="/signup"
             className="bg-brand-500 hover:bg-brand-600 text-white font-medium py-4 px-10 rounded-2xl w-full max-w-sm transition-colors shadow-lg shadow-brand-200 cursor-pointer block text-center"
           >
-            See how it works
+            Enter Patient Portal
           </Link>
         </div>
 
@@ -212,7 +312,7 @@ export default function Home() {
               {/* Top Right Product Tag */}
               <div className="absolute top-8 right-8">
                 <button className="bg-white px-4 py-2 rounded-full text-xs font-medium flex items-center gap-2 shadow-sm text-gray-700 cursor-pointer">
-                  Product <span className="text-[10px]">▼</span>
+                  ZorabiHealth <span className="text-[10px]">▼</span>
                 </button>
               </div>
               {/* Research Card Top Left */}
@@ -222,33 +322,44 @@ export default function Home() {
                     ↗
                   </div>
                   <p className="text-sm font-bold leading-tight text-slate-800">
-                    Research and Expertise
+                    Research &amp; Guidance
                   </p>
                 </div>
-                <div className="w-20 h-20 bg-gray-200 rounded-xl overflow-hidden flex-shrink-0 relative">
-                  <Image
-                    alt="Researcher"
-                    className="object-cover"
-                    src="/images/researcher.jpg"
-                    fill
-                    sizes="80px"
-                    priority
-                  />
+                <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 relative">
+                  <video autoPlay muted loop playsInline className="w-full h-full object-cover">
+                    <source src="/logo/video/logo_animation.mp4" type="video/mp4" />
+                  </video>
+                </div>
+              </div>
+              {/* Logo Animation Badge */}
+              <div className="absolute bottom-24 left-6 bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-4 flex items-center gap-4 border border-white/50">
+                <video
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="w-16 h-16 rounded-xl object-cover"
+                >
+                  <source src="/logo/video/logo_animation.mp4" type="video/mp4" />
+                </video>
+                <div>
+                  <p className="text-sm font-bold text-slate-800">ZorabiHealth</p>
+                  <p className="text-xs text-slate-500">AI-Powered Care</p>
                 </div>
               </div>
               {/* Bottom Tabs */}
               <div className="absolute bottom-8 flex gap-3">
                 <div className="bg-white px-4 py-1.5 rounded-full text-[10px] text-slate-800 font-semibold border border-white shadow-sm">
-                  Diagnostic
+                  Clinical Voice
                 </div>
                 <div className="bg-white px-4 py-1.5 rounded-full text-[10px] text-slate-800 font-semibold border border-white shadow-sm">
-                  Personalized
+                  Auto-Refills
                 </div>
                 <div className="bg-white px-4 py-1.5 rounded-full text-[10px] text-slate-800 font-semibold border border-white shadow-sm">
-                  CTI imaging
+                  Push Alerts
                 </div>
                 <div className="bg-white px-4 py-1.5 rounded-full text-[10px] text-slate-800 font-semibold border border-white shadow-sm">
-                  Markers &amp; Indicators Analysis
+                  Vital Indicators
                 </div>
               </div>
               {/* Cut-out center Arrow tab */}
@@ -290,15 +401,15 @@ export default function Home() {
             data-purpose="feature-card-1"
           >
             <div>
-              <h3 className="text-brand-900 font-bold mb-3 text-lg">Data integration</h3>
+              <h3 className="text-brand-900 font-bold mb-3 text-lg">AI Voice Logs</h3>
               <p className="text-brand-700/80 text-sm leading-relaxed font-medium">
-                Securely upload a CSV file or connect to a data source. Show how the data matches
-                the variables of your customized model.
+                Log your health indicators naturally. Speak to the Deepgram assistant to parse
+                symptom updates and automatically record telemetry.
               </p>
             </div>
             <div className="flex justify-between items-end mt-4">
               <div className="w-12 h-12 bg-white/90 rounded-xl flex items-center justify-center text-brand-50 text-2xl shadow-sm">
-                📁
+                🎙️
               </div>
               <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-brand-400 shadow-sm text-lg hover:bg-brand-100 cursor-pointer transition-colors">
                 →
@@ -311,17 +422,17 @@ export default function Home() {
             data-purpose="feature-card-2"
           >
             <div>
-              <h3 className="font-bold mb-3 text-lg text-slate-900">Get Predictions</h3>
+              <h3 className="font-bold mb-3 text-lg text-slate-900">Automated Refills</h3>
               <p className="text-slate-800/90 text-sm leading-relaxed mb-4 font-medium">
-                Equip teams and departments with blazing fast predictive capabilities without
-                machine learning expertise.
+                Automatically verify pharmacy stocks, coordinate delivery locations, and get push
+                alerts to ensure you never miss a dose.
               </p>
-              <a
+              <Link
                 className="text-sm text-slate-900 font-bold hover:text-slate-700 transition-colors flex items-center gap-1"
-                href="#"
+                href="/dashboard"
               >
                 Learn more <span className="text-xs">↗</span>
-              </a>
+              </Link>
             </div>
             <div className="absolute bottom-6 right-6 w-20 h-20 bg-white/90 rounded-full flex items-center justify-center">
               {/* Spinning progress animation */}
@@ -538,11 +649,13 @@ export default function Home() {
                     <div className="flex flex-col justify-center gap-4 flex-grow relative">
                       {/* Centered heart image */}
                       <div className="absolute inset-0 flex items-center justify-center opacity-40 pointer-events-none mix-blend-multiply">
-                        <img
+                        <Image
                           alt="Heart"
-                          className="h-full object-contain filter grayscale contrast-125"
                           src="/images/doctor_hero.png"
+                          fill
+                          className="object-contain filter grayscale contrast-125"
                           style={{ clipPath: "circle(40% at center)" }}
+                          sizes="(max-width: 768px) 100vw, 50vw"
                         />
                       </div>
                       <div className="flex items-baseline gap-2 z-10 self-end">
@@ -716,7 +829,10 @@ export default function Home() {
                       </div>
                     </div>
                   </div>
-                  <div className="mt-auto z-10 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity">
+                  <Link
+                    href="/dashboard/sleep"
+                    className="mt-auto z-10 flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                  >
                     <div className="w-8 h-8 rounded-lg border border-white/30 flex items-center justify-center bg-white/10">
                       <svg
                         className="w-4 h-4"
@@ -728,8 +844,8 @@ export default function Home() {
                         <path d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                       </svg>
                     </div>
-                    <span className="text-xs font-bold">Download app</span>
-                  </div>
+                    <span className="text-xs font-bold">View details</span>
+                  </Link>
                 </section>
                 {/* END: Sleep Tracking Card */}
 
@@ -905,7 +1021,7 @@ export default function Home() {
                             <div className="w-10 h-10 bg-slate-100 rounded-xl" />
                             <div>
                               <p className="text-xs font-bold text-slate-800">
-                                Homemade Plain Waffles
+                                Morning HIIT Training
                               </p>
                               <p className="text-[9px] text-slate-500 mt-0.5">
                                 Intense • 30 min • Cardio
@@ -1134,7 +1250,7 @@ export default function Home() {
                       <p className="text-2xl font-bold text-slate-800">22</p>
                       <p className="text-[10px] text-slate-500 mb-2">Longest Streak</p>
                       <p className="text-[9px] text-slate-400 leading-relaxed px-4">
-                        You are on fire! Keep using the sandow app to gain more streak!
+                        You are on fire! Keep using ZorabiHealth to gain more streak!
                       </p>
                     </div>
 
@@ -1186,22 +1302,749 @@ export default function Home() {
               </div>
             )}
 
-            {activeTab !== "overview" && activeTab !== "workout" && (
-              <div className="flex-grow flex flex-col items-center justify-center p-8 bg-slate-50 rounded-[32px] border border-slate-100 min-h-[500px] text-center">
-                <div className="w-16 h-16 bg-brand-100 rounded-full flex items-center justify-center mx-auto mb-4 text-brand-500">
-                  <Sparkles className="w-8 h-8" />
+            {activeTab === "analytics" && (
+              <div className="font-sans bg-white/60 backdrop-blur-md rounded-[40px] shadow-lg p-8 flex flex-col gap-6 shrink-0 relative min-h-[640px]">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-800">Analytics &amp; Trends</h2>
+                    <p className="text-xs text-slate-400">
+                      Clinical indicator predictions and historical data analysis.
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => setAnalyticsMetric("heartRate")}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        analyticsMetric === "heartRate"
+                          ? "bg-brand-500 text-white shadow-sm"
+                          : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                      }`}
+                    >
+                      Heart Rate
+                    </button>
+                    <button
+                      onClick={() => setAnalyticsMetric("spo2")}
+                      className={`px-4 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer ${
+                        analyticsMetric === "spo2"
+                          ? "bg-brand-500 text-white shadow-sm"
+                          : "bg-white text-slate-600 hover:bg-slate-50 border border-slate-200"
+                      }`}
+                    >
+                      SpO2
+                    </button>
+                  </div>
                 </div>
-                <h3 className="text-xl font-bold text-slate-800 mb-2">Feature Coming Soon</h3>
-                <p className="text-sm text-slate-500 max-w-sm mx-auto leading-relaxed">
-                  This preview section is under active clinical testing. You can explore the full
-                  functional version of zorabihealth by entering the portal.
-                </p>
-                <Link
-                  href="/login"
-                  className="mt-6 inline-block bg-[#1e4a46] hover:bg-[#153633] text-white font-bold py-2.5 px-6 rounded-full text-xs transition-colors shadow-md cursor-pointer"
-                >
-                  Sign In to Full Dashboard
-                </Link>
+
+                <div className="grid grid-cols-12 gap-6">
+                  {/* Chart view */}
+                  <div className="col-span-8 bg-white rounded-[24px] p-6 border border-slate-100 shadow-sm flex flex-col justify-between h-[360px]">
+                    <div className="flex justify-between items-center">
+                      <span className="text-sm font-bold text-slate-700">
+                        {analyticsMetric === "heartRate"
+                          ? "Heart Rate History (bpm)"
+                          : "Blood Oxygen Levels (SpO2 %)"}
+                      </span>
+                      <div className="flex gap-1.5 bg-slate-100 p-1 rounded-lg">
+                        {["7D", "30D"].map((r) => (
+                          <button
+                            key={r}
+                            onClick={() => setAnalyticsRange(r)}
+                            className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${
+                              analyticsRange === r
+                                ? "bg-white text-brand-600 shadow-xs"
+                                : "text-slate-500 hover:text-slate-800"
+                            }`}
+                          >
+                            {r}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Chart SVG */}
+                    <div className="h-48 w-full mt-4 relative">
+                      <svg
+                        className="w-full h-full text-brand-500"
+                        viewBox="0 0 400 120"
+                        preserveAspectRatio="none"
+                      >
+                        <defs>
+                          <linearGradient id="chartGrad" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#0ea5e9" stopOpacity="0.4" />
+                            <stop offset="100%" stopColor="#0ea5e9" stopOpacity="0.0" />
+                          </linearGradient>
+                          <linearGradient id="chartGradGreen" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="0%" stopColor="#10b981" stopOpacity="0.4" />
+                            <stop offset="100%" stopColor="#10b981" stopOpacity="0.0" />
+                          </linearGradient>
+                        </defs>
+                        {/* Grid lines */}
+                        <line
+                          x1="0"
+                          y1="30"
+                          x2="400"
+                          y2="30"
+                          stroke="#f1f5f9"
+                          strokeWidth="1"
+                          strokeDasharray="4 4"
+                        />
+                        <line
+                          x1="0"
+                          y1="60"
+                          x2="400"
+                          y2="60"
+                          stroke="#f1f5f9"
+                          strokeWidth="1"
+                          strokeDasharray="4 4"
+                        />
+                        <line
+                          x1="0"
+                          y1="90"
+                          x2="400"
+                          y2="90"
+                          stroke="#f1f5f9"
+                          strokeWidth="1"
+                          strokeDasharray="4 4"
+                        />
+
+                        {analyticsMetric === "heartRate" ? (
+                          <>
+                            {/* Heart rate path */}
+                            <path
+                              d={
+                                analyticsRange === "7D"
+                                  ? "M 0 80 Q 50 40, 100 90 T 200 50 T 300 70 T 400 35"
+                                  : "M 0 75 Q 30 50, 60 85 T 120 40 T 180 90 T 240 60 T 300 50 T 400 45"
+                              }
+                              fill="none"
+                              stroke="#0ea5e9"
+                              strokeWidth="3"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d={
+                                analyticsRange === "7D"
+                                  ? "M 0 80 Q 50 40, 100 90 T 200 50 T 300 70 T 400 35 L 400 120 L 0 120 Z"
+                                  : "M 0 75 Q 30 50, 60 85 T 120 40 T 180 90 T 240 60 T 300 50 T 400 45 L 400 120 L 0 120 Z"
+                              }
+                              fill="url(#chartGrad)"
+                            />
+                            {/* Active Point */}
+                            <circle
+                              cx="400"
+                              cy="35"
+                              r="5"
+                              fill="white"
+                              stroke="#0ea5e9"
+                              strokeWidth="3"
+                            />
+                          </>
+                        ) : (
+                          <>
+                            {/* SpO2 path */}
+                            <path
+                              d={
+                                analyticsRange === "7D"
+                                  ? "M 0 30 Q 80 25, 160 35 T 320 20 T 400 24"
+                                  : "M 0 28 Q 50 35, 100 24 T 200 32 T 300 22 T 400 26"
+                              }
+                              fill="none"
+                              stroke="#10b981"
+                              strokeWidth="3"
+                              strokeLinecap="round"
+                            />
+                            <path
+                              d={
+                                analyticsRange === "7D"
+                                  ? "M 0 30 Q 80 25, 160 35 T 320 20 T 400 24 L 400 120 L 0 120 Z"
+                                  : "M 0 28 Q 50 35, 100 24 T 200 32 T 300 22 T 400 26 L 400 120 L 0 120 Z"
+                              }
+                              fill="url(#chartGradGreen)"
+                            />
+                            {/* Active Point */}
+                            <circle
+                              cx="400"
+                              cy="24"
+                              r="5"
+                              fill="white"
+                              stroke="#10b981"
+                              strokeWidth="3"
+                            />
+                          </>
+                        )}
+                      </svg>
+                      {/* X Axis labels */}
+                      <div className="flex justify-between mt-2 text-[9px] text-slate-400 font-semibold px-1">
+                        {analyticsRange === "7D" ? (
+                          <>
+                            <span>Mon</span>
+                            <span>Tue</span>
+                            <span>Wed</span>
+                            <span>Thu</span>
+                            <span>Fri</span>
+                            <span>Sat</span>
+                            <span>Sun</span>
+                          </>
+                        ) : (
+                          <>
+                            <span>May 1</span>
+                            <span>May 10</span>
+                            <span>May 20</span>
+                            <span>May 30</span>
+                            <span>June 6</span>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Summary Indicators */}
+                  <div className="col-span-4 flex flex-col gap-4">
+                    <div className="bg-white rounded-[24px] p-5 border border-slate-100 shadow-sm flex flex-col justify-between flex-grow">
+                      <div>
+                        <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                          Predictive Recovery
+                        </span>
+                        <h3 className="text-3xl font-extrabold text-slate-800 mt-1">94%</h3>
+                        <p className="text-[10px] text-emerald-600 font-bold mt-1">
+                          ✓ Excellent Condition
+                        </p>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-relaxed mt-2 font-medium">
+                        Based on your resting HRV and continuous SpO2 trends over the last 24h, your
+                        recovery rate has increased by{" "}
+                        <span className="text-brand-500 font-bold">+4.2%</span>.
+                      </p>
+                    </div>
+
+                    <div className="bg-[#1e4a46] text-white rounded-[24px] p-5 flex flex-col justify-between flex-grow shadow-md">
+                      <div>
+                        <span className="text-[10px] text-white/70 font-bold uppercase tracking-wider">
+                          Clinical Compliance
+                        </span>
+                        <h3 className="text-2xl font-black mt-1">98.2%</h3>
+                        <p className="text-[10px] text-teal-200 mt-1">16 out of 17 doses taken</p>
+                      </div>
+                      <Link
+                        href="/dashboard"
+                        className="text-[10px] text-white font-bold hover:underline mt-4 flex items-center gap-1"
+                      >
+                        View Medication Plan <span>→</span>
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Bottom Stats Grid */}
+                <div className="grid grid-cols-3 gap-4 mt-2">
+                  <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
+                    <p className="text-[10px] text-slate-400 font-semibold">Average Heart Rate</p>
+                    <p className="text-xl font-bold text-slate-800 mt-1">
+                      {analyticsMetric === "heartRate" ? "68 bpm" : "71 bpm"}
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
+                    <p className="text-[10px] text-slate-400 font-semibold">Oxygen Stability</p>
+                    <p className="text-xl font-bold text-slate-800 mt-1">
+                      {analyticsMetric === "spo2" ? "98.8%" : "98.1%"}
+                    </p>
+                  </div>
+                  <div className="bg-slate-50 rounded-2xl p-4 text-center border border-slate-100">
+                    <p className="text-[10px] text-slate-400 font-semibold">
+                      Symptom Severity Index
+                    </p>
+                    <p className="text-xl font-bold text-emerald-600 mt-1">0.1 (Low)</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "vitals" && (
+              <div className="font-sans bg-white/60 backdrop-blur-md rounded-[40px] shadow-lg p-8 flex flex-col gap-6 shrink-0 relative min-h-[640px]">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-800">Symptom Tracker</h2>
+                    <p className="text-xs text-slate-400">
+                      Log physical symptoms to feed telemetry calculations.
+                    </p>
+                  </div>
+                  <span className="text-xs px-3 py-1 rounded-full bg-brand-50 text-brand-700 font-bold border border-brand-100">
+                    Active Logging
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-12 gap-6">
+                  {/* Selector panel */}
+                  <div className="col-span-7 bg-white rounded-[24px] p-6 border border-slate-100 shadow-sm flex flex-col gap-5">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-700 mb-2">Select Symptoms</h3>
+                      <div className="flex flex-wrap gap-2">
+                        {[
+                          { id: "headache", label: "Headache", emoji: "🧠" },
+                          { id: "fatigue", label: "Fatigue", emoji: "🔋" },
+                          { id: "cough", label: "Dry Cough", emoji: "🗣️" },
+                          { id: "insomnia", label: "Insomnia", emoji: "🌙" },
+                          { id: "nausea", label: "Nausea", emoji: "🤢" },
+                          { id: "chestPain", label: "Chest Tightness", emoji: "🫁" },
+                        ].map((sym) => {
+                          const isSelected = selectedSymptoms.includes(sym.id);
+                          return (
+                            <button
+                              key={sym.id}
+                              onClick={() => {
+                                if (isSelected) {
+                                  setSelectedSymptoms(selectedSymptoms.filter((s) => s !== sym.id));
+                                } else {
+                                  setSelectedSymptoms([...selectedSymptoms, sym.id]);
+                                }
+                              }}
+                              className={`px-3.5 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 border transition-all cursor-pointer ${
+                                isSelected
+                                  ? "bg-brand-50 border-brand-400 text-brand-700 shadow-xs"
+                                  : "bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100"
+                              }`}
+                            >
+                              <span>{sym.emoji}</span>
+                              <span>{sym.label}</span>
+                              {isSelected && <Check className="w-3.5 h-3.5 text-brand-600" />}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-700 mb-2">Symptom Severity</h3>
+                      <div className="grid grid-cols-3 gap-3">
+                        {[
+                          {
+                            id: "Mild",
+                            color: "bg-emerald-500",
+                            text: "text-emerald-700",
+                            bg: "bg-emerald-50 border-emerald-100",
+                          },
+                          {
+                            id: "Moderate",
+                            color: "bg-amber-500",
+                            text: "text-amber-700",
+                            bg: "bg-amber-50 border-amber-100",
+                          },
+                          {
+                            id: "Severe",
+                            color: "bg-red-500",
+                            text: "text-red-700",
+                            bg: "bg-red-50 border-red-100",
+                          },
+                        ].map((sev) => {
+                          const isActive = symptomSeverity === sev.id;
+                          return (
+                            <button
+                              key={sev.id}
+                              onClick={() => setSymptomSeverity(sev.id)}
+                              className={`p-3 rounded-2xl text-xs font-bold border transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                                isActive
+                                  ? `${sev.bg} border-2`
+                                  : "bg-white border-slate-200 text-slate-600 hover:bg-slate-50"
+                              }`}
+                            >
+                              <span className={`w-2.5 h-2.5 rounded-full ${sev.color}`} />
+                              <span className={isActive ? sev.text : "text-slate-600"}>
+                                {sev.id}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        if (selectedSymptoms.length === 0) return;
+                        const newLog = `${selectedSymptoms
+                          .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
+                          .join(", ")} (${symptomSeverity})`;
+                        setSymptomLogs([
+                          { date: "Today", detail: newLog, severity: symptomSeverity },
+                          ...symptomLogs,
+                        ]);
+                        setSelectedSymptoms([]);
+                      }}
+                      disabled={selectedSymptoms.length === 0}
+                      className="w-full bg-[#1e4a46] hover:bg-[#153633] disabled:opacity-50 text-white font-bold py-3.5 rounded-2xl text-xs transition-colors shadow-md cursor-pointer mt-2"
+                    >
+                      Record Log Entry
+                    </button>
+                  </div>
+
+                  {/* Summary indicators */}
+                  <div className="col-span-5 flex flex-col gap-4">
+                    <div className="bg-slate-50 border border-slate-100 rounded-[24px] p-5 flex-grow flex flex-col justify-between">
+                      <div>
+                        <h4 className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          Clinical Status
+                        </h4>
+                        <div className="flex items-center gap-2 mt-2">
+                          <span
+                            className={`w-3.5 h-3.5 rounded-full ${
+                              symptomSeverity === "Severe" && selectedSymptoms.length > 0
+                                ? "bg-red-500"
+                                : "bg-emerald-500"
+                            }`}
+                          />
+                          <span className="text-lg font-black text-slate-800">
+                            {symptomSeverity === "Severe" && selectedSymptoms.length > 0
+                              ? "Attention Required"
+                              : "Stable & Normal"}
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-relaxed mt-4 font-medium">
+                        {symptomSeverity === "Severe" && selectedSymptoms.length > 0
+                          ? "We detected a severe physical flag. A push notification escalation trigger is armed. If indicators persist, we will contact Dr. Jenkins."
+                          : "No emergency clinical thresholds crossed. Rest well and continue logging symptoms periodically."}
+                      </p>
+                    </div>
+
+                    <div className="bg-white border border-slate-100 rounded-[24px] p-5 h-44 overflow-y-auto flex flex-col gap-2.5 shadow-xs">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                        Recent Logs
+                      </span>
+                      {symptomLogs.length === 0 ? (
+                        <p className="text-xs text-slate-400 italic my-auto text-center">
+                          No logs logged today.
+                        </p>
+                      ) : (
+                        <div className="flex flex-col gap-2">
+                          {symptomLogs.map((log, index) => (
+                            <div
+                              key={index}
+                              className="flex justify-between items-center bg-slate-50 p-2.5 rounded-xl border border-slate-100 text-[10px] font-semibold"
+                            >
+                              <span className="text-slate-800 truncate max-w-[150px]">
+                                {log.detail}
+                              </span>
+                              <div className="flex gap-2 items-center">
+                                <span
+                                  className={`px-2 py-0.5 rounded-full text-[8px] font-bold ${
+                                    log.severity === "Severe"
+                                      ? "bg-red-100 text-red-700"
+                                      : log.severity === "Moderate"
+                                        ? "bg-amber-100 text-amber-700"
+                                        : "bg-emerald-100 text-emerald-700"
+                                  }`}
+                                >
+                                  {log.severity}
+                                </span>
+                                <span className="text-slate-400">{log.date}</span>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "meditation" && (
+              <div className="font-sans bg-white/60 backdrop-blur-md rounded-[40px] shadow-lg p-8 flex flex-col gap-6 shrink-0 relative min-h-[640px]">
+                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-800">
+                      Meditation &amp; Mindfulness
+                    </h2>
+                    <p className="text-xs text-slate-400">
+                      Settle your mind and reduce heart rate with guided breathing.
+                    </p>
+                  </div>
+                  <span className="text-xs px-3 py-1 rounded-full bg-emerald-50 text-emerald-700 font-bold border border-emerald-100">
+                    Relaxation Center
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-12 gap-8 items-center mt-2">
+                  {/* Left Column - Audio Player Mockup */}
+                  <div className="col-span-6 flex flex-col items-center bg-white rounded-[32px] p-6 border border-slate-100 shadow-sm relative overflow-hidden h-[380px] justify-between">
+                    {/* Breathing circle animation */}
+                    <div className="my-auto flex flex-col items-center justify-center relative">
+                      <div
+                        className={`w-36 h-36 rounded-full bg-gradient-to-br from-emerald-100 to-teal-200/40 flex items-center justify-center relative transition-all duration-[3000ms] ${
+                          isPlayingMeditation ? "animate-pulse scale-105" : ""
+                        }`}
+                      >
+                        <div className="w-28 h-28 rounded-full bg-white flex flex-col items-center justify-center shadow-inner text-center p-2 z-10">
+                          <p className="text-[10px] text-slate-400 font-semibold uppercase tracking-wider">
+                            {isPlayingMeditation ? "Breathing" : "Paused"}
+                          </p>
+                          <p className="text-sm font-extrabold text-[#1e4a46] mt-1">
+                            {isPlayingMeditation ? "Inhale..." : "Begin"}
+                          </p>
+                        </div>
+                        {/* Ambient aura */}
+                        {isPlayingMeditation && (
+                          <div className="absolute inset-0 rounded-full border border-teal-400/30 animate-ping opacity-60" />
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Progress slider */}
+                    <div className="w-full flex flex-col gap-1.5 px-2">
+                      <div className="flex justify-between text-[9px] text-slate-400 font-semibold">
+                        <span>1:45</span>
+                        <span>
+                          {activeMeditationTrack === "forest"
+                            ? "5:30"
+                            : activeMeditationTrack === "ocean"
+                              ? "8:00"
+                              : "10:15"}
+                        </span>
+                      </div>
+                      <div className="h-1 bg-slate-100 rounded-full w-full overflow-hidden">
+                        <div
+                          className="h-full bg-teal-500 rounded-full transition-all duration-1000"
+                          style={{ width: isPlayingMeditation ? "32%" : "20%" }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Player controls */}
+                    <div className="flex items-center gap-6 mt-4">
+                      <button
+                        onClick={() => setIsPlayingMeditation(!isPlayingMeditation)}
+                        className="w-14 h-14 bg-[#1e4a46] hover:bg-[#153633] text-white rounded-full flex items-center justify-center shadow-md transition-colors cursor-pointer"
+                      >
+                        {isPlayingMeditation ? (
+                          <Pause className="w-6 h-6 text-white" />
+                        ) : (
+                          <Play className="w-6 h-6 text-white fill-white ml-1" />
+                        )}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Right Column - Sound tracks */}
+                  <div className="col-span-6 flex flex-col gap-4">
+                    <h3 className="text-sm font-bold text-slate-700">Choose Guided Zen Sessions</h3>
+                    <div className="flex flex-col gap-3">
+                      {[
+                        {
+                          id: "forest",
+                          name: "Forest Rain Breath",
+                          duration: "5:30",
+                          desc: "Gentle raindrops coupled with diaphragmatic rhythm.",
+                          emoji: "🌧️",
+                        },
+                        {
+                          id: "ocean",
+                          name: "Deep Zen Ocean",
+                          duration: "8:00",
+                          desc: "Symphony of ambient tides to stabilize sinus rhythm.",
+                          emoji: "🌊",
+                        },
+                        {
+                          id: "cosmic",
+                          name: "Cosmic Mind Calm",
+                          duration: "10:15",
+                          desc: "Low-frequency pulses for restorative neural cycles.",
+                          emoji: "🌌",
+                        },
+                      ].map((track) => (
+                        <button
+                          key={track.id}
+                          onClick={() => {
+                            setActiveMeditationTrack(track.id);
+                            setIsPlayingMeditation(true);
+                          }}
+                          className={`p-4 rounded-[24px] border transition-all cursor-pointer flex items-center justify-between text-left w-full ${
+                            activeMeditationTrack === track.id
+                              ? "bg-teal-50 border-teal-200 shadow-xs"
+                              : "bg-white border-slate-100 hover:bg-slate-50"
+                          }`}
+                        >
+                          <div className="flex items-center gap-4">
+                            <span className="text-2xl">{track.emoji}</span>
+                            <div>
+                              <p className="text-xs font-bold text-slate-800">{track.name}</p>
+                              <p className="text-[10px] text-slate-400 mt-0.5">{track.desc}</p>
+                            </div>
+                          </div>
+                          <span className="text-[10px] text-slate-400 font-bold">
+                            {track.duration}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "settings" && (
+              <div className="font-sans bg-white/60 backdrop-blur-md rounded-[40px] shadow-lg p-8 flex flex-col gap-6 shrink-0 relative min-h-[640px]">
+                {/* Header */}
+                <div className="flex justify-between items-center border-b border-slate-100 pb-4">
+                  <div>
+                    <h2 className="text-2xl font-bold text-slate-800">Clinical Settings</h2>
+                    <p className="text-xs text-slate-400">
+                      Configure your telemetry synchronization and push notification alarms.
+                    </p>
+                  </div>
+                  <span className="text-xs px-3 py-1 rounded-full bg-slate-100 text-slate-700 font-bold border border-slate-200">
+                    Console Config
+                  </span>
+                </div>
+
+                {/* Settings panel */}
+                <div className="grid grid-cols-12 gap-6 mt-2">
+                  <div className="col-span-8 bg-white rounded-[24px] p-6 border border-slate-100 shadow-sm flex flex-col gap-5">
+                    {/* Toggles */}
+                    <div className="flex flex-col gap-4">
+                      {/* HIPAA */}
+                      <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div className="flex items-center gap-3">
+                          <Shield className="w-5 h-5 text-brand-600" />
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">HIPAA Secure Sharing</p>
+                            <p className="text-[9px] text-slate-400">
+                              Sync all telemetry reports directly to your clinician profile.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setSettingsHIPAA(!settingsHIPAA)}
+                          className={`w-10 h-6 rounded-full p-0.5 transition-colors cursor-pointer ${
+                            settingsHIPAA ? "bg-brand-500" : "bg-slate-200"
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform ${
+                              settingsHIPAA ? "translate-x-4" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Push Notifications */}
+                      <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div className="flex items-center gap-3">
+                          <Smartphone className="w-5 h-5 text-emerald-600" />
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">Push Notifications</p>
+                            <p className="text-[9px] text-slate-400">
+                              Deliver real-time alerts to your device via Web Push.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setSettingsSMS(!settingsSMS)}
+                          className={`w-10 h-6 rounded-full p-0.5 transition-colors cursor-pointer ${
+                            settingsSMS ? "bg-brand-500" : "bg-slate-200"
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform ${
+                              settingsSMS ? "translate-x-4" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Escalation */}
+                      <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div className="flex items-center gap-3">
+                          <Zap className="w-5 h-5 text-amber-500" />
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">
+                              Emergency Escalation Alarms
+                            </p>
+                            <p className="text-[9px] text-slate-400">
+                              Alert designated contacts after consecutive missed medications.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setSettingsEscalation(!settingsEscalation)}
+                          className={`w-10 h-6 rounded-full p-0.5 transition-colors cursor-pointer ${
+                            settingsEscalation ? "bg-brand-500" : "bg-slate-200"
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform ${
+                              settingsEscalation ? "translate-x-4" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+
+                      {/* Deepgram */}
+                      <div className="flex items-center justify-between bg-slate-50 p-4 rounded-2xl border border-slate-100">
+                        <div className="flex items-center gap-3">
+                          <Sparkles className="w-5 h-5 text-violet-500" />
+                          <div>
+                            <p className="text-xs font-bold text-slate-800">
+                              Deepgram Voice Export
+                            </p>
+                            <p className="text-[9px] text-slate-400">
+                              Enable storage of transcripts and recordings in Supabase buckets.
+                            </p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => setSettingsDeepgram(!settingsDeepgram)}
+                          className={`w-10 h-6 rounded-full p-0.5 transition-colors cursor-pointer ${
+                            settingsDeepgram ? "bg-brand-500" : "bg-slate-200"
+                          }`}
+                        >
+                          <div
+                            className={`w-5 h-5 rounded-full bg-white shadow-sm transform transition-transform ${
+                              settingsDeepgram ? "translate-x-4" : "translate-x-0"
+                            }`}
+                          />
+                        </button>
+                      </div>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        setShowSaveToast(true);
+                        setTimeout(() => setShowSaveToast(false), 3000);
+                      }}
+                      className="w-full bg-[#1e4a46] hover:bg-[#153633] text-white font-bold py-3.5 rounded-2xl text-xs transition-colors shadow-md cursor-pointer mt-2"
+                    >
+                      Save Configuration
+                    </button>
+                  </div>
+
+                  {/* Summary / Info */}
+                  <div className="col-span-4 flex flex-col gap-4 relative">
+                    <div className="bg-slate-50 border border-slate-100 rounded-[24px] p-5 flex-grow">
+                      <span className="text-[10px] text-slate-400 font-bold uppercase tracking-wider">
+                        Sync Status
+                      </span>
+                      <div className="flex items-center gap-2 mt-2">
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="text-sm font-bold text-slate-700">
+                          Connected to Supabase
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 leading-relaxed mt-4 font-medium">
+                        Your console settings are automatically saved locally and synchronized
+                        across the secure cloud database for all devices.
+                      </p>
+                    </div>
+
+                    {/* Notification Toast */}
+                    {showSaveToast && (
+                      <div className="absolute inset-x-0 bottom-0 bg-emerald-600 text-white rounded-2xl p-4 shadow-lg border border-emerald-500 flex items-center gap-3 animate-bounce">
+                        <CheckCircle2 className="w-5 h-5 text-white" />
+                        <span className="text-[10px] font-bold">
+                          Preferences saved and synced successfully!
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
               </div>
             )}
           </div>
@@ -1209,6 +2052,548 @@ export default function Home() {
         </div>
       </section>
       {/* END: Integrated Health Dashboard */}
+
+      {/* NEW SECTION 1: Pharmacy & Medication Management */}
+      <section className="px-10 py-16 bg-[#f8fafc] border-t border-slate-100 animate-on-scroll">
+        <div className="relative bg-white rounded-[40px] overflow-hidden min-h-[600px] flex items-center px-12 py-16 shadow-sm border border-slate-100">
+          {/* Background Decorative Curves */}
+          <div className="absolute inset-0 pointer-events-none">
+            <svg
+              className="w-full h-full opacity-20"
+              fill="none"
+              viewBox="0 0 1200 600"
+              xmlns="http://www.w3.org/2000/svg"
+            >
+              <path
+                d="M-100 450 Q 300 350 600 450 T 1300 350"
+                stroke="#0ea5e9"
+                strokeDasharray="8 8"
+                strokeWidth="2"
+              ></path>
+              <path
+                d="M-100 500 Q 400 400 700 500 T 1300 400"
+                stroke="#0ea5e9"
+                strokeDasharray="8 8"
+                strokeWidth="2"
+              ></path>
+            </svg>
+          </div>
+          <div className="grid grid-cols-12 gap-8 items-center w-full relative z-10">
+            {/* Left Content */}
+            <div className="col-span-12 lg:col-span-6">
+              <h2 className="text-5xl font-bold text-slate-900 leading-[1.1] mb-6">
+                Your <span className="text-brand-500">trusted partner</span>
+                <br />
+                in digital healthcare.
+              </h2>
+              <p className="text-slate-500 text-sm leading-relaxed mb-8 max-w-md">
+                <span className="text-brand-500 font-bold">
+                  Empowering Your Health at Every Step.
+                </span>{" "}
+                Experience personalized medical care from the comfort of your home. Connect with{" "}
+                <span className="text-brand-500 font-bold underline">certified doctors</span>,
+                manage prescriptions, and schedule appointments with ease. Ready to take control of
+                your health? <span className="text-brand-500 font-bold">Get Started</span> or Book
+                an Appointment today.
+              </p>
+              <button className="bg-brand-500 hover:bg-brand-600 text-white font-bold py-4 px-8 rounded-xl flex items-center gap-3 transition-all shadow-lg shadow-brand-100 mb-12 cursor-pointer">
+                Book an appointment <ChevronRight className="w-5 h-5" />
+              </button>
+              <div className="space-y-4">
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
+                  Trusted by millions across the globe:
+                </p>
+                <div className="flex items-center gap-6 opacity-60 grayscale">
+                  <div className="relative h-5 w-20">
+                    <Image
+                      alt="Amazon"
+                      fill
+                      className="object-contain"
+                      src="/images/logos/amazon.png"
+                      sizes="80px"
+                    />
+                  </div>
+                  <div className="relative h-5 w-16">
+                    <Image
+                      alt="Apple"
+                      fill
+                      className="object-contain"
+                      src="/images/logos/apple.png"
+                      sizes="64px"
+                    />
+                  </div>
+                  <div className="relative h-5 w-20">
+                    <Image
+                      alt="Google"
+                      fill
+                      className="object-contain"
+                      src="/images/logos/google.png"
+                      sizes="80px"
+                    />
+                  </div>
+                  <div className="relative h-5 w-16">
+                    <Image
+                      alt="Notion"
+                      fill
+                      className="object-contain"
+                      src="/images/logos/notion.png"
+                      sizes="64px"
+                    />
+                  </div>
+                  <div className="relative h-5 w-20">
+                    <Image
+                      alt="Spotify"
+                      fill
+                      className="object-contain"
+                      src="/images/logos/spotify.png"
+                      sizes="80px"
+                    />
+                  </div>
+                  <div className="relative h-5 w-16">
+                    <Image
+                      alt="Slack"
+                      fill
+                      className="object-contain"
+                      src="/images/logos/slack.png"
+                      sizes="64px"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            {/* Right Visual */}
+            <div className="col-span-12 lg:col-span-6 relative flex justify-center">
+              <div className="relative w-full max-w-md aspect-square">
+                {/* Doctor Image in Circle */}
+                <div className="absolute inset-0 bg-brand-50 rounded-full overflow-hidden border-[12px] border-white shadow-xl">
+                  <Image
+                    alt="Doctor"
+                    className="object-cover object-top"
+                    src="/images/doctor_partner.jpg"
+                    fill
+                    sizes="400px"
+                  />
+                </div>
+                {/* Floating Badge 1: Easy Appointment */}
+                <div className="absolute top-1/2 -left-12 -translate-y-1/2 bg-white px-4 py-2 rounded-lg shadow-lg flex items-center gap-2 border border-slate-50 z-20">
+                  <Star className="text-brand-500 w-4 h-4 fill-brand-500" />
+                  <span className="text-[10px] font-bold text-slate-700">
+                    Easy Appointment Booking
+                  </span>
+                </div>
+                {/* Floating Badge 2: Happy Customers */}
+                <div className="absolute top-1/4 -right-8 bg-white p-3 rounded-xl shadow-lg border border-slate-50 w-40 z-20">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className="flex -space-x-2">
+                      <div className="w-6 h-6 rounded-full border border-white bg-slate-200 overflow-hidden relative">
+                        <Image
+                          alt=""
+                          fill
+                          src="/images/doctor1.jpg"
+                          sizes="24px"
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="w-6 h-6 rounded-full border border-white bg-slate-300 overflow-hidden relative">
+                        <Image
+                          alt=""
+                          fill
+                          src="/images/doctor2.jpg"
+                          sizes="24px"
+                          className="object-cover"
+                        />
+                      </div>
+                      <div className="w-6 h-6 rounded-full border border-white bg-slate-400 overflow-hidden relative">
+                        <Image
+                          alt=""
+                          fill
+                          src="/images/doctor3.jpg"
+                          sizes="24px"
+                          className="object-cover"
+                        />
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-800">2400+</span>
+                  </div>
+                  <p className="text-[8px] font-bold text-brand-500 mb-1">Happy Customers</p>
+                  <div className="flex text-yellow-500 text-[8px] items-center gap-0.5">
+                    <Star className="w-2.5 h-2.5 fill-current" />
+                    <Star className="w-2.5 h-2.5 fill-current" />
+                    <Star className="w-2.5 h-2.5 fill-current" />
+                    <Star className="w-2.5 h-2.5 fill-current" />
+                    <Star className="w-2.5 h-2.5 fill-current" />
+                    <span className="ml-1 text-slate-400 font-semibold">(4.7 Stars)</span>
+                  </div>
+                </div>
+                {/* Floating Badge 3: Quote */}
+                <div className="absolute -bottom-4 -right-4 bg-white/80 backdrop-blur-md p-4 rounded-2xl shadow-lg border border-white/50 max-w-[200px] z-20">
+                  <Quote className="text-brand-500 w-5 h-5 mb-1" />
+                  <p className="text-[10px] font-medium text-slate-600 leading-tight italic">
+                    Where science meets art, and compassion heals.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* NEW SECTION 2: Patient Empowerment Portal */}
+      <section className="px-10 py-24 bg-white animate-on-scroll">
+        <div className="max-w-7xl mx-auto flex flex-col lg:flex-row items-center gap-16">
+          <div className="w-full lg:w-1/2">
+            <span className="text-brand-500 font-bold text-sm uppercase tracking-widest mb-4 block">
+              Central Intelligence
+            </span>
+            <h2 className="text-5xl font-bold leading-tight mb-6 text-slate-900">
+              Your Health,{" "}
+              <span className="bg-gradient-to-r from-brand-600 to-brand-400 bg-clip-text text-transparent">
+                Unified.
+              </span>
+            </h2>
+            <p className="text-slate-500 text-lg mb-10 leading-relaxed">
+              Experience a clean, light-filled portal where your entire medical history meets
+              real-time predictive analytics.
+            </p>
+            <div className="space-y-8">
+              <div className="flex gap-6">
+                <div className="w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center shrink-0">
+                  <FolderHeart className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl mb-2 text-slate-800">
+                    Centralized medical records
+                  </h3>
+                  <p className="text-slate-500 text-sm">
+                    Secure access to labs, imaging, and histories in one high-fidelity interface.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-6">
+                <div className="w-12 h-12 rounded-full bg-brand-50 flex items-center justify-center shrink-0">
+                  <HeartPulse className="w-6 h-6 text-brand-500" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl mb-2 text-slate-800">
+                    Real-time vitals monitoring
+                  </h3>
+                  <p className="text-slate-500 text-sm">
+                    Synchronize wearable data with clinical-grade visualization tools.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-6">
+                <div className="w-12 h-12 rounded-full bg-violet-50 flex items-center justify-center shrink-0">
+                  <Brain className="w-6 h-6 text-violet-600" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-xl mb-2 text-slate-800">
+                    Personalized AI health insights
+                  </h3>
+                  <p className="text-slate-500 text-sm">
+                    ZorabiHealth analyzes your unique markers to provide actionable recovery
+                    pathways.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+          {/* Visual: High-contrast data visualizations mirroring ZorabiHealth style */}
+          <div className="w-full lg:w-1/2 grid grid-cols-2 gap-4">
+            <div className="bg-slate-50 p-8 rounded-[40px] border border-slate-100 shadow-sm hover:shadow-md transition-shadow">
+              <div className="flex justify-between items-start mb-12">
+                <Activity className="w-6 h-6 text-brand-500" />
+                <span className="text-[10px] font-bold text-slate-400 bg-white px-2 py-1 rounded-full border">
+                  LIVE
+                </span>
+              </div>
+              <div className="h-24 flex items-end gap-2">
+                <div className="w-full bg-brand-200 rounded-t-lg h-[60%]"></div>
+                <div className="w-full bg-brand-400 rounded-t-lg h-[85%]"></div>
+                <div className="w-full bg-brand-500 rounded-t-lg h-[70%]"></div>
+                <div className="w-full bg-brand-300 rounded-t-lg h-[100%] animate-pulse"></div>
+                <div className="w-full bg-brand-200 rounded-t-lg h-[55%]"></div>
+              </div>
+              <p className="mt-6 font-bold text-slate-800">Oxygen Saturation</p>
+              <p className="text-xs text-slate-400">98% Avg this week</p>
+            </div>
+            <div className="bg-slate-900 p-8 rounded-[40px] text-white flex flex-col justify-between hover:scale-[1.02] transition-transform">
+              <TrendingUp className="w-8 h-8 text-brand-400" />
+              <div>
+                <h4 className="text-3xl font-bold mb-2">+12%</h4>
+                <p className="text-white/60 text-xs font-bold uppercase tracking-widest">
+                  Metabolic Efficiency
+                </p>
+              </div>
+            </div>
+            <div className="col-span-2 bg-gradient-to-br from-brand-500 to-brand-600 p-8 rounded-[40px] text-white flex items-center justify-between shadow-sm">
+              <div>
+                <h4 className="text-2xl font-bold mb-1">Unified Health Score</h4>
+                <p className="text-white/80 text-sm">Clinical benchmark: Optimized</p>
+              </div>
+              <div className="w-16 h-16 rounded-full border-4 border-white/20 flex items-center justify-center text-xl font-black">
+                94
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* NEW SECTION 3: Doctor-Patient Appointment Hub */}
+      <section className="px-10 py-16 bg-[#f0f4f8] animate-on-scroll">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center mb-16">
+            <h2 className="text-5xl font-bold text-slate-900 mb-4">
+              Seamless Clinical Connection.
+            </h2>
+            <p className="text-slate-500 text-lg max-w-2xl mx-auto">
+              Sophisticated scheduling for the modern patient-doctor relationship, inspired by
+              clinical excellence.
+            </p>
+          </div>
+          <div className="grid grid-cols-12 gap-8">
+            {/* Feature Cards */}
+            <div className="col-span-12 lg:col-span-4 space-y-6">
+              <div className="appointment-glass p-8 rounded-[32px] hover:bg-white transition-colors cursor-pointer group shadow-sm bg-white/70 border border-white/40">
+                <Calendar className="w-8 h-8 text-brand-600 mb-4 group-hover:scale-110 transition-transform" />
+                <h3 className="text-xl font-bold text-slate-800 mb-2">Instant booking</h3>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                  Synchronize directly with clinical calendars for zero-latency scheduling.
+                </p>
+              </div>
+              <div className="appointment-glass p-8 rounded-[32px] hover:bg-white transition-colors cursor-pointer group shadow-sm bg-white/70 border border-white/40">
+                <Video className="w-8 h-8 text-brand-600 mb-4 group-hover:scale-110 transition-transform" />
+                <h3 className="text-xl font-bold text-slate-800 mb-2">
+                  Secure video consultations
+                </h3>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                  HIPAA-compliant, high-definition tele-health integration with low latency.
+                </p>
+              </div>
+              <div className="appointment-glass p-8 rounded-[32px] hover:bg-white transition-colors cursor-pointer group shadow-sm bg-white/70 border border-white/40">
+                <ClipboardList className="w-8 h-8 text-brand-600 mb-4 group-hover:scale-110 transition-transform" />
+                <h3 className="text-xl font-bold text-slate-800 mb-2">
+                  Integrated patient history
+                </h3>
+                <p className="text-slate-500 text-sm leading-relaxed">
+                  Automatic pre-briefing for doctors using ZorabiHealth predictive summaries.
+                </p>
+              </div>
+            </div>
+            {/* Appointment Interface */}
+            <div className="col-span-12 lg:col-span-8 bg-white rounded-[40px] p-8 shadow-xl border border-slate-200 relative overflow-hidden flex flex-col justify-between">
+              <div className="absolute top-0 right-0 w-64 h-64 bg-brand-50 rounded-full blur-3xl -mr-20 -mt-20 opacity-50 pointer-events-none"></div>
+              <div className="relative z-10 flex flex-col h-full justify-between gap-8">
+                <div className="flex justify-between items-center">
+                  <h4 className="text-2xl font-bold text-slate-800">Upcoming Consultations</h4>
+                  <div className="flex gap-2">
+                    <button className="p-2 rounded-full border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors cursor-pointer">
+                      <ChevronRight className="w-5 h-5 rotate-180" />
+                    </button>
+                    <button className="p-2 rounded-full border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors cursor-pointer">
+                      <ChevronRight className="w-5 h-5" />
+                    </button>
+                  </div>
+                </div>
+                <div className="space-y-4">
+                  {/* Glassmorphism Appointment Cards */}
+                  <div className="flex items-center gap-6 p-6 rounded-3xl bg-slate-50 border border-slate-100 group hover:border-brand-500 transition-all">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-200 overflow-hidden shrink-0 relative">
+                      <Image
+                        alt="Doctor"
+                        className="object-cover"
+                        src="/images/doctor_jenkins.jpg"
+                        fill
+                        sizes="64px"
+                      />
+                    </div>
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-slate-800">Dr. Sarah Jenkins</h5>
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                        Cardiology Specialist
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-slate-800">Today, 14:30</p>
+                      <p className="text-xs text-brand-500 font-bold">Video Consult</p>
+                    </div>
+                    <button className="bg-brand-500 text-white px-6 py-2 rounded-xl text-sm font-bold shadow-lg shadow-brand-100 transform group-hover:scale-105 transition-all cursor-pointer">
+                      Join Room
+                    </button>
+                  </div>
+                  <div className="flex items-center gap-6 p-6 rounded-3xl bg-white border border-slate-100 hover:bg-slate-50 transition-all opacity-80">
+                    <div className="w-16 h-16 rounded-2xl bg-slate-200 overflow-hidden shrink-0 relative">
+                      <Image
+                        alt="Doctor"
+                        className="object-cover"
+                        src="/images/doctor2.jpg"
+                        fill
+                        sizes="64px"
+                      />
+                    </div>
+                    <div className="flex-grow">
+                      <h5 className="font-bold text-slate-800">Dr. Michael Chen</h5>
+                      <p className="text-xs text-slate-400 font-bold uppercase tracking-wider">
+                        Internal Medicine
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <p className="font-bold text-slate-800">July 26, 09:15</p>
+                      <p className="text-xs text-slate-400 font-bold">In-Person</p>
+                    </div>
+                    <button className="bg-slate-100 text-slate-400 px-6 py-2 rounded-xl text-sm font-bold cursor-pointer">
+                      Manage
+                    </button>
+                  </div>
+                </div>
+                <div className="pt-6 flex items-center justify-between border-t border-slate-100">
+                  <div className="flex items-center gap-4">
+                    <div className="flex -space-x-3">
+                      <div className="w-10 h-10 rounded-full border-2 border-white bg-slate-200 overflow-hidden relative">
+                        <Image
+                          alt=""
+                          fill
+                          className="object-cover"
+                          src="/images/doctor1.jpg"
+                          sizes="40px"
+                        />
+                      </div>
+                      <div className="w-10 h-10 rounded-full border-2 border-white bg-slate-300 overflow-hidden relative">
+                        <Image
+                          alt=""
+                          fill
+                          className="object-cover"
+                          src="/images/doctor2.jpg"
+                          sizes="40px"
+                        />
+                      </div>
+                      <div className="w-10 h-10 rounded-full border-2 border-white bg-brand-500 flex items-center justify-center text-[10px] font-bold text-white z-10">
+                        +24
+                      </div>
+                    </div>
+                    <p className="text-xs font-bold text-slate-400">
+                      Trusted by top specialists globally
+                    </p>
+                  </div>
+                  <button className="text-brand-500 font-bold text-sm flex items-center gap-2 hover:underline cursor-pointer">
+                    View complete directory <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* NEW SECTION 4: Online Pharmacy Section */}
+      <section
+        className="px-10 py-24 bg-white border-t border-slate-100 animate-on-scroll"
+        data-purpose="pharmacy-section"
+      >
+        <div className="max-w-7xl mx-auto">
+          <div className="grid grid-cols-12 gap-12 items-center mb-16">
+            <div className="col-span-12 lg:col-span-6">
+              <h2 className="text-5xl font-bold text-slate-900 leading-tight mb-6">
+                Your Trusted <span className="text-brand-500">Online Pharmacy</span>
+              </h2>
+              <p className="text-slate-500 text-lg mb-10 leading-relaxed">
+                Safe medicines, fast delivery, and professional guidance all in one place. We are a
+                certified online pharmacy committed to making healthcare simple, safe, and
+                affordable.
+              </p>
+              <div className="flex flex-wrap gap-4">
+                <button className="bg-brand-500 hover:bg-brand-600 text-white font-bold py-4 px-8 rounded-2xl flex items-center gap-3 transition-all shadow-lg shadow-brand-100 cursor-pointer">
+                  <ShoppingBasket className="w-5 h-5" /> Shop Medicines
+                </button>
+                <button className="bg-white border-2 border-brand-500 text-brand-500 hover:bg-brand-50 font-bold py-4 px-8 rounded-2xl flex items-center gap-3 transition-all cursor-pointer">
+                  <Upload className="w-5 h-5" /> Upload Prescription
+                </button>
+              </div>
+            </div>
+            <div className="col-span-12 lg:col-span-6 relative flex justify-center">
+              <div className="w-full max-w-md aspect-square rounded-[40px] overflow-hidden shadow-2xl border-[12px] border-white relative">
+                <Image
+                  alt="Medical Professional"
+                  className="object-cover"
+                  src="/images/medical_professional.jpg"
+                  fill
+                  sizes="450px"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-24">
+            <div className="bg-slate-50 p-8 rounded-[32px] text-center hover:shadow-md transition-shadow border border-slate-100">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm text-3xl">
+                💊
+              </div>
+              <p className="font-bold text-slate-800">Supplements</p>
+            </div>
+            <div className="bg-slate-50 p-8 rounded-[32px] text-center hover:shadow-md transition-shadow border border-slate-100">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm text-3xl">
+                💉
+              </div>
+              <p className="font-bold text-slate-800">Diabetes</p>
+            </div>
+            <div className="bg-slate-50 p-8 rounded-[32px] text-center hover:shadow-md transition-shadow border border-slate-100">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm text-3xl">
+                🧴
+              </div>
+              <p className="font-bold text-slate-800">Beauty Products</p>
+            </div>
+            <div className="bg-slate-50 p-8 rounded-[32px] text-center hover:shadow-md transition-shadow border border-slate-100">
+              <div className="w-16 h-16 bg-white rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-sm text-3xl">
+                🪥
+              </div>
+              <p className="font-bold text-slate-800">Oral Care</p>
+            </div>
+          </div>
+          <div className="flex justify-between items-end mb-12">
+            <h3 className="text-3xl font-bold text-slate-900">Shop by Health Concerns</h3>
+            <button className="text-brand-500 font-bold flex items-center gap-2 hover:underline cursor-pointer">
+              View All <ArrowRight className="w-4 h-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 text-center hover:border-brand-500 transition-colors">
+              <div className="w-20 h-20 bg-red-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🫁
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Lung</p>
+            </div>
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 text-center hover:border-brand-500 transition-colors">
+              <div className="w-20 h-20 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🦷
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Dental</p>
+            </div>
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 text-center hover:border-brand-500 transition-colors">
+              <div className="w-20 h-20 bg-pink-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                ❤️
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Heart</p>
+            </div>
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 text-center hover:border-brand-500 transition-colors">
+              <div className="w-20 h-20 bg-orange-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🦴
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Bone</p>
+            </div>
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 text-center hover:border-brand-500 transition-colors">
+              <div className="w-20 h-20 bg-yellow-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🥩
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Liver</p>
+            </div>
+            <div className="bg-white p-6 rounded-[32px] border border-slate-100 text-center hover:border-brand-500 transition-colors">
+              <div className="w-20 h-20 bg-purple-50 rounded-full flex items-center justify-center mx-auto mb-4 text-3xl">
+                🦠
+              </div>
+              <p className="text-xs font-bold text-slate-600 uppercase tracking-wider">Virus</p>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* BEGIN: Medicine Section */}
       <section className="medicine-section relative py-24 border-t border-slate-100 overflow-hidden animate-on-scroll">
