@@ -165,6 +165,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     }
   }, [role, roleLoading, checkingAuth, router]);
 
+  // Update Pendo visitor with role once it loads from user_roles table
+  useEffect(() => {
+    if (!roleLoading && role && typeof pendo !== "undefined" && pendo?.updateOptions) {
+      pendo.updateOptions({ visitor: { role } });
+    }
+  }, [role, roleLoading]);
+
   useEffect(() => {
     const checkUser = async () => {
       const isPlaceholder = !process.env.NEXT_PUBLIC_SUPABASE_URL;
