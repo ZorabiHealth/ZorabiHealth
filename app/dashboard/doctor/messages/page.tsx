@@ -232,15 +232,25 @@ export default function DoctorMessages() {
       read_at: null,
     };
     setMessages((prev) => [...prev, optimistic]);
-    setInput(""); // safe to clear now — revert on error
+    setInput("");
 
     try {
-      const { error } = await supabase.from("messages").insert({
-        conversation_id: activeConv.id,
-        sender_id: userId,
-        content: text,
-      });
+      const { data: inserted, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: activeConv.id,
+          sender_id: userId,
+          content: text,
+        })
+        .select("*")
+        .single();
       if (error) throw error;
+
+      if (inserted) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === optimistic.id ? { ...inserted, content: inserted.content } : m))
+        );
+      }
 
       await supabase
         .from("conversations")
@@ -252,7 +262,7 @@ export default function DoctorMessages() {
     } catch (err) {
       console.error("Failed to send message:", err);
       setMessages((prev) => prev.filter((m) => m.id !== optimistic.id));
-      setInput(text); // restore input text on failure
+      setInput(text);
     } finally {
       setSendingMessage(false);
     }

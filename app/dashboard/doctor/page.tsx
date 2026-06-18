@@ -951,7 +951,15 @@ export default function DoctorDashboard() {
     ]);
 
     const { default: jsPDF } = await import("jspdf");
-    const { default: autoTable } = await import("jspdf-autotable");
+    const autoTableModule = await import("jspdf-autotable");
+    const autoTable =
+      (
+        autoTableModule as {
+          default?: (doc: unknown, options: unknown) => void;
+          autoTable?: (doc: unknown, options: unknown) => void;
+        }
+      ).default ?? autoTableModule.autoTable;
+    if (!autoTable) throw new Error("PDF table renderer unavailable");
 
     const doc = new jsPDF({ unit: "mm", format: "a4" });
     const pageW = doc.internal.pageSize.getWidth();
