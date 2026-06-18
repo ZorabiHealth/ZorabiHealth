@@ -50,7 +50,7 @@ function Footerdemo() {
               Your personal AI-powered health companion. Track medications, monitor vitals, and stay
               on top of your wellness journey.
             </p>
-            <div className="flex items-center gap-2 mb-6 text-xs text-slate-400 dark:text-slate-500">
+            <div className="flex items-center gap-2 mb-6 text-xs text-slate-500 dark:text-slate-400">
               <Shield className="h-3.5 w-3.5 text-emerald-500" />
               HIPAA-aligned &bull; SSL encrypted &bull; SOC 2
             </div>

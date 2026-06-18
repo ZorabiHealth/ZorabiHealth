@@ -455,13 +455,14 @@ const renderMenuItem = (item: MenuItem) => {
   }
 
   return (
-    <Link
-      key={item.title}
-      className="group inline-flex h-10 w-max items-center justify-center rounded-md bg-transparent px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
-      href={item.url}
-    >
-      {item.title}
-    </Link>
+    <NavigationMenuItem key={item.title} className="text-slate-500">
+      <Link
+        className="group inline-flex h-10 w-max items-center justify-center rounded-md bg-transparent px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900"
+        href={item.url}
+      >
+        {item.title}
+      </Link>
+    </NavigationMenuItem>
   );
 };
 

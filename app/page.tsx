@@ -244,8 +244,9 @@ export default function Home() {
               className="w-24 h-24 rounded-2xl object-cover shadow-lg border border-brand-100"
             >
               <source src="/logo/video/logo_animation.mp4" type="video/mp4" />
+              <track kind="captions" src="/logo/video/captions.vtt" label="English" srcLang="en" />
             </video>
-            <span className="text-sm font-semibold text-brand-600 uppercase tracking-wider">
+            <span className="text-sm font-semibold text-brand-700 uppercase tracking-wider">
               Your Personal Health Companion
             </span>
           </div>
@@ -262,7 +263,7 @@ export default function Home() {
           </h1>
           <ul className="space-y-4 mb-10">
             <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-600 text-xs bg-brand-50">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-700 text-xs bg-brand-50">
                 ✓
               </span>
               <span className="text-slate-600 font-medium">
@@ -270,7 +271,7 @@ export default function Home() {
               </span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-600 text-xs bg-brand-50">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-700 text-xs bg-brand-50">
                 ✓
               </span>
               <span className="text-slate-600 font-medium">
@@ -278,7 +279,7 @@ export default function Home() {
               </span>
             </li>
             <li className="flex items-start gap-3">
-              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-600 text-xs bg-brand-50">
+              <span className="flex-shrink-0 w-6 h-6 rounded-full border border-brand-200 flex items-center justify-center text-brand-700 text-xs bg-brand-50">
                 ✓
               </span>
               <span className="text-slate-600 font-medium">
@@ -288,7 +289,7 @@ export default function Home() {
           </ul>
           <Link
             href="/signup"
-            className="bg-brand-500 hover:bg-brand-600 text-white font-medium py-4 px-10 rounded-2xl w-full max-w-sm transition-colors shadow-lg shadow-brand-200 cursor-pointer block text-center"
+            className="bg-brand-600 hover:bg-brand-700 text-white font-medium py-4 px-10 rounded-2xl w-full max-w-sm transition-colors shadow-lg shadow-brand-200 cursor-pointer block text-center"
           >
             Enter Patient Portal
           </Link>
@@ -371,7 +372,7 @@ export default function Home() {
           </div>
         </div>
         {/* Scroll to explore indicator */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center text-slate-400 animate-bounce">
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center text-slate-500 animate-bounce">
           <span className="text-[10px] uppercase tracking-widest font-semibold mb-1">
             Scroll to explore
           </span>
@@ -402,8 +403,8 @@ export default function Home() {
             data-purpose="feature-card-1"
           >
             <div>
-              <h3 className="text-brand-900 font-bold mb-3 text-lg">AI Voice Logs</h3>
-              <p className="text-brand-700/80 text-sm leading-relaxed font-medium">
+              <h2 className="text-brand-900 font-bold mb-3 text-lg">AI Voice Logs</h2>
+              <p className="text-brand-700 text-sm leading-relaxed font-medium">
                 Log your health indicators naturally. Speak to the Deepgram assistant to parse
                 symptom updates and automatically record telemetry.
               </p>
@@ -2388,10 +2389,16 @@ export default function Home() {
                 <div className="flex justify-between items-center">
                   <h4 className="text-2xl font-bold text-slate-800">Upcoming Consultations</h4>
                   <div className="flex gap-2">
-                    <button className="p-2 rounded-full border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors cursor-pointer">
+                    <button
+                      className="p-2 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer"
+                      aria-label="Previous consultation"
+                    >
                       <ChevronRight className="w-5 h-5 rotate-180" />
                     </button>
-                    <button className="p-2 rounded-full border border-slate-200 text-slate-400 hover:bg-slate-50 transition-colors cursor-pointer">
+                    <button
+                      className="p-2 rounded-full border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors cursor-pointer"
+                      aria-label="Next consultation"
+                    >
                       <ChevronRight className="w-5 h-5" />
                     </button>
                   </div>
