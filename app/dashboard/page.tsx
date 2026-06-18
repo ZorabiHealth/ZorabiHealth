@@ -47,7 +47,7 @@ export default function DashboardOverview() {
   const { role, loading: roleLoading } = useUserRole();
   const router = useRouter();
 
-  const [displayName, setDisplayName] = useState("Patient");
+  const [displayName, setDisplayName] = useState("");
   useEffect(() => {
     if (!roleLoading) {
       if (role === "doctor") {
@@ -164,6 +164,11 @@ export default function DashboardOverview() {
         } = await supabase.auth.getSession();
         if (!s || cancelled) return;
         setSession(s);
+        const sessionName =
+          s.user.user_metadata?.full_name ||
+          s.user.email?.split("@")[0]?.replace(/[._]/g, " ") ||
+          "Patient";
+        setDisplayName(sessionName);
         await refreshDashboardData(s.user.id, s.user);
       } catch (e) {
         console.error("Failed to load dashboard session:", e);
