@@ -1,146 +1,106 @@
-# ZorabiHealth — Clinical Intelligence Dashboard & Sync Platform
+# ZorabiHealth
 
-ZorabiHealth is a production-grade, unified healthcare platform designed to bridge clinical care, pharmacy supply chains, patient self-monitoring, and smart wearable telemetries.
+ZorabiHealth is a clinical operations platform for patients, doctors, and pharmacies. It unifies patient dashboards, voice logging, medication reminders, prescriptions, messaging, and Supabase-powered workflows in one product.
 
----
+## Overview
 
-## 🚀 Key Modules & Features
+ZorabiHealth helps care teams and patients work from the same source of truth.
 
-### 1. 🎙️ AI Voice Agent Assistant & Speech Logger
+- Keep patient health actions in one place
+- Route reminders to the right user and device
+- Support doctor, patient, and pharmacy workflows
+- Capture voice notes and clinical actions quickly
+- Store and sync data with Supabase
 
-- **Real-Time Voice Streaming**: Speech-to-text powered by **Deepgram Nova-3**.
-- **Intent Classification**: Real-time speech intent categorization and action triggering.
-- **Clinical Note Extraction**: Automatically converts vocal medical logs into structured clinical notes.
-- **Session History Logs**: Session export capabilities, search history, and persistent transcript storage.
+## Architecture
 
-### 2. 🩺 Doctor-Patient Care Portal (v2)
+The platform is built as three layers: experience, services, and data.
 
-- **Doctor Command Center**: Comprehensive dashboards displaying active patients, consultation metrics, schedule timelines, and billing analytics.
-- **Digital Prescription Engine**: Doctors can issue digital, AI-assisted prescriptions specifying drug, dosage, frequency, duration, quantity, and notes.
-- **PDF Report Generator**: Automatically compiles digital prescriptions into downloadable PDFs (using `jsPDF`) and archives them in Supabase `prescription_pdfs` storage buckets.
-- **Secure Direct Messaging**: HIPAA-compliant, real-time message chat channels between patients and doctors.
-- **Appointment Scheduling**: Automated patient booking portal, doctor availability configuration, and time-off planners.
+```mermaid
+flowchart LR
+  subgraph Experience
+    Users[Patients / Doctors / Pharmacies]
+    App[Next.js App]
+  end
 
-### 3. 💊 E-Commerce & Pharmacy Ecosystem (ZorabiPharm)
+  subgraph Services
+    Auth[Authentication]
+    Voice[Voice + AI]
+    Jobs[Edge Functions]
+  end
 
-- **Retail Storefront**: Drug catalog search engine categorized by medical class (ACE Inhibitors, Antibiotics, NSAIDs, etc.).
-- **Checkout & Confirmation**: Full-featured retail shopping cart, pincode/shipping inputs, automated order tracking ID (`ZH-YYYYMMDD-[RANDOM]`) generator, and delivery timeline trackers.
-- **Pharmacy Inventory Dashboard**: Vendor portal to manage stock levels, price-per-unit, availability, catalog submissions, and status updates (PENDING to DELIVERED/CANCELLED).
-- **Auto-Refills & Logistics**: Automatic pharmacy vendor matching based on inventory availability, operating hours, ratings, and locations.
+  subgraph Data
+    DB[Supabase Database]
+    Storage[Supabase Storage]
+    RT[Realtime Updates]
+  end
 
-### 4. 🛌 Outpatient Telemetry & Wearable Sync
+  Users --> App
+  App --> Auth
+  App --> Voice
+  App --> Jobs
+  Auth --> DB
+  Jobs --> DB
+  App --> Storage
+  DB --> RT
+  RT --> App
+```
 
-- **Vitals Logger**: Manual or wearable logging of blood pressure, heart rate, body temperature, oxygen saturation (SpO2), respiratory rate, weight, height, and automated Body Mass Index (BMI) calculations.
-- **Sleep Companion**: Sleep stages hypnogram tracker showing duration, efficiency, deep/REM/light phase breakdowns, and wearable-synced database alarms.
-- **Pedometer & Fitness**: Active step counters tracking daily progress, calorie targets, distance, and active durations.
-- **Gemini AI Meal Suggestions**: Nutrition trackers logging protein, carbs, and fat, coupled with a Gemini-powered meal recommendation engine integrated with YouTube workouts.
+## Features
 
-### 5. 🔔 Multi-Device Adherence Alarms
+- Patient dashboard with personalized summaries
+- Voice assistant for fast health logging
+- Medication reminders and adherence tracking
+- Doctor prescriptions and appointment workflows
+- Pharmacy fulfillment and order tracking
+- Realtime notifications and device sync
 
-- **Cross-Device Syncing**: Live visual/audio alarms on all active companion app viewports.
-- **Instant Adherence Sync**: Checking off or snoozing an alarm on one device immediately silences the alerts on all other active companion viewports.
-- **Escalation Contexts**: Automatic emergency SMS/alert dispatch to designated emergency contacts after consecutive missed medications.
+## Getting Started
 
----
+1. Copy `.env.local.example` to `.env.local`.
+2. Add your Supabase, Deepgram, Gemini, and notification keys.
+3. Install dependencies with `npm install`.
+4. Start the app with `npm run dev`.
+5. Open `http://localhost:3000`.
 
-## 🛠️ Tech Stack
+> **Tip:** Deploy the matching Supabase migrations and Edge Functions before testing reminders, voice, or notifications.
 
-- **Framework**: Next.js 16 (App Router, Turbopack), React 19, TypeScript
-- **Database & Storage**: Supabase (PostgreSQL, Realtime WebSockets, Row-Level Security, Storage Buckets)
-- **AI & Speech APIs**: Gemini AI (Meal recommendations), Deepgram Nova-3 (Audio Transcription), YouTube Data API (Workouts)
-- **Libraries**: Framer Motion (Animations), jsPDF (Prescription PDF generation), Vitest (Automated testing), Prettier & ESLint (Formatting & quality checks)
+## Documentation
 
----
+Read the full docs site here:
 
-## 📂 Project Directory Structure
+- `docs/README.md`
+- `docs/overview.md`
+- `docs/getting-started.md`
+- `docs/core-concepts.md`
+- `docs/features.md`
+- `docs/configuration.md`
+- `docs/integrations.md`
+- `docs/troubleshooting.md`
+- `docs/changelog.md`
+- `docs/glossary.md`
 
-```bash
+## Project Structure
+
+```text
 zorabihealth/
-├── app/                  # Next.js App Router pages (marketing, dashboard, storefront)
-├── components/           # Reusable UI components & alarm triggers
-├── hooks/                # Custom React hooks (notifications, user roles)
-├── lib/                  # Core logic, authentication utilities, Supabase client
-├── public/               # Static assets, images, and audio/video files
-├── scripts/              # Setup and utility scripts
-├── supabase/             # DB schema definitions and SQL migration scripts
-├── eslint.config.mjs     # ESLint configuration rules
-├── package.json          # Project dependencies and npm scripts
-├── README.md             # This documentation file
-└── DATABASE_MEMORY.md    # Master database schema reference guide
+├── app/         Next.js routes and dashboards
+├── components/  Shared UI components
+├── hooks/       React hooks
+├── lib/         Shared helpers and clients
+├── public/      Static assets
+├── supabase/    SQL migrations and Edge Functions
+├── docs/        Documentation files
+└── README.md    Project overview
 ```
+
+## Development
+
+- `npm install`
+- `npm run dev`
+- `npm run lint`
+- `npm run typecheck`
 
 ---
 
-## 🏁 Getting Started
-
-### 1. Prerequisites
-
-Verify that Node.js 20+ is installed on your system.
-
-### 2. Install Dependencies
-
-```bash
-npm install
-```
-
-### 3. Configure Environment Variables
-
-Copy `.env.local.example` to `.env.local` and fill in your keys:
-
-```bash
-cp .env.local.example .env.local
-```
-
-Example environment file contents:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-supabase-url.supabase.co
-NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=your-supabase-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-supabase-service-key
-SUPABASE_JWT_SECRET=your-supabase-jwt-secret
-
-GEMINI_API_KEY=your-gemini-key
-DEEPGRAM_API_KEY=your-deepgram-key
-YOUTUBE_API_KEY=your-youtube-key
-TELEGRAM_BOT_TOKEN=your-telegram-bot-token
-
-NEXT_PUBLIC_VAPID_PUBLIC_KEY=your-vapid-public-key
-VAPID_PRIVATE_KEY=your-vapid-private-key
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-### 4. Setup Database Schema
-
-Execute the SQL migrations inside the `supabase/migrations/` directory in order, or run `supabase_schema.sql`, `supabase_schema_wearable.sql`, and `supabase_migration_rls.sql` in your **Supabase SQL Editor** to initialize the tables, indices, RLS policies, and automated triggers.
-
-### 5. Launch the Local Dev Server
-
-```bash
-npm run dev
-```
-
-Open **[http://localhost:3000](http://localhost:3000)** in your browser.
-
----
-
-## 🧪 Developer Workflow & CI/CD Pipeline
-
-To ensure codebase integrity, we enforce the following quality assurance pipelines.
-
-### 1. Pre-Commit Verification
-
-- **Code Formatting Check**: `npm run format` (runs Prettier)
-- **Linting Check**: `npm run lint` (runs ESLint)
-- **Type Safety**: `npm run typecheck` (runs `tsc --noEmit`)
-- **Automated Tests**: `npm run test` (runs Vitest suites)
-
-### 2. GitHub Actions CI/CD Pipeline
-
-Every push and pull request to `main`, `master`, and `dev` runs our automated CI pipeline:
-
-1. Installs dependencies cleanly.
-2. Checks formatting rules with Prettier.
-3. Performs code static analysis with ESLint.
-4. Compiles the TypeScript project.
-5. Runs the Vitest automated test suite.
-6. Verifies Next.js production builds compile cleanly.
+For the full documentation site, open `docs/README.md`.

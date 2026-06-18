@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { DeepgramClient } from "@deepgram/sdk";
 import { verifyAuth } from "@/lib/auth-utils";
 
 export async function GET(req: NextRequest) {
@@ -12,18 +13,16 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "Deepgram API key not configured" }, { status: 500 });
   }
 
-  const { createClient } = await import("@supabase/supabase-js");
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || "";
-  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || "";
-  const supabase = createClient(supabaseUrl, anonKey);
+  try {
+    const deepgram = new DeepgramClient({ apiKey });
+    const tokenResponse = await deepgram.auth.v1.tokens.grant({ ttl_seconds: 300 });
 
-  const { data: tokenData, error: tokenError } = await supabase.functions.invoke("deepgram-token", {
-    body: { userId: auth.user.id },
-  });
-
-  if (tokenError || !tokenData?.token) {
+    return NextResponse.json({
+      key: tokenResponse.access_token,
+      expiresIn: tokenResponse.expires_in ?? 300,
+    });
+  } catch (error) {
+    console.error("[Deepgram Token] Failed to create access token:", error);
     return NextResponse.json({ error: "Failed to generate Deepgram token" }, { status: 500 });
   }
-
-  return NextResponse.json({ key: tokenData.token });
 }
