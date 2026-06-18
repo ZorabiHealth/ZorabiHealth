@@ -64,7 +64,8 @@ function PrescriptionsPageContent() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [, setPatientNames] = useState<Map<string, string>>(new Map());
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const [patientNames, setPatientNames] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     if (role === null) return;
