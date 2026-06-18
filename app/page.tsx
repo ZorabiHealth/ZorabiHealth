@@ -35,7 +35,6 @@ import {
   Star,
   Stethoscope,
   TrendingUp,
-  Upload,
   Users,
   Video,
   Zap,
@@ -2543,12 +2542,12 @@ export default function Home() {
                 affordable.
               </p>
               <div className="flex flex-wrap gap-4">
-                <button className="bg-brand-500 hover:bg-brand-600 text-white font-bold py-4 px-8 rounded-2xl flex items-center gap-3 transition-all shadow-lg shadow-brand-100 cursor-pointer">
+                <Link
+                  href="/zobraipharm"
+                  className="bg-brand-500 hover:bg-brand-600 text-white font-bold py-4 px-8 rounded-2xl flex items-center gap-3 transition-all shadow-lg shadow-brand-100 cursor-pointer"
+                >
                   <ShoppingBasket className="w-5 h-5" /> Shop Medicines
-                </button>
-                <button className="bg-white border-2 border-brand-500 text-brand-500 hover:bg-brand-50 font-bold py-4 px-8 rounded-2xl flex items-center gap-3 transition-all cursor-pointer">
-                  <Upload className="w-5 h-5" /> Upload Prescription
-                </button>
+                </Link>
               </div>
             </div>
             <div className="col-span-12 lg:col-span-6 relative flex justify-center">
