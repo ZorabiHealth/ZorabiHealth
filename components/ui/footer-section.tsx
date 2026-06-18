@@ -1,17 +1,27 @@
 "use client";
 
 import * as React from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Textarea } from "@/components/ui/textarea";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Facebook, Instagram, Linkedin, Moon, Send, Sun, Twitter } from "lucide-react";
+import {
+  Facebook,
+  Instagram,
+  Linkedin,
+  Moon,
+  Send,
+  Shield,
+  Sun,
+  Twitter,
+  HeartPulse,
+} from "lucide-react";
 
 function Footerdemo() {
   const [isDarkMode, setIsDarkMode] = React.useState(false);
-  const [isChatOpen, setIsChatOpen] = React.useState(false);
 
   React.useEffect(() => {
     if (isDarkMode) {
@@ -24,16 +34,30 @@ function Footerdemo() {
   return (
     <footer className="relative border-t bg-white text-slate-800 transition-colors duration-300 dark:bg-gray-900 dark:text-gray-100">
       <div className="container mx-auto px-4 py-12 md:px-6 lg:px-8 max-w-7xl">
-        <div className="grid gap-12 md:grid-cols-2 lg:grid-cols-4">
-          <div className="relative">
-            <h2 className="mb-4 text-3xl font-bold tracking-tight text-brand-900 dark:text-brand-400">
-              Stay Connected
-            </h2>
-            <p className="mb-6 text-slate-600 dark:text-slate-400 text-sm">
-              Join our clinical research newsletter for the latest updates in predictive health
-              intelligence.
+        <div className="grid gap-8 sm:gap-12 grid-cols-2 md:grid-cols-2 lg:grid-cols-5">
+          {/* Brand & Newsletter */}
+          <div className="col-span-2">
+            <div className="flex items-center gap-3 mb-4">
+              <Image
+                src="/logo/image/logo.png"
+                alt="ZorabiHealth"
+                width={140}
+                height={40}
+                className="object-contain"
+              />
+            </div>
+            <p className="mb-4 text-slate-600 dark:text-slate-400 text-sm leading-relaxed max-w-sm">
+              Your personal AI-powered health companion. Track medications, monitor vitals, and stay
+              on top of your wellness journey.
             </p>
-            <form className="relative">
+            <div className="flex items-center gap-2 mb-6 text-xs text-slate-400 dark:text-slate-500">
+              <Shield className="h-3.5 w-3.5 text-emerald-500" />
+              HIPAA-aligned &bull; SSL encrypted &bull; SOC 2
+            </div>
+            <h3 className="mb-2 text-sm font-semibold text-brand-900 dark:text-brand-400">
+              Stay Connected
+            </h3>
+            <form className="relative max-w-sm">
               <Input
                 type="email"
                 placeholder="Enter your clinical email"
@@ -49,55 +73,96 @@ function Footerdemo() {
               </Button>
             </form>
           </div>
+
+          {/* Platform */}
           <div>
-            <h3 className="mb-4 text-lg font-semibold text-brand-900 dark:text-brand-400">
-              Quick Links
+            <h3 className="mb-4 text-sm font-semibold text-brand-900 dark:text-brand-400 uppercase tracking-wider">
+              Platform
             </h3>
-            <nav className="space-y-2 text-sm">
-              <a href="#" className="block transition-colors hover:text-brand-600">
-                Predictive Models
-              </a>
-              <a href="#" className="block transition-colors hover:text-brand-600">
-                Research &amp; Case Studies
-              </a>
-              <a href="#" className="block transition-colors hover:text-brand-600">
-                Clinical Integrations
-              </a>
-              <a href="#" className="block transition-colors hover:text-brand-600">
-                Platform Pricing
-              </a>
-              <a href="#" className="block transition-colors hover:text-brand-600">
-                Help &amp; Support
-              </a>
+            <nav className="space-y-2.5 text-sm">
+              <Link
+                href="/dashboard"
+                className="block transition-colors hover:text-brand-600 text-slate-600 dark:text-slate-400"
+              >
+                Patient Portal
+              </Link>
+              <Link
+                href="/dashboard/pharmacy"
+                className="block transition-colors hover:text-brand-600 text-slate-600 dark:text-slate-400"
+              >
+                Pharmacy
+              </Link>
+              <Link
+                href="/dashboard/medications"
+                className="block transition-colors hover:text-brand-600 text-slate-600 dark:text-slate-400"
+              >
+                Medications
+              </Link>
+              <Link
+                href="/dashboard/voice"
+                className="block transition-colors hover:text-brand-600 text-slate-600 dark:text-slate-400"
+              >
+                Voice Assistant
+              </Link>
             </nav>
           </div>
+
+          {/* Resources */}
           <div>
-            <h3 className="mb-4 text-lg font-semibold text-brand-900 dark:text-brand-400">
-              Contact Us
+            <h3 className="mb-4 text-sm font-semibold text-brand-900 dark:text-brand-400 uppercase tracking-wider">
+              Resources
             </h3>
-            <address className="space-y-2 text-sm not-italic text-slate-600 dark:text-slate-400">
-              <p>450 Serene Parkway, Suite 300</p>
-              <p>San Francisco, CA 94107</p>
-              <p>Phone: +1 (800) 555-0199</p>
-              <p>Email: contact@zorabihealth.com</p>
-            </address>
+            <nav className="space-y-2.5 text-sm">
+              <Link
+                href="/dashboard"
+                className="block transition-colors hover:text-brand-600 text-slate-600 dark:text-slate-400"
+              >
+                Clinical Dashboard
+              </Link>
+              <Link
+                href="#"
+                className="block transition-colors hover:text-brand-600 text-slate-600 dark:text-slate-400"
+              >
+                Help &amp; Support
+              </Link>
+              <Link
+                href="#"
+                className="block transition-colors hover:text-brand-600 text-slate-600 dark:text-slate-400"
+              >
+                API Docs
+              </Link>
+              <Link
+                href="#"
+                className="block transition-colors hover:text-brand-600 text-slate-600 dark:text-slate-400"
+              >
+                Status
+              </Link>
+            </nav>
           </div>
-          <div className="relative">
-            <h3 className="mb-4 text-lg font-semibold text-brand-900 dark:text-brand-400">
-              Follow Us
+
+          {/* Connect */}
+          <div>
+            <h3 className="mb-4 text-sm font-semibold text-brand-900 dark:text-brand-400 uppercase tracking-wider">
+              Connect
             </h3>
-            <div className="mb-6 flex space-x-4">
+            <div className="mb-6 flex flex-wrap gap-3">
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="rounded-full border-slate-200 hover:bg-slate-50 dark:border-gray-700"
+                    <a
+                      href="https://facebook.com/zorabihealth"
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
-                      <Facebook className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-                      <span className="sr-only">Facebook</span>
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="rounded-full border-slate-200 hover:bg-slate-50 dark:border-gray-700 h-9 w-9"
+                      >
+                        <Facebook className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                        <span className="sr-only">Facebook</span>
+                      </Button>
+                    </a>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Follow us on Facebook</p>
@@ -107,14 +172,20 @@ function Footerdemo() {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="rounded-full border-slate-200 hover:bg-slate-50 dark:border-gray-700"
+                    <a
+                      href="https://twitter.com/zorabihealth"
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
-                      <Twitter className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-                      <span className="sr-only">Twitter</span>
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="rounded-full border-slate-200 hover:bg-slate-50 dark:border-gray-700 h-9 w-9"
+                      >
+                        <Twitter className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                        <span className="sr-only">Twitter</span>
+                      </Button>
+                    </a>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Follow us on Twitter</p>
@@ -124,14 +195,20 @@ function Footerdemo() {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="rounded-full border-slate-200 hover:bg-slate-50 dark:border-gray-700"
+                    <a
+                      href="https://instagram.com/zorabihealth"
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
-                      <Instagram className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-                      <span className="sr-only">Instagram</span>
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="rounded-full border-slate-200 hover:bg-slate-50 dark:border-gray-700 h-9 w-9"
+                      >
+                        <Instagram className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                        <span className="sr-only">Instagram</span>
+                      </Button>
+                    </a>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Follow us on Instagram</p>
@@ -141,14 +218,20 @@ function Footerdemo() {
               <TooltipProvider>
                 <Tooltip>
                   <TooltipTrigger asChild>
-                    <Button
-                      variant="outline"
-                      size="icon"
-                      className="rounded-full border-slate-200 hover:bg-slate-50 dark:border-gray-700"
+                    <a
+                      href="https://linkedin.com/company/zorabihealth"
+                      target="_blank"
+                      rel="noopener noreferrer"
                     >
-                      <Linkedin className="h-4 w-4 text-slate-600 dark:text-slate-400" />
-                      <span className="sr-only">LinkedIn</span>
-                    </Button>
+                      <Button
+                        variant="outline"
+                        size="icon"
+                        className="rounded-full border-slate-200 hover:bg-slate-50 dark:border-gray-700 h-9 w-9"
+                      >
+                        <Linkedin className="h-4 w-4 text-slate-600 dark:text-slate-400" />
+                        <span className="sr-only">LinkedIn</span>
+                      </Button>
+                    </a>
                   </TooltipTrigger>
                   <TooltipContent>
                     <p>Connect with us on LinkedIn</p>
@@ -167,28 +250,29 @@ function Footerdemo() {
           </div>
         </div>
         <div className="mt-12 flex flex-col items-center justify-between gap-4 border-t border-slate-100 dark:border-gray-800 pt-8 text-center md:flex-row">
-          <p className="text-sm text-slate-500 dark:text-slate-400">
-            © 2026 zorabihealth. All rights reserved.
-          </p>
+          <div className="flex items-center gap-2 text-sm text-slate-500 dark:text-slate-400">
+            <HeartPulse className="h-4 w-4 text-brand-500" />
+            &copy; 2026 ZorabiHealth. All rights reserved.
+          </div>
           <nav className="flex gap-4 text-sm">
-            <a
-              href="#"
+            <Link
+              href="/privacy"
               className="transition-colors hover:text-brand-600 text-slate-500 dark:text-slate-400"
             >
               Privacy Policy
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              href="/terms"
               className="transition-colors hover:text-brand-600 text-slate-500 dark:text-slate-400"
             >
               Terms of Service
-            </a>
-            <a
-              href="#"
+            </Link>
+            <Link
+              href="/cookies"
               className="transition-colors hover:text-brand-600 text-slate-500 dark:text-slate-400"
             >
               Cookie Settings
-            </a>
+            </Link>
           </nav>
         </div>
       </div>

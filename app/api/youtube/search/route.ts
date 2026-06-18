@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
 
 // Memory cache to prevent exceeding the YouTube Data API quota (10,000 units/day)
-const videoCache = new Map<string, { data: any; expiry: number }>();
+const videoCache = new Map<string, { data: Record<string, unknown>; expiry: number }>();
 const CACHE_TTL = 30 * 60 * 1000; // 30 minutes cache duration
 
 // Fallback high-quality mock workout videos with real working IDs and high-res thumbnails
-const FALLBACK_VIDEOS: Record<string, any[]> = {
+const FALLBACK_VIDEOS: Record<string, Record<string, unknown>[]> = {
   hiit: [
     {
       id: { videoId: "ml6cT4AZz78" },
@@ -136,8 +136,8 @@ export async function GET(req: Request) {
     videoCache.set(cacheKey, { data: videos, expiry: Date.now() + CACHE_TTL });
 
     return NextResponse.json({ items: videos, source: "network" });
-  } catch (err: any) {
-    console.error("[YouTube API Proxy Route Error]", err);
+  } catch (err: unknown) {
+    console.error("[YouTube API Proxy Route Error]");
     // Secure fallback: never break the UI, return fallback items if API calls fail
     const queryStr = new URL(req.url).searchParams.get("q") || "hiit";
     let catKey = "hiit";
@@ -147,7 +147,7 @@ export async function GET(req: Request) {
     return NextResponse.json({
       items: FALLBACK_VIDEOS[catKey] || FALLBACK_VIDEOS["hiit"],
       source: "error-fallback",
-      error: err.message,
+      error: err instanceof Error ? err.message : String(err),
     });
   }
 }

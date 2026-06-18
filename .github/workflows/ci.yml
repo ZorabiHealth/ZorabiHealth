@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main, master, dev]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   build:
     name: Build & Verify
@@ -18,7 +21,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
           cache: "npm"
 
       - name: Install Dependencies
@@ -29,17 +32,29 @@ jobs:
             npm install
           fi
 
+      - name: Run Code Formatter Check
+        run: npx prettier --check .
+
       - name: Run ESLint Checks
         run: npm run lint
 
       - name: Run TypeScript Compiler Check
         run: npm run typecheck
 
+      - name: Run Automated Unit Tests
+        run: npm run test
+
       - name: Verify Next.js Production Build
         run: npm run build
         env:
           NEXT_PUBLIC_SUPABASE_URL: "https://placeholder-url.supabase.co"
           NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: "sb_publishable_placeholder"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "sb_publishable_placeholder"
+          SUPABASE_SERVICE_ROLE_KEY: "service_role_placeholder"
+          SUPABASE_JWT_SECRET: "jwt_secret_placeholder"
           DEEPGRAM_API_KEY: "deepgram_placeholder"
-          VONAGE_API_KEY: "vonage_placeholder"
-          VONAGE_API_SECRET: "vonage_secret_placeholder"
+          NEXT_PUBLIC_VAPID_PUBLIC_KEY: "vapid_public_placeholder"
+          VAPID_PRIVATE_KEY: "vapid_private_placeholder"
+          YOUTUBE_API_KEY: "youtube_placeholder"
+          GEMINI_API_KEY: "gemini_placeholder"
+          NEXT_PUBLIC_APP_URL: "http://localhost:3000"

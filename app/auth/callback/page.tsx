@@ -13,6 +13,7 @@ function AuthCallbackHandler() {
 
   useEffect(() => {
     const code = searchParams.get("code");
+    const redirectTo = searchParams.get("redirect") || "/dashboard";
 
     const handleCallback = async () => {
       try {
@@ -24,16 +25,39 @@ function AuthCallbackHandler() {
         const {
           data: { session },
         } = await supabase.auth.getSession();
-        if (session) {
-          setStatus("Success! Redirecting to dashboard...");
-          router.push("/dashboard");
+        const userId = session?.user?.id;
+        if (userId) {
+          localStorage.setItem("zh_login_time", new Date().toISOString());
+
+          // Apply any pending role from an earlier signup
+          const pendingRole = localStorage.getItem("zh_pending_role");
+          if (pendingRole) {
+            try {
+              const token = session?.access_token;
+              await fetch("/api/auth/set-role-initial", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  user_id: userId,
+                  role: pendingRole,
+                  token,
+                }),
+              });
+            } catch (e) {
+              console.warn("[Callback] Failed to apply pending role:", e);
+            }
+            localStorage.removeItem("zh_pending_role");
+          }
+
+          setStatus("Success! Redirecting...");
+          router.push(redirectTo);
         } else {
           const {
             data: { user },
           } = await supabase.auth.getUser();
           if (user) {
             setStatus("Success! Redirecting...");
-            router.push("/dashboard");
+            router.push(redirectTo);
           } else {
             throw new Error("No active session found.");
           }

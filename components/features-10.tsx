@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
-import { Brain, TrendingUp, ShieldCheck, Activity } from "lucide-react";
+import Image from "next/image";
+import { Brain, TrendingUp } from "lucide-react";
 import { ReactNode } from "react";
 
 export function Features() {
@@ -33,8 +34,8 @@ export function Features() {
               <div className="absolute inset-0 [background:radial-gradient(125%_125%_at_50%_0%,transparent_40%,hsl(var(--muted)),white_125%)]"></div>
               <div className="aspect-[76/59] p-1 px-6">
                 <DualModeImage
-                  darkSrc="https://tailark.com/_next/image?url=%2Fpayments.png&w=3840&q=75"
-                  lightSrc="https://tailark.com/_next/image?url=%2Fpayments-light.png&w=3840&q=75"
+                  darkSrc="/images/features/payments.png"
+                  lightSrc="/images/features/payments-light.png"
                   alt="ai health insights"
                   width={1207}
                   height={929}
@@ -55,11 +56,19 @@ export function Features() {
 
             <CardContent>
               <div className="relative mb-6 sm:mb-0">
-                <div className="absolute -inset-6 [background:radial-gradient(50%_50%_at_75%_50%,transparent,hsl(var(--background))_100%)]"></div>
-                <div className="aspect-[76/59] border border-slate-100">
+                <video
+                  autoPlay
+                  muted
+                  loop
+                  playsInline
+                  className="absolute -inset-6 w-[calc(100%+3rem)] h-[calc(100%+3rem)] object-cover rounded-2xl opacity-40"
+                >
+                  <source src="/video/secondbox.mp4" type="video/mp4" />
+                </video>
+                <div className="aspect-[76/59] border border-slate-100 relative z-10">
                   <DualModeImage
-                    darkSrc="https://tailark.com/_next/image?url=%2Forigin-cal-dark.png&w=3840&q=75"
-                    lightSrc="https://tailark.com/_next/image?url=%2Forigin-cal.png&w=3840&q=75"
+                    darkSrc="/images/features/origin-cal-dark.png"
+                    lightSrc="/images/features/origin-cal.png"
                     alt="predictive trends"
                     width={1207}
                     height={929}
@@ -131,7 +140,7 @@ const CardDecorator = () => (
 );
 
 interface CardHeadingProps {
-  icon: any;
+  icon: React.ElementType;
   title: string;
   description: string;
   text: string;
@@ -166,19 +175,21 @@ const DualModeImage = ({
   className,
 }: DualModeImageProps) => (
   <>
-    <img
+    <Image
       src={darkSrc}
       className={cn("hidden dark:block object-contain w-full h-full", className)}
       alt={`${alt} dark`}
       width={width}
       height={height}
+      loading="eager"
     />
-    <img
+    <Image
       src={lightSrc}
       className={cn("shadow dark:hidden object-contain w-full h-full", className)}
       alt={`${alt} light`}
       width={width}
       height={height}
+      loading="eager"
     />
   </>
 );

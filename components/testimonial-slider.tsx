@@ -1,6 +1,6 @@
 "use client";
 import React, { useState, useEffect, useRef } from "react";
-import { motion } from "framer-motion";
+import { motion, PanInfo } from "framer-motion";
 import { ChevronLeft, ChevronRight, Quote } from "lucide-react";
 import Image from "next/image";
 
@@ -154,7 +154,7 @@ const TestimonialSlider: React.FC = () => {
     setTimeout(() => setIsAutoPlaying(true), 8000);
   };
 
-  const handleDragEnd = (event: any, info: any) => {
+  const handleDragEnd = (event: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
     const { offset } = info;
     const swipeThreshold = 30;
 
@@ -202,10 +202,12 @@ const TestimonialSlider: React.FC = () => {
                   <div className="mt-auto pt-4 border-t border-slate-100">
                     <div className="flex items-center">
                       <div className="w-10 h-10 rounded-full bg-slate-200 relative overflow-hidden">
-                        <img
+                        <Image
                           src={testimonial.avatar}
                           alt={testimonial.name}
-                          className="w-full h-full object-cover"
+                          fill
+                          className="object-cover"
+                          sizes="40px"
                         />
                       </div>
                       <div className="ml-3">

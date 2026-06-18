@@ -1,23 +1,51 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
+import { useUserRole } from "@/hooks/useUserRole";
 import {
-  Settings,
   UserCheck,
   BellRing,
   ShieldCheck,
   Save,
-  HeartPulse,
   CheckCircle2,
+  Smartphone,
+  Loader2,
+  XCircle,
+  LogIn,
+  QrCode,
+  RefreshCw,
+  Package,
+  Stethoscope,
+  MapPin,
 } from "lucide-react";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { supabase } from "@/lib/supabase";
+import { QRCodeSVG } from "qrcode.react";
+
+interface PairedDevice {
+  id: string;
+  device_name: string;
+  platform: string;
+  is_active: boolean;
+  last_active_at: string;
+  paired_at: string;
+  is_same_account: boolean;
+}
 
 export default function SettingsPage() {
-  const [name, setName] = useState("Dr. Sarah Jenkins");
-  const [age, setAge] = useState("34");
-  const [height, setHeight] = useState("168");
-  const [weight, setWeight] = useState("62");
+  const { role } = useUserRole();
+  const [name, setName] = useState("");
+  const [age, setAge] = useState("");
+  const [height, setHeight] = useState("");
+  const [weight, setWeight] = useState("");
+
+  // Delivery address state
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [defaultPayment, setDefaultPayment] = useState("COD");
 
   // Alert Preferences State
   const [isHRAlertsOn, setIsHRAlertsOn] = useState(true);
@@ -27,13 +55,243 @@ export default function SettingsPage() {
   // Success Notification State
   const [showSuccessToast, setShowSuccessToast] = useState(false);
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  // Test push notification state
+  const [sendingTestPush, setSendingTestPush] = useState(false);
+  const [testPushResult, setTestPushResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  // Supabase session state
+  const [session, setSession] = useState<import("@supabase/supabase-js").Session | null>(null);
+
+  // Paired devices state
+  const [pairedDevices, setPairedDevices] = useState<PairedDevice[]>([]);
+  const [loadingDevices, setLoadingDevices] = useState(true);
+
+  // Pairing code state
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [generatingCode, setGeneratingCode] = useState(false);
+  const [codeExpiresIn, setCodeExpiresIn] = useState(0);
+
+  const fetchDevices = React.useCallback(async () => {
+    try {
+      const {
+        data: { session: fresh },
+      } = await supabase.auth.refreshSession();
+      const token = fresh?.access_token;
+      if (!token) return;
+      const res = await fetch("/api/notifications/devices", {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (json.devices) setPairedDevices(json.devices);
+    } catch (e) {
+      console.error("Failed to fetch paired devices:", e);
+    } finally {
+      setLoadingDevices(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    const fetchSession = async () => {
+      try {
+        const {
+          data: { session: s },
+        } = await supabase.auth.getSession();
+        if (s) {
+          setSession(s);
+          if (s.user) {
+            const emailName = s.user.email ? s.user.email.split("@")[0] : "";
+            const formattedName = emailName
+              ? emailName.charAt(0).toUpperCase() + emailName.slice(1)
+              : "Clinician";
+            setName(s.user.user_metadata?.full_name || formattedName);
+          }
+
+          // Fetch patient_profiles
+          const { data: profile } = await supabase
+            .from("patient_profiles")
+            .select("*")
+            .eq("id", s.user.id)
+            .maybeSingle();
+
+          if (profile) {
+            if (profile.full_name) setName(profile.full_name);
+            if (profile.age) setAge(profile.age);
+            if (profile.height) setHeight(profile.height);
+            if (profile.weight) setWeight(profile.weight);
+            if (profile.phone) setPhone(profile.phone);
+            if (profile.delivery_address) setAddress(profile.delivery_address);
+            if (profile.delivery_city) setCity(profile.delivery_city);
+            if (profile.delivery_pincode) setPincode(profile.delivery_pincode);
+            if (profile.default_payment_method) setDefaultPayment(profile.default_payment_method);
+          }
+        }
+      } catch (e) {
+        console.error("Failed to fetch session:", e);
+      }
+    };
+    fetchSession();
+  }, []);
+
+  // Fetch devices + Realtime subscription + polling fallback
+  useEffect(() => {
+    if (!session) return;
+
+    const initialFetch = async () => {
+      try {
+        const {
+          data: { session: fresh },
+        } = await supabase.auth.refreshSession();
+        const token = fresh?.access_token;
+        if (!token) return;
+        const res = await fetch("/api/notifications/devices", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        if (json.devices) setPairedDevices(json.devices);
+      } catch (e) {
+        console.error("Failed to fetch paired devices:", e);
+      } finally {
+        setLoadingDevices(false);
+      }
+    };
+    initialFetch();
+
+    const deviceChannel = supabase
+      .channel(`web-devices-${session.user?.id}`)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "user_pairings",
+          filter: `web_user_id=eq.${session.user?.id}`,
+        },
+        () => {
+          fetchDevices();
+        }
+      )
+      .subscribe();
+
+    // Poll every 5s as fallback (catches any missed Realtime events)
+    const pollInterval = setInterval(fetchDevices, 5000);
+
+    return () => {
+      deviceChannel.unsubscribe();
+      clearInterval(pollInterval);
+    };
+  }, [session, fetchDevices]);
+
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    setShowSuccessToast(true);
-    setTimeout(() => {
-      setShowSuccessToast(false);
-    }, 4000);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user?.id) return;
+
+      const { error } = await supabase.from("patient_profiles").upsert(
+        {
+          id: session.user.id,
+          full_name: name,
+          age: age || null,
+          height: height || null,
+          weight: weight || null,
+          phone,
+          delivery_address: address,
+          delivery_city: city,
+          delivery_pincode: pincode,
+          default_payment_method: defaultPayment,
+        },
+        { onConflict: "id" }
+      );
+
+      if (error) {
+        console.error("[settings] Save error:", error);
+        return;
+      }
+
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 4000);
+    } catch (err) {
+      console.error("[settings] Save error:", err);
+    }
   };
+
+  const getFreshToken = async (): Promise<string | null> => {
+    const {
+      data: { session: fresh },
+    } = await supabase.auth.refreshSession();
+    return fresh?.access_token ?? null;
+  };
+
+  const generatePairingCode = async () => {
+    const token = await getFreshToken();
+    if (!token) return;
+    setGeneratingCode(true);
+    setPairingCode(null);
+    try {
+      const res = await fetch("/api/notifications/pairing/init", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const json = await res.json();
+      if (res.ok && json.code) {
+        setPairingCode(json.code);
+        setCodeExpiresIn(json.expires_in || 600);
+      }
+    } catch (e) {
+      console.error("Failed to generate pairing code:", e);
+    } finally {
+      setGeneratingCode(false);
+    }
+  };
+
+  const handleTestPush = async () => {
+    const token = await getFreshToken();
+    if (!token) return;
+    setSendingTestPush(true);
+    setTestPushResult(null);
+
+    try {
+      const res = await fetch("/api/notifications/send", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: "Test Push",
+          body: "This is a test notification from your dashboard",
+          category: "medication",
+          priority: "high",
+          data: { source: "dashboard_test" },
+        }),
+      });
+
+      const json = await res.json();
+      if (res.ok && json.notification_id) {
+        if (json.dispatched > 0) {
+          setTestPushResult({ ok: true, msg: `Push sent to ${json.dispatched} device(s)` });
+        } else {
+          setTestPushResult({
+            ok: true,
+            msg: json.message || "Notification created. Mobile will receive it via Realtime.",
+          });
+        }
+      } else {
+        setTestPushResult({
+          ok: false,
+          msg: json.detail || json.error || "Failed to create notification",
+        });
+      }
+    } catch (err: unknown) {
+      setTestPushResult({ ok: false, msg: err instanceof Error ? err.message : "Request failed" });
+    } finally {
+      setSendingTestPush(false);
+    }
+  };
+
+  const pairingUrl = pairingCode ? `zorabihealth://pair?c=${pairingCode}` : "";
 
   return (
     <div className="p-8 space-y-8 w-full min-h-full bg-[#f0f5ff] relative">
@@ -89,39 +347,390 @@ export default function SettingsPage() {
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Age (yrs)
                 </label>
-                <Input
-                  type="number"
-                  value={age}
-                  onChange={(e) => setAge(e.target.value)}
-                  required
-                />
+                <Input type="number" value={age} onChange={(e) => setAge(e.target.value)} />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Height (cm)
                 </label>
-                <Input
-                  type="number"
-                  value={height}
-                  onChange={(e) => setHeight(e.target.value)}
-                  required
-                />
+                <Input type="number" value={height} onChange={(e) => setHeight(e.target.value)} />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Weight (kg)
                 </label>
-                <Input
-                  type="number"
-                  value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
-                  required
-                />
+                <Input type="number" value={weight} onChange={(e) => setWeight(e.target.value)} />
               </div>
             </div>
           </section>
+
+          {/* Delivery Address Section */}
+          <section className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+            <div className="flex gap-2.5 items-center mb-2">
+              <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                <MapPin className="text-emerald-500 h-5.5 w-5.5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Delivery Address</h3>
+                <p className="text-slate-500 text-xs font-semibold">
+                  Used for medication refill deliveries.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Phone Number
+                </label>
+                <Input
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+91XXXXXXXXXX"
+                />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Address
+                </label>
+                <Input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Flat / House No., Street, Locality"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  City
+                </label>
+                <Input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="City"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Pincode
+                </label>
+                <Input
+                  type="text"
+                  value={pincode}
+                  onChange={(e) => setPincode(e.target.value)}
+                  placeholder="XXXXXX"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Default Payment Method
+                </label>
+                <select
+                  value={defaultPayment}
+                  onChange={(e) => setDefaultPayment(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                >
+                  <option value="COD">Cash on Delivery</option>
+                  <option value="CARD">Card Payment</option>
+                  <option value="UPI">UPI</option>
+                </select>
+              </div>
+            </div>
+          </section>
+
+          {/* Pharmacy Profile Section (pharmacy role only) */}
+          {role === "pharmacy_vendor" && (
+            <section className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+              <div className="flex gap-2.5 items-center mb-2">
+                <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                  <Package className="text-emerald-500 h-5.5 w-5.5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">Pharmacy Profile</h3>
+                  <p className="text-slate-500 text-xs font-semibold">
+                    Manage your pharmacy business details.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Business Name
+                  </label>
+                  <Input type="text" placeholder="City Pharmacy" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    License Number
+                  </label>
+                  <Input type="text" placeholder="PH-KA-2026-XXXXX" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Business Email
+                  </label>
+                  <Input type="email" placeholder="orders@pharmacy.in" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Business Phone
+                  </label>
+                  <Input type="tel" placeholder="+91802XXXXXXXX" />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Doctor Profile Section (doctor role only) */}
+          {role === "doctor" && (
+            <section className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+              <div className="flex gap-2.5 items-center mb-2">
+                <div className="h-10 w-10 rounded-xl bg-violet-50 flex items-center justify-center">
+                  <Stethoscope className="text-violet-500 h-5.5 w-5.5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-800">Clinical Profile</h3>
+                  <p className="text-slate-500 text-xs font-semibold">
+                    Manage your medical practice details.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Specialization
+                  </label>
+                  <Input type="text" placeholder="Cardiology" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Medical License
+                  </label>
+                  <Input type="text" placeholder="MCI-XXXXX" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Clinic / Hospital
+                  </label>
+                  <Input type="text" placeholder="City Hospital" />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                    Years of Experience
+                  </label>
+                  <Input type="number" placeholder="10" />
+                </div>
+              </div>
+            </section>
+          )}
+
+          {/* Role Badge */}
+          <section className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+            <div className="flex gap-2.5 items-center mb-2">
+              <div className="h-10 w-10 rounded-xl bg-violet-50 flex items-center justify-center">
+                <RefreshCw className="text-violet-500 h-5.5 w-5.5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Account Role</h3>
+                <p className="text-slate-500 text-xs font-semibold">
+                  Your role is set at signup and cannot be changed.
+                </p>
+              </div>
+            </div>
+            <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-blue-50 border border-blue-200 text-blue-700 text-sm font-bold capitalize">
+              {role === "pharmacy_vendor" ? "Pharmacy" : role === "doctor" ? "Doctor" : "Patient"}
+            </div>
+          </section>
+
+          {/* Mobile App Pairing Section */}
+          <section className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+            <div className="flex gap-2.5 items-center mb-2">
+              <div className="h-10 w-10 rounded-xl bg-brand-50 flex items-center justify-center">
+                <ShieldCheck className="text-brand-500 h-5.5 w-5.5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Pair Mobile Device</h3>
+                <p className="text-slate-500 text-xs font-semibold">
+                  Link the mobile app for notifications and alarm sync.
+                </p>
+              </div>
+            </div>
+
+            {/* Auto-pairing info banner — always shown when logged in */}
+            {session && (
+              <div className="flex items-start gap-3 bg-emerald-50 border border-emerald-200 rounded-2xl p-4">
+                <LogIn className="h-5 w-5 text-emerald-600 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-xs font-bold text-emerald-800">Auto-pairing active</p>
+                  <p className="text-[11px] text-emerald-600 font-semibold mt-1">
+                    Log into the mobile app with{" "}
+                    <span className="font-black">{session.user?.email}</span> to automatically pair
+                    — no QR needed. Devices appear below instantly.
+                  </p>
+                </div>
+              </div>
+            )}
+
+            {/* Same-user pairing — quick code */}
+            {session ? (
+              <div className="flex flex-col md:flex-row items-center gap-8 bg-emerald-50 p-6 rounded-3xl border border-emerald-200">
+                <div className="bg-white p-4 rounded-2xl shadow-sm border border-emerald-100 shrink-0 flex flex-col items-center gap-3">
+                  {pairingCode ? (
+                    <>
+                      <QRCodeSVG value={pairingUrl} size={160} />
+                      <p className="text-xs font-bold text-slate-500">
+                        Code:{" "}
+                        <span className="text-blue-600 text-lg font-black tracking-[0.3em]">
+                          {pairingCode}
+                        </span>
+                      </p>
+                      <p className="text-[10px] text-amber-600 font-bold">
+                        Expires in {Math.floor(codeExpiresIn / 60)}:
+                        {String(codeExpiresIn % 60).padStart(2, "0")}
+                      </p>
+                    </>
+                  ) : (
+                    <button
+                      onClick={generatePairingCode}
+                      disabled={generatingCode}
+                      className="bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 text-white font-bold py-3 px-6 rounded-xl text-xs flex items-center gap-2 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-sm"
+                    >
+                      {generatingCode ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <QrCode className="h-4 w-4" />
+                      )}
+                      {generatingCode ? "Generating..." : "Show Pairing Code"}
+                    </button>
+                  )}
+                </div>
+                <div className="space-y-3">
+                  <h4 className="text-sm font-bold text-emerald-800">
+                    Pair your mobile (same email)
+                  </h4>
+                  <p className="text-xs text-emerald-700 font-semibold leading-relaxed">
+                    Logged in with the same email on both devices? Use the code above to pair
+                    instantly.
+                  </p>
+                  <ol className="list-decimal list-inside text-xs text-emerald-600 space-y-1.5 font-semibold">
+                    <li>
+                      Open the mobile app →{" "}
+                      <span className="font-extrabold text-emerald-800">Settings</span>
+                    </li>
+                    <li>
+                      Enter this code in the{" "}
+                      <span className="font-extrabold text-emerald-800">pairing code</span> field
+                    </li>
+                    <li>
+                      Tap <span className="font-extrabold text-emerald-800">Pair</span> — done!
+                    </li>
+                  </ol>
+                  {pairingCode && (
+                    <button
+                      onClick={generatePairingCode}
+                      className="text-[10px] text-emerald-600 font-bold underline"
+                    >
+                      Regenerate code
+                    </button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="bg-emerald-50 p-6 rounded-3xl border border-emerald-100 text-center py-10">
+                <p className="text-sm text-emerald-700 font-bold">
+                  Sign in to generate a pairing code.
+                </p>
+              </div>
+            )}
+          </section>
+
+          {/* Paired Devices List */}
+          {session && (
+            <section className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+              <div className="flex gap-2.5 items-center mb-2">
+                <div className="h-10 w-10 rounded-xl bg-brand-50 flex items-center justify-center">
+                  <Smartphone className="text-brand-500 h-5.5 w-5.5" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg font-black text-slate-800">Paired Devices</h3>
+                  <p className="text-slate-500 text-xs font-semibold">
+                    Devices linked to your account for notifications and sync.
+                  </p>
+                </div>
+                <button
+                  onClick={fetchDevices}
+                  disabled={loadingDevices}
+                  className="bg-white border border-slate-200 hover:bg-slate-50 disabled:opacity-50 text-slate-600 font-bold py-2 px-3 rounded-xl text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shadow-sm"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${loadingDevices ? "animate-spin" : ""}`} />
+                  Refresh
+                </button>
+              </div>
+
+              <div className="bg-slate-50 rounded-3xl border border-slate-100 divide-y divide-slate-100">
+                {loadingDevices ? (
+                  <div className="flex items-center justify-center py-10">
+                    <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                  </div>
+                ) : pairedDevices.length === 0 ? (
+                  <div className="text-center py-10">
+                    <Smartphone className="h-8 w-8 text-slate-300 mx-auto mb-2 opacity-50" />
+                    <p className="text-sm text-slate-500 font-bold">No devices paired yet.</p>
+                    <p className="text-xs text-slate-400 font-semibold mt-1">
+                      Use the QR code above to pair your mobile device.
+                    </p>
+                  </div>
+                ) : (
+                  pairedDevices.map((device) => (
+                    <div key={device.id} className="flex items-center justify-between px-6 py-4">
+                      <div className="flex items-center gap-4">
+                        <div
+                          className={`h-9 w-9 rounded-xl flex items-center justify-center ${device.is_active ? "bg-emerald-50" : "bg-slate-100"}`}
+                        >
+                          <Smartphone
+                            className={`h-4.5 w-4.5 ${device.is_active ? "text-emerald-600" : "text-slate-400"}`}
+                          />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold text-slate-800">{device.device_name}</p>
+                          <p className="text-[11px] text-slate-500 font-semibold">
+                            {device.platform}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {device.is_same_account && (
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-[9px] font-black uppercase tracking-wider">
+                            <LogIn className="h-2.5 w-2.5" /> Auto
+                          </span>
+                        )}
+                        <span
+                          className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${device.is_active ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}
+                        >
+                          {device.is_active ? (
+                            <>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Active
+                            </>
+                          ) : (
+                            <>
+                              <XCircle className="h-3 w-3" /> Inactive
+                            </>
+                          )}
+                        </span>
+                        <span className="text-[10px] text-slate-400 font-semibold">
+                          {new Date(device.paired_at).toLocaleDateString()}
+                        </span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </section>
+          )}
 
           {/* Alerts / Vitals Thresholds Card */}
           <section className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
@@ -185,6 +794,38 @@ export default function SettingsPage() {
                   className="w-5 h-5 accent-brand-500 border-slate-300 rounded cursor-pointer"
                 />
               </div>
+            </div>
+
+            {/* Test Push Notification */}
+            <div className="flex items-center justify-between p-4 bg-brand-50 border border-brand-200 rounded-2xl">
+              <div className="flex items-center gap-3">
+                <Smartphone className="h-5 w-5 text-brand-600" />
+                <div>
+                  <h4 className="text-xs font-bold text-slate-800">Test Push Notification</h4>
+                  <p className="text-[10px] text-slate-500 font-semibold mt-0.5">
+                    Send a test push to all registered devices
+                  </p>
+                  {testPushResult && (
+                    <p
+                      className={`text-[10px] font-bold mt-1 ${testPushResult.ok ? "text-emerald-600" : "text-red-500"}`}
+                    >
+                      {testPushResult.msg}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <button
+                onClick={handleTestPush}
+                disabled={sendingTestPush || !session}
+                className="bg-brand-500 hover:bg-brand-600 disabled:bg-slate-300 text-white font-bold py-2 px-4 rounded-xl text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer disabled:cursor-not-allowed shadow-sm"
+              >
+                {sendingTestPush ? (
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : (
+                  <Smartphone className="h-3.5 w-3.5" />
+                )}
+                {sendingTestPush ? "Sending..." : "Send Test"}
+              </button>
             </div>
           </section>
 

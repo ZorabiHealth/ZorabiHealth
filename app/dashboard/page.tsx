@@ -6,21 +6,195 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   HeartPulse,
-  Plus,
   Play,
   Pause,
   Activity,
   Calendar,
   X,
   AlertCircle,
-  ExternalLink,
   Sparkles,
   BookOpen,
+  Search,
+  ShoppingBag,
+  Package,
+  ChevronRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { useUserRole } from "@/hooks/useUserRole";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import type { Session } from "@supabase/supabase-js";
+
+type JioSaavnSong = {
+  id: string;
+  name: string;
+  artists?: { primary?: { name: string }[] };
+  image?: { url: string }[];
+  downloadUrl?: { url: string }[];
+  duration: string;
+};
+
+type DashboardOrder = {
+  id: string;
+  tracking_id: string;
+  created_at: string;
+  total: number;
+  status: string;
+};
 
 export default function DashboardOverview() {
+  const { role, loading: roleLoading } = useUserRole();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!roleLoading) {
+      if (role === "doctor") {
+        router.replace("/dashboard/doctor");
+      } else if (role === "pharmacy_vendor") {
+        router.replace("/dashboard/pharmacy/inventory");
+      }
+    }
+  }, [role, roleLoading, router]);
+
+  // Missed Medication Alerts State
+  const [session, setSession] = useState<Session | null>(null);
+  const [missedMeds, setMissedMeds] = useState<
+    {
+      id: string;
+      name: string;
+      dosage: string;
+      time: string;
+      currentStock: number;
+    }[]
+  >([]);
+  const [loginTime, setLoginTime] = useState<string | null>(() =>
+    localStorage.getItem("zh_login_time")
+  );
+
+  useEffect(() => {
+    const fetchSessionAndMeds = async () => {
+      try {
+        const {
+          data: { session: s },
+        } = await supabase.auth.getSession();
+        if (!s) return;
+        setSession(s);
+
+        // Fetch medications
+        const { data: medications } = await supabase
+          .from("medications")
+          .select("*")
+          .eq("user_id", s.user.id)
+          .eq("is_active", true);
+
+        // Fetch today's logs
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        const { data: logs } = await supabase
+          .from("medication_logs")
+          .select("*")
+          .eq("status", "taken")
+          .gte("scheduled_at", todayStart.toISOString());
+
+        // Find missed medications
+        const missed: {
+          id: string;
+          name: string;
+          dosage: string;
+          time: string;
+          currentStock: number;
+        }[] = [];
+        const now = new Date();
+
+        (medications || []).forEach((med) => {
+          const times = med.scheduled_times || [];
+          times.forEach((time: string) => {
+            const [hours, minutes] = time.split(":").map(Number);
+            const scheduledDate = new Date();
+            scheduledDate.setHours(hours, minutes, 0, 0);
+
+            if (now > scheduledDate) {
+              // Check if logged as taken for today
+              const hasLogged = (logs || []).some(
+                (log) =>
+                  log.medication_id === med.id &&
+                  new Date(log.scheduled_at).toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: false,
+                  }) === time
+              );
+
+              if (!hasLogged) {
+                missed.push({
+                  id: med.id,
+                  name: med.name,
+                  dosage: med.dosage,
+                  time,
+                  currentStock: med.current_stock,
+                });
+              }
+            }
+          });
+        });
+
+        setMissedMeds(missed);
+      } catch (e) {
+        console.error("Failed to load dashboard sync logs:", e);
+      }
+    };
+
+    fetchSessionAndMeds();
+    const interval = setInterval(fetchSessionAndMeds, 10000); // Check every 10s for updates
+    return () => clearInterval(interval);
+  }, []);
+
+  const handleTakeMissedMed = async (med: {
+    id: string;
+    name: string;
+    dosage: string;
+    time: string;
+    currentStock: number;
+  }) => {
+    if (!session?.user?.id) return;
+    const now = new Date();
+    const [hours, minutes] = med.time.split(":").map(Number);
+    const scheduledTime = new Date();
+    scheduledTime.setHours(hours, minutes, 0, 0);
+
+    try {
+      const { error: logError } = await supabase.from("medication_logs").insert({
+        medication_id: med.id,
+        medication_name: med.name,
+        scheduled_at: scheduledTime.toISOString(),
+        taken_at: now.toISOString(),
+        status: "taken",
+        dose: med.dosage,
+      });
+
+      if (logError) throw logError;
+
+      // Decrement stock
+      const newStock = Math.max(0, med.currentStock - 1);
+      const { error: stockError } = await supabase
+        .from("medications")
+        .update({ current_stock: newStock })
+        .eq("id", med.id);
+
+      if (stockError) throw stockError;
+
+      // Filter local state
+      setMissedMeds((prev) => prev.filter((m) => !(m.id === med.id && m.time === med.time)));
+      const { showToast } = await import("@/components/ui/toast");
+      showToast(`Dose logged successfully for ${med.name}!`, "success");
+    } catch (e) {
+      console.error(e);
+      const { showToast } = await import("@/components/ui/toast");
+      showToast("Failed to log dose.", "error");
+    }
+  };
+
   // 1. Vitals telemetry states
   const [heartRate, setHeartRate] = useState(72);
   const [spO2, setSpO2] = useState(97);
@@ -28,10 +202,29 @@ export default function DashboardOverview() {
   const [inputHR, setInputHR] = useState("72");
   const [inputSpO2, setInputSpO2] = useState("97");
 
-  // 2. Music Player state
+  // 2. Music Player & JioSaavn API states
+  const [currentSong, setCurrentSong] = useState<{
+    name: string;
+    artist: string;
+    image: string;
+    audioUrl: string;
+    duration: number;
+  }>({
+    name: "Rustle of petals",
+    artist: "Flower meditation",
+    image: "",
+    audioUrl: "",
+    duration: 300,
+  });
   const [isPlaying, setIsPlaying] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(206); // 3m 26s
-  const totalDuration = 300; // 5m total
+  const [audioCurrentTime, setAudioCurrentTime] = useState(0);
+  const [audioDuration, setAudioDuration] = useState(0);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState<JioSaavnSong[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const audioRef = React.useRef<HTMLAudioElement | null>(null);
 
   // 3. News Article details modal state
   const [activeArticle, setActiveArticle] = useState<{ title: string; content: string } | null>(
@@ -41,12 +234,79 @@ export default function DashboardOverview() {
   // 4. Clinical Valve details alert modal state
   const [isValveDetailOpen, setIsValveDetailOpen] = useState(false);
 
-  // 5. Calendar info state
+  // 5. Dynamic Time and Calendar state
+  const [currentTime, setCurrentTime] = useState("");
   const [currentDate, setCurrentDate] = useState({
-    day: "24",
-    weekday: "Wednesday",
-    month: "July",
+    day: "5",
+    weekday: "Friday",
+    month: "June",
   });
+
+  // 6. Recent Orders state
+  const [recentOrders, setRecentOrders] = useState<DashboardOrder[]>([]);
+
+  useEffect(() => {
+    let channel: { unsubscribe: () => void } | null = null;
+    let cancelled = false;
+
+    const fetchOrders = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+        const res = await fetch("/api/store/orders", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) setRecentOrders(data.slice(0, 5));
+        }
+      } catch {}
+    };
+
+    const setupRealtime = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user?.id || cancelled) return;
+
+      channel = supabase
+        .channel(`dash-orders-${session.user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "store_orders",
+            filter: `user_id=eq.${session.user.id}`,
+          },
+          () => {
+            fetchOrders();
+          }
+        )
+        .subscribe();
+    };
+
+    if (role === "patient") {
+      fetchOrders();
+      setupRealtime();
+    }
+
+    return () => {
+      cancelled = true;
+      channel?.unsubscribe();
+    };
+  }, [role]);
+
+  const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
+    PENDING: { label: "Pending", color: "text-yellow-800", bg: "bg-yellow-100" },
+    CONFIRMED: { label: "Confirmed", color: "text-blue-800", bg: "bg-blue-100" },
+    PREPARING: { label: "Preparing", color: "text-amber-800", bg: "bg-amber-100" },
+    DISPATCHED: { label: "Dispatched", color: "text-emerald-800", bg: "bg-emerald-100" },
+    DELIVERED: { label: "Delivered", color: "text-green-800", bg: "bg-green-100" },
+    CANCELLED: { label: "Cancelled", color: "text-red-800", bg: "bg-red-100" },
+  };
 
   useEffect(() => {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -64,27 +324,151 @@ export default function DashboardOverview() {
       "November",
       "December",
     ];
-    const d = new Date();
-    setCurrentDate({
-      day: d.getDate().toString(),
-      weekday: days[d.getDay()],
-      month: months[d.getMonth()],
-    });
+
+    const updateDateTime = () => {
+      const d = new Date();
+      setCurrentDate({
+        day: d.getDate().toString(),
+        weekday: days[d.getDay()],
+        month: months[d.getMonth()],
+      });
+
+      let hours = d.getHours();
+      const minutes = d.getMinutes().toString().padStart(2, "0");
+      const seconds = d.getSeconds().toString().padStart(2, "0");
+      const ampm = hours >= 12 ? "PM" : "AM";
+      hours = hours % 12;
+      hours = hours ? hours : 12; // 0 should be 12
+      setCurrentTime(`${hours.toString().padStart(2, "0")}:${minutes}:${seconds} ${ampm}`);
+    };
+
+    updateDateTime();
+    const interval = setInterval(updateDateTime, 1000);
+    return () => clearInterval(interval);
   }, []);
 
-  // Music Player interval countdown
+  // Client-side HTML5 Audio event listeners
   useEffect(() => {
-    let interval: NodeJS.Timeout;
-    if (isPlaying && timeLeft > 0) {
-      interval = setInterval(() => {
-        setTimeLeft((prev) => prev - 1);
-      }, 1000);
-    } else if (timeLeft === 0) {
-      setIsPlaying(false);
-      setTimeLeft(totalDuration);
+    if (typeof window !== "undefined") {
+      audioRef.current = new Audio();
     }
-    return () => clearInterval(interval);
-  }, [isPlaying, timeLeft]);
+
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    const handlePlay = () => setIsPlaying(true);
+    const handlePause = () => setIsPlaying(false);
+    const handleTimeUpdate = () => setAudioCurrentTime(audio.currentTime);
+    const handleLoadedMetadata = () => setAudioDuration(audio.duration);
+    const handleEnded = () => {
+      setIsPlaying(false);
+      setAudioCurrentTime(0);
+    };
+
+    audio.addEventListener("play", handlePlay);
+    audio.addEventListener("pause", handlePause);
+    audio.addEventListener("timeupdate", handleTimeUpdate);
+    audio.addEventListener("loadedmetadata", handleLoadedMetadata);
+    audio.addEventListener("ended", handleEnded);
+
+    return () => {
+      audio.removeEventListener("play", handlePlay);
+      audio.removeEventListener("pause", handlePause);
+      audio.removeEventListener("timeupdate", handleTimeUpdate);
+      audio.removeEventListener("loadedmetadata", handleLoadedMetadata);
+      audio.removeEventListener("ended", handleEnded);
+      audio.pause();
+    };
+  }, []);
+
+  // Fetch a default meditation song from JioSaavn on mount
+  useEffect(() => {
+    fetch("/api/saavn/search?q=meditation")
+      .then((res) => res.json())
+      .then((res) => {
+        if (res.success && res.data?.results?.length > 0) {
+          const first = res.data.results[0];
+          const name = first.name;
+          const artist = first.artists?.primary?.[0]?.name || "JioSaavn";
+          const image =
+            first.image?.[2]?.url || first.image?.[1]?.url || first.image?.[0]?.url || "";
+          const audioUrl =
+            first.downloadUrl?.[4]?.url ||
+            first.downloadUrl?.[3]?.url ||
+            first.downloadUrl?.[2]?.url ||
+            "";
+          const duration = parseInt(first.duration) || 300;
+          setCurrentSong({ name, artist, image, audioUrl, duration });
+        }
+      })
+      .catch((err) => console.error("Error fetching default JioSaavn song:", err));
+  }, []);
+
+  // Load and play song stream when audioUrl updates
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (currentSong.audioUrl && audio.src !== currentSong.audioUrl) {
+      audio.src = currentSong.audioUrl;
+      audio.load();
+      if (isPlaying) {
+        audio.play().catch((e) => console.warn("Failed to play audio stream:", e));
+      }
+    }
+  }, [currentSong.audioUrl, isPlaying]);
+
+  // Sync play/pause actions
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+
+    if (isPlaying) {
+      if (audio.src) {
+        audio.play().catch((e) => {
+          console.warn("Failed to play audio stream:", e);
+          setIsPlaying(false);
+        });
+      }
+    } else {
+      audio.pause();
+    }
+  }, [isPlaying]);
+
+  // JioSaavn search triggers
+  const handleSearchSong = async (query: string) => {
+    if (!query.trim()) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch(`/api/saavn/search?q=${encodeURIComponent(query)}`);
+      const data = await res.json();
+      if (data.success && data.data?.results) {
+        setSearchResults(data.data.results);
+      } else {
+        setSearchResults([]);
+      }
+    } catch (e) {
+      console.error("Failed to search song from JioSaavn proxy:", e);
+      setSearchResults([]);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const selectSong = (song: JioSaavnSong) => {
+    const name = song.name;
+    const artist = song.artists?.primary?.[0]?.name || "JioSaavn";
+    const image = song.image?.[2]?.url || song.image?.[1]?.url || song.image?.[0]?.url || "";
+    const audioUrl =
+      song.downloadUrl?.[4]?.url || song.downloadUrl?.[3]?.url || song.downloadUrl?.[2]?.url || "";
+    const duration = parseInt(song.duration) || 300;
+
+    setCurrentSong({ name, artist, image, audioUrl, duration });
+    setIsPlaying(true);
+    setShowSearch(false);
+    setSearchResults([]);
+    setSearchQuery("");
+  };
 
   // Form Submit Handler
   const handleVitalsSubmit = (e: React.FormEvent) => {
@@ -102,33 +486,73 @@ export default function DashboardOverview() {
   };
 
   const formatTime = (seconds: number) => {
+    if (isNaN(seconds) || seconds < 0) return "0:00";
     const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
+    const secs = Math.floor(seconds % 60);
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const progressPercent = ((totalDuration - timeLeft) / totalDuration) * 100;
+  const progressPercent = audioDuration ? (audioCurrentTime / audioDuration) * 100 : 0;
 
   return (
     <div
-      className="w-full min-h-full bg-[#f0f5ff] flex flex-col animate-slide-up p-6"
+      className="w-full min-h-full bg-[#f0f5ff] flex flex-col animate-slide-up p-4"
       data-purpose="overview-grid"
     >
+      {/* Dynamic Missed Medication Sync Alerts */}
+      <AnimatePresence>
+        {missedMeds.length > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="mb-6 bg-red-50 border border-red-200 rounded-3xl p-5 shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-4"
+          >
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-xl flex items-center justify-center shrink-0">
+                <AlertCircle className="w-5 h-5 text-red-600 animate-bounce" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-red-950">Missed Medication Reminders</h3>
+                <p className="text-xs text-red-700 font-semibold mt-1">
+                  You have missed taking the following scheduled doses:
+                  <span className="block mt-1 font-bold text-red-800">
+                    {missedMeds
+                      .map((m) => `${m.name} ${m.dosage} (scheduled at ${m.time})`)
+                      .join(", ")}
+                  </span>
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2 shrink-0">
+              {missedMeds.map((med, index) => (
+                <Button
+                  key={index}
+                  onClick={() => handleTakeMissedMed(med)}
+                  className="bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-bold px-4 py-2 cursor-pointer shadow-sm"
+                >
+                  Take {med.name}
+                </Button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* 4/3 Grid Core Layout */}
-      <div className="grid grid-cols-12 gap-4 flex-grow shrink-0 min-h-full">
+      <div className="grid grid-cols-12 gap-3 flex-grow shrink-0 min-h-full">
         {/* BEGIN: Heart Health Card (Top Left - 9 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-9 bg-gradient-to-r from-[#608ec4] via-[#a2bce0] to-[#c4d4eb] rounded-[32px] relative overflow-hidden p-8 flex flex-col justify-between text-white border border-white/20 shadow-md min-h-[350px]">
-          {/* Background image overlay with mix blend screen */}
-          <div className="absolute inset-0 z-0 select-none pointer-events-none">
-            <Image
-              alt="Clinical Heart Visualization"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuBpvlRutqAv6FsbdYd8Xq0OUdzy8hI2yOlY3Ff3MHayPK1TCQMh6gDBIC6zDDqN8IMbQ0jCWeienQqbrGJoRYPEqPD2tYYYOc8EtX5IG5u-hfOL0nqqFg-_I-znFcGAKdlSBzLRRa6BWKH6-_n_snNh7c9dC_jHG-ikpFaVP7nHPPcr16PtUJ7NCHiMmoeFXns4D0bv26XEHyaAY-3XRp4M7NfeO17hxRyx3nmxhBu9aWLSZcfCGDy158ZWQEjRgj_aQ6KeQqREz78"
-              fill
-              className="object-cover opacity-60 mix-blend-screen"
-              sizes="(max-width: 1024px) 100vw, 800px"
-              priority
-            />
-          </div>
+        <section className="col-span-12 lg:col-span-9 bg-slate-950 rounded-[32px] relative overflow-hidden p-5 flex flex-col justify-between text-white border border-white/20 shadow-md min-h-[260px]">
+          {/* Loop background video */}
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover z-0 select-none pointer-events-none"
+          >
+            <source src="/video/in_first_image_you_create_your.mp4" type="video/mp4" />
+          </video>
 
           <header className="relative z-10">
             <h2 className="text-2xl font-bold tracking-tight leading-snug">
@@ -138,11 +562,16 @@ export default function DashboardOverview() {
                 Your personalized health summary
               </span>
             </h2>
+            {loginTime && (
+              <p className="text-[11px] text-white/70 font-semibold mt-2">
+                Last login: {new Date(loginTime).toLocaleString()}
+              </p>
+            )}
           </header>
 
-          <div className="relative z-10 flex flex-col md:flex-row gap-6 mt-4 items-end justify-between">
+          <div className="relative z-10 flex flex-col md:flex-row gap-4 mt-2 items-end justify-between">
             {/* Info Box Left */}
-            <div className="bg-white/10 backdrop-blur-md p-6 rounded-[24px] max-w-xs border border-white/20 shadow-sm flex flex-col justify-between">
+            <div className="bg-white/10 backdrop-blur-md p-4 rounded-[24px] max-w-xs border border-white/20 shadow-sm flex flex-col justify-between">
               <div className="flex items-start gap-3 mb-3">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
                   <Activity className="w-5 h-5 text-white" />
@@ -228,7 +657,7 @@ export default function DashboardOverview() {
           {/* Warning Valve Sticker */}
           <div
             onClick={() => setIsValveDetailOpen(true)}
-            className="relative z-10 self-start mt-6 bg-white/10 hover:bg-white/20 border border-white/20 px-5 py-3 rounded-2xl flex flex-col cursor-pointer transition-colors"
+            className="relative z-10 self-start mt-3 bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-2xl flex flex-col cursor-pointer transition-colors"
           >
             <span className="text-xs font-bold leading-normal">
               The valve is not
@@ -241,101 +670,194 @@ export default function DashboardOverview() {
         {/* END: Heart Health Card */}
 
         {/* BEGIN: Time/Music Card (Top Right - 3 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-3 bg-gradient-to-br from-[#1e40af] to-[#60a5fa] rounded-[32px] relative overflow-hidden p-6 text-white border border-white/10 shadow-md flex flex-col justify-between min-h-[350px]">
-          <div className="flex justify-between items-start">
-            <h1 className="text-3xl font-black tracking-tight font-mono">12:45</h1>
-            <div className="text-right">
-              <p className="text-[10px] opacity-80 font-bold uppercase tracking-wider">
-                {currentDate.weekday}
-              </p>
-              <p className="text-xs font-black">
-                {currentDate.day} {currentDate.month}
+        <section className="col-span-12 lg:col-span-3 rounded-[32px] relative overflow-hidden p-4 text-white border border-white/10 shadow-md flex flex-col justify-between min-h-[260px]">
+          {/* Background Video */}
+          <video
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover z-0"
+          >
+            <source src="/video/try_do.mp4" type="video/mp4" />
+          </video>
+
+          {/* Clock & Date Header */}
+          <div className="relative z-10 flex justify-between items-start">
+            <div>
+              <h1 className="text-2xl font-black tracking-tight font-mono leading-none drop-shadow-md">
+                {currentTime || "12:45:00 PM"}
+              </h1>
+              <p className="text-[10px] opacity-90 font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1.5 drop-shadow-sm">
+                <Calendar className="w-3.5 h-3.5 text-blue-400" />
+                {currentDate.weekday}, {currentDate.day} {currentDate.month}
               </p>
             </div>
+            <button
+              onClick={() => setShowSearch(!showSearch)}
+              className="w-8 h-8 rounded-full bg-white/15 hover:bg-white/25 border border-white/20 flex items-center justify-center cursor-pointer transition-all hover:scale-105 active:scale-95 shadow-sm"
+              title="Search JioSaavn Music"
+            >
+              {showSearch ? <X className="w-4 h-4" /> : <Search className="w-4 h-4" />}
+            </button>
           </div>
 
-          <div className="mt-auto space-y-4">
-            <div className="bg-white/15 p-3 rounded-2xl flex items-center gap-3 border border-white/20">
-              <button
-                onClick={() => setIsPlaying(!isPlaying)}
-                className="w-10 h-10 bg-white text-blue-600 rounded-full flex items-center justify-center shadow-md hover:scale-105 transition-transform shrink-0 cursor-pointer"
-              >
-                {isPlaying ? (
-                  <Pause className="w-4 h-4 fill-current" />
+          {showSearch ? (
+            <div className="relative z-10 flex-grow flex flex-col mt-4 bg-black/50 backdrop-blur-md rounded-2xl border border-white/10 p-3 overflow-hidden">
+              <div className="flex gap-1.5">
+                <Input
+                  placeholder="Search JioSaavn..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSearchSong(searchQuery);
+                  }}
+                  className="h-8 text-[11px] bg-white/10 border-white/15 text-white placeholder-white/40 focus-visible:ring-white/20 rounded-lg py-1 px-2.5"
+                />
+                <Button
+                  onClick={() => handleSearchSong(searchQuery)}
+                  className="h-8 text-xs px-2.5 bg-white text-blue-600 hover:bg-white/90 rounded-lg font-bold cursor-pointer"
+                >
+                  Go
+                </Button>
+              </div>
+
+              <div className="flex-grow overflow-y-auto mt-2 space-y-1.5 pr-1 max-h-[140px] custom-scrollbar">
+                {isLoading ? (
+                  <div className="text-center py-6 text-xs opacity-75 animate-pulse">
+                    Searching JioSaavn...
+                  </div>
+                ) : searchResults.length > 0 ? (
+                  searchResults.map((song: JioSaavnSong) => {
+                    const songName = song.name;
+                    const artistName = song.artists?.primary?.[0]?.name || "JioSaavn";
+                    const imgUrl = song.image?.[1]?.url || song.image?.[0]?.url || "";
+                    return (
+                      <div
+                        key={song.id}
+                        onClick={() => selectSong(song)}
+                        className="flex items-center gap-2.5 p-1.5 hover:bg-white/15 rounded-lg cursor-pointer transition-all border border-transparent hover:border-white/5"
+                      >
+                        {imgUrl ? (
+                          <Image
+                            src={imgUrl}
+                            alt={songName}
+                            width={32}
+                            height={32}
+                            className="rounded object-cover shadow-sm"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded bg-white/10 flex items-center justify-center text-[10px]">
+                            🎵
+                          </div>
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-[11px] font-bold truncate leading-tight">{songName}</p>
+                          <p className="text-[9px] opacity-70 truncate leading-none mt-0.5">
+                            {artistName}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })
                 ) : (
-                  <Play className="w-4 h-4 fill-current ml-0.5" />
+                  <div className="text-center py-6 text-xs opacity-50 font-medium">
+                    {searchQuery ? "No results found" : "Type above and press Go"}
+                  </div>
                 )}
-              </button>
-              <div className="flex-grow min-w-0">
-                <p className="text-[10px] font-bold leading-tight truncate">Rustle of petals</p>
-                <p className="text-[9px] opacity-70 truncate mt-0.5">Flower meditation</p>
-                {/* Progress bar */}
-                <div className="w-full bg-white/25 rounded-full h-1 mt-1.5 overflow-hidden">
-                  <div
-                    className="bg-white h-full transition-all duration-300"
-                    style={{ width: `${progressPercent}%` }}
-                  />
+              </div>
+            </div>
+          ) : (
+            <div className="relative z-10 mt-auto space-y-4">
+              <div className="bg-white/10 backdrop-blur-md p-3.5 rounded-2xl flex items-center gap-3.5 border border-white/15 shadow-md">
+                <button
+                  onClick={() => setIsPlaying(!isPlaying)}
+                  className="w-10 h-10 bg-white text-blue-600 rounded-full flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-transform shrink-0 cursor-pointer"
+                >
+                  {isPlaying ? (
+                    <Pause className="w-4.5 h-4.5 fill-current text-blue-600" />
+                  ) : (
+                    <Play className="w-4.5 h-4.5 fill-current text-blue-600 ml-0.5" />
+                  )}
+                </button>
+                <div className="flex-grow min-w-0">
+                  <p className="text-[11px] font-bold leading-tight truncate">{currentSong.name}</p>
+                  <p className="text-[9px] opacity-80 truncate mt-0.5 font-medium">
+                    {currentSong.artist}
+                  </p>
+                  {/* Progress bar */}
+                  <div className="w-full bg-white/20 rounded-full h-1 mt-2 overflow-hidden">
+                    <div
+                      className="bg-white h-full transition-all duration-300"
+                      style={{ width: `${progressPercent}%` }}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-col items-end shrink-0 gap-1">
+                  {currentSong.image ? (
+                    <Image
+                      src={currentSong.image}
+                      alt={currentSong.name}
+                      width={32}
+                      height={32}
+                      className="rounded-lg object-cover shadow-sm border border-white/15"
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded-lg bg-white/10 flex items-center justify-center text-xs border border-white/10">
+                      🎵
+                    </div>
+                  )}
+                  <span className="text-[8px] opacity-75 font-mono">
+                    {formatTime(audioCurrentTime)} /{" "}
+                    {formatTime(audioDuration || currentSong.duration)}
+                  </span>
                 </div>
               </div>
-              <span className="text-[9px] opacity-80 font-mono shrink-0">
-                -{formatTime(timeLeft)}
-              </span>
+              <div className="flex justify-center gap-1.5">
+                <div className="w-1.5 h-1.5 bg-white rounded-full" />
+                <div className="w-1.5 h-1.5 bg-white/30 rounded-full" />
+              </div>
             </div>
-            <div className="flex justify-center gap-1">
-              <div className="w-1.5 h-1.5 bg-white rounded-full" />
-              <div className="w-1.5 h-1.5 bg-white/30 rounded-full" />
-            </div>
-          </div>
+          )}
         </section>
         {/* END: Time/Music Card */}
 
-        {/* BEGIN: Clinical Visualization Card (Bottom Left - 5 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-5 bg-white/40 backdrop-blur-xl border border-white/30 rounded-[32px] p-6 flex flex-col justify-between shadow-md min-h-[350px]">
+        {/* BEGIN: Choose Your Doctor Card (Bottom Left - 5 Cols, 3 Rows) */}
+        <section className="col-span-12 lg:col-span-5 bg-white/40 backdrop-blur-xl border border-white/30 rounded-[32px] p-4 flex flex-col justify-between shadow-md min-h-[300px]">
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
-              Medical Imagery
+              Your Health Team
             </span>
             <h2 className="text-xl font-bold text-slate-800 leading-snug mt-1">
-              Clinical Visualization
+              Choose Your Doctor
             </h2>
           </div>
 
-          <div className="flex gap-3 justify-center py-2">
-            <div className="w-full h-32 rounded-2xl overflow-hidden border border-white/30 shadow-md relative group select-none pointer-events-none">
-              <Image
-                alt="Clinical Visualization"
-                className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-105"
-                src="https://lh3.googleusercontent.com/aida-public/AB6AXuBrhLgiDEyI1UaTgJAFjF3Iyyf80wU3MlQvgyOoccezi8YSUHql5QyLGZZgm5ycFhfPnroM-ndlGD4YCmQ7fsg3nebNQ9PMigW77ZZasPcI060kNgQZbmxuxYVrsJz44YOpqP_lXujKvN1w3V_JI2FLR6StVUJwd64wxUbn32BEpi2z0goBPtcrGFIlLeMWTzN-WyUoLewkR9zOjKZBFxbV09G5iFBI62PmhTC_OkrXi02W7qbEtnfFWIiYA9B2-xPlI4cUeqPcHMk"
-                fill
-                sizes="(max-width: 768px) 100vw, 300px"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <div className="flex gap-1 justify-center">
-              <div className="w-1 h-1 bg-slate-300 rounded-full" />
-              <div className="w-1.5 h-1 bg-blue-500 rounded-full" />
-              <div className="w-1 h-1 bg-slate-300 rounded-full" />
-              <div className="w-1 h-1 bg-slate-300 rounded-full" />
-            </div>
+          <div className="flex gap-3 justify-center flex-1 py-1">
             <Link
-              href="/dashboard/analytics"
-              className="w-full block text-center bg-white/80 border border-slate-200 text-slate-700 font-bold py-3 rounded-2xl text-xs hover:bg-white transition-colors cursor-pointer shadow-sm"
+              href="/dashboard/patient/book-appointment"
+              className="w-full h-full rounded-2xl overflow-hidden border border-white/30 shadow-md relative group block"
             >
-              Explore analysis
+              <div
+                className="w-full h-full bg-cover bg-top transition-transform duration-700 group-hover:scale-105 flex items-center justify-center"
+                style={{ backgroundImage: "url('/images/doctorpage.avif')" }}
+              >
+                <span className="text-white text-sm font-bold bg-black/50 px-4 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  Click here
+                </span>
+              </div>
             </Link>
           </div>
         </section>
-        {/* END: Clinical Visualization Card */}
+        {/* END: Choose Your Doctor Card */}
 
         {/* BEGIN: Sleep Tracking Card (Bottom Middle - 3 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-3 bg-gradient-to-b from-[#1e3a8a] to-[#3b0764] rounded-[32px] p-6 flex flex-col justify-between text-white relative overflow-hidden shadow-md min-h-[350px]">
+        <section className="col-span-12 lg:col-span-3 bg-slate-900 rounded-[32px] p-4 flex flex-col justify-between text-white relative overflow-hidden shadow-md min-h-[300px]">
           <div className="absolute inset-0 z-0 select-none pointer-events-none">
             <Image
               alt="Clinical Floral Background"
-              className="w-full h-full object-cover opacity-50"
-              src="https://lh3.googleusercontent.com/aida-public/AB6AXuAFLBhzm-CgR-Ql3tBbf8b3HTOjSMk4AJ_oMii291DUZM7y_eJ5S2-NN2QioGaVQ_d0oAhO_eyZV3Qeai8UOJhQed3imQzBUQjIFZrrHBKTPUFkSpVXrrRr0G8YNH709Bw43-HJv9whVy0IonZXDLprBP4NXgkA60RSDJFqk8hMJMXHvAaFIPhruHX87ogQYrtq8hjAqW0HvpmDPuqj0nGkEF_hix0GsedOI4b55NKAebs3FQ5LRktpvMo1RkHJpCtI3kOy0iv75Q0"
+              className="w-full h-full object-cover"
+              src="/images/pngtree-flowers-pink-flowers-image_13248117.png"
               fill
               sizes="(max-width: 768px) 100vw, 250px"
             />
@@ -357,17 +879,20 @@ export default function DashboardOverview() {
             </div>
           </div>
 
-          <div className="mt-auto z-10 flex items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity p-2 rounded-xl bg-white/10 border border-white/10">
+          <Link
+            href="/dashboard/sleep"
+            className="mt-auto z-10 flex items-center gap-2 cursor-pointer hover:opacity-85 transition-opacity p-2 rounded-xl bg-white/10 border border-white/10"
+          >
             <div className="w-8 h-8 rounded-lg border border-white/30 flex items-center justify-center bg-white/20">
               <Sparkles className="w-4 h-4 text-white" />
             </div>
             <span className="text-[10px] font-bold">Download companion app</span>
-          </div>
+          </Link>
         </section>
         {/* END: Sleep Tracking Card */}
 
         {/* BEGIN: Medical News Card (Bottom Right - 4 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-4 bg-white/40 backdrop-blur-xl border border-white/30 rounded-[32px] p-6 flex flex-col gap-4 shadow-md min-h-[350px]">
+        <section className="col-span-12 lg:col-span-4 bg-white/40 backdrop-blur-xl border border-white/30 rounded-[32px] p-4 flex flex-col gap-3 shadow-md min-h-[300px]">
           <header className="flex justify-between items-start">
             <h2 className="text-xl font-bold text-slate-800 leading-tight">
               Medical
@@ -379,7 +904,7 @@ export default function DashboardOverview() {
             </span>
           </header>
 
-          <div className="flex flex-col gap-3 mt-2">
+          <div className="flex flex-col gap-2">
             {/* Article 1 */}
             <div
               onClick={() =>
@@ -417,6 +942,53 @@ export default function DashboardOverview() {
         </section>
         {/* END: Medical News Card */}
       </div>
+
+      {/* Recent Orders Section */}
+      {recentOrders.length > 0 && (
+        <section className="mt-4 bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 pt-5 pb-3">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-emerald-600" />
+              <h2 className="text-base font-bold text-slate-800">Recent Orders</h2>
+            </div>
+            <Link
+              href="/dashboard/my-orders"
+              className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+            >
+              View All <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="px-6 pb-5 space-y-2">
+            {recentOrders.map((order: DashboardOrder) => (
+              <Link
+                key={order.id}
+                href={`/zobraipharm/confirmation?id=${order.id}`}
+                className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Package className="w-4 h-4 text-slate-400 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800 font-mono">
+                      {order.tracking_id}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      {new Date(order.created_at).toLocaleDateString()} · ₹
+                      {Number(order.total).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                    STATUS_BADGE[order.status]?.bg || "bg-slate-100"
+                  } ${STATUS_BADGE[order.status]?.color || "text-slate-700"}`}
+                >
+                  {STATUS_BADGE[order.status]?.label || order.status}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ================= MODALS & OVERLAYS ================= */}
 

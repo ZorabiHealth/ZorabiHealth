@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   Pill,
   Plus,
@@ -11,18 +11,16 @@ import {
   AlertTriangle,
   Clock,
   RefreshCw,
-  ChevronRight,
-  Phone,
   Edit2,
   X,
   Smartphone,
   Database,
-  Wifi,
   WifiOff,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import {
   Medication,
   MedicationLog,
@@ -37,6 +35,7 @@ import {
   type LogStatus,
 } from "@/lib/medications";
 import { supabase, queueSyncItem, drainSyncQueue } from "@/lib/supabase";
+import { cleanAndValidatePhone } from "@/lib/validation";
 
 type Tab = "list" | "add" | "logs";
 
@@ -77,11 +76,32 @@ export default function MedicationsPage() {
   const [editingMed, setEditingMed] = useState<Medication | null>(null);
   const [sendingTestSMS, setSendingTestSMS] = useState<string | null>(null);
   const [smsResult, setSmsResult] = useState<{ id: string; ok: boolean; msg: string } | null>(null);
+  const [confirmDialog, setConfirmDialog] = useState<{
+    open: boolean;
+    title: string;
+    message: string;
+    confirmLabel?: string;
+    variant?: "danger" | "warning" | "default";
+    onConfirm: () => void;
+    onCancel: () => void;
+  }>({ open: false, title: "", message: "", onConfirm: () => {}, onCancel: () => {} });
   const [showDeleteConfirm, setShowDeleteConfirm] = useState<string | null>(null);
+  const [phoneError, setPhoneError] = useState<string | null>(null);
+  const [emergencyPhoneError, setEmergencyPhoneError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showExpired, setShowExpired] = useState(false);
 
   // Sync state
+  const [sessionUserId, setSessionUserId] = useState<string | null>(null);
   const [syncStatus, setSyncStatus] = useState<"connected" | "offline" | "syncing">("connected");
   const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSessionUserId(session?.user?.id ?? null);
+    });
+  }, []);
 
   // Form state
   const [form, setForm] = useState({
@@ -124,11 +144,20 @@ export default function MedicationsPage() {
       // Try draining offline queue first
       await drainSyncQueue();
 
-      // Fetch Medications
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const userId = session?.user?.id ?? sessionUserId;
+
+      if (!userId) {
+        throw new Error("User not authenticated");
+      }
+
       const { data: dbMeds, error: medsError } = await supabase
         .from("medications")
         .select("*")
         .eq("is_active", true)
+        .eq("user_id", userId)
         .order("name", { ascending: true });
 
       if (medsError) throw medsError;
@@ -203,13 +232,15 @@ export default function MedicationsPage() {
     }
   };
 
-  useEffect(() => {
-    loadData();
+  const loadDataRef = useRef(loadData);
 
-    // Listen to network status change
+  useEffect(() => {
+    loadDataRef.current = loadData;
+    queueMicrotask(() => loadDataRef.current().catch(console.error));
+
     const handleOnline = () => {
       setSyncStatus("syncing");
-      loadData();
+      loadDataRef.current().catch(console.error);
     };
     const handleOffline = () => setSyncStatus("offline");
 
@@ -219,7 +250,7 @@ export default function MedicationsPage() {
       window.removeEventListener("online", handleOnline);
       window.removeEventListener("offline", handleOffline);
     };
-  }, []);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const getScheduledTimes = (): string[] => {
     const freq = form.frequency;
@@ -231,8 +262,49 @@ export default function MedicationsPage() {
 
   const handleSaveMed = async () => {
     if (!form.name || !form.dosage) return;
+    if (isSaving) return;
+
+    let hasError = false;
+    let validatedPhone = form.phoneForAlerts;
+    let validatedEmergencyPhone = form.emergencyPhone;
+
+    // Validate phone number for alerts if entered
+    if (form.phoneForAlerts && form.phoneForAlerts.trim() !== "") {
+      const phoneVal = cleanAndValidatePhone(form.phoneForAlerts);
+      if (!phoneVal.isValid) {
+        setPhoneError(phoneVal.error ?? "Invalid phone number");
+        hasError = true;
+      } else {
+        setPhoneError(null);
+        validatedPhone = phoneVal.cleanedPhone ?? form.phoneForAlerts;
+      }
+    } else {
+      setPhoneError(null);
+    }
+
+    // Validate emergency phone if emergency contact name is set
+    if (form.emergencyName && form.emergencyPhone && form.emergencyPhone.trim() !== "") {
+      const emergencyPhoneVal = cleanAndValidatePhone(form.emergencyPhone);
+      if (!emergencyPhoneVal.isValid) {
+        setEmergencyPhoneError(emergencyPhoneVal.error ?? "Invalid emergency phone number");
+        hasError = true;
+      } else {
+        setEmergencyPhoneError(null);
+        validatedEmergencyPhone = emergencyPhoneVal.cleanedPhone ?? form.emergencyPhone;
+      }
+    } else {
+      setEmergencyPhoneError(null);
+    }
+
+    if (hasError) return;
+
+    setIsSaving(true);
     const times = getScheduledTimes();
     const now = new Date().toISOString();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    const userId = session?.user?.id ?? sessionUserId;
 
     const targetId = editingMed?.id ?? generateUUID();
     const newMed: Medication = {
@@ -247,11 +319,11 @@ export default function MedicationsPage() {
       currentStock: parseInt(form.currentStock) || 30,
       refillAt: parseInt(form.refillAt) || 7,
       prescribedBy: form.prescribedBy,
-      phoneForAlerts: form.phoneForAlerts,
+      phoneForAlerts: validatedPhone,
       emergencyContact: form.emergencyName
         ? {
             name: form.emergencyName,
-            phone: form.emergencyPhone,
+            phone: validatedEmergencyPhone,
             alertAfterMisses: parseInt(form.alertAfterMisses) || 2,
           }
         : undefined,
@@ -272,6 +344,7 @@ export default function MedicationsPage() {
     // Save to Database
     const dbPayload = {
       id: newMed.id,
+      ...(userId ? { user_id: userId } : {}),
       name: newMed.name,
       generic_name: newMed.genericName || null,
       dosage: newMed.dosage,
@@ -295,7 +368,6 @@ export default function MedicationsPage() {
       try {
         const { error } = await supabase.from("medications").upsert(dbPayload);
         if (error) throw error;
-        console.log("[Supabase] Saved medication successfully.");
       } catch (err) {
         console.error("[Supabase] Failed to save, queuing offline:", err);
         queueSyncItem({ table: "medications", action: "update", payload: dbPayload });
@@ -308,9 +380,13 @@ export default function MedicationsPage() {
 
     resetForm();
     setTab("list");
+    setIsSaving(false);
   };
 
   const handleDelete = async (id: string) => {
+    if (isDeleting) return;
+    setIsDeleting(true);
+
     // Optimistic delete
     const updated = meds.filter((m) => m.id !== id);
     setMeds(updated);
@@ -323,7 +399,6 @@ export default function MedicationsPage() {
         // We do hard delete as defined in our schema cascade constraints
         const { error } = await supabase.from("medications").delete().eq("id", id);
         if (error) throw error;
-        console.log("[Supabase] Deleted medication successfully.");
       } catch (err) {
         console.error("[Supabase] Failed to delete, queuing offline:", err);
         queueSyncItem({ table: "medications", action: "delete", payload: { id } });
@@ -333,6 +408,7 @@ export default function MedicationsPage() {
       queueSyncItem({ table: "medications", action: "delete", payload: { id } });
       setSyncStatus("offline");
     }
+    setIsDeleting(false);
   };
 
   const handleLogTaken = async (med: Medication) => {
@@ -385,8 +461,6 @@ export default function MedicationsPage() {
           .update({ current_stock: updatedStock })
           .eq("id", med.id);
         if (stockErr) throw stockErr;
-
-        console.log("[Supabase] Logged dose and decremented stock.");
       } catch (err) {
         console.error("[Supabase] Failed to log dose, queuing offline:", err);
         queueSyncItem({ table: "medication_logs", action: "insert", payload: dbLogPayload });
@@ -409,41 +483,64 @@ export default function MedicationsPage() {
   };
 
   const handleTestSMS = async (med: Medication) => {
-    if (!med.phoneForAlerts) {
-      setSmsResult({ id: med.id, ok: false, msg: "No phone number set for this medication." });
+    // Check for emergency contact before proceeding
+    if (!med.emergencyContact?.phone || !med.emergencyContact?.name) {
+      const { showToast } = await import("@/components/ui/toast");
+      showToast("No emergency contact configured. Go to Settings to add one.", "warning");
       return;
     }
-    setSendingTestSMS(med.id);
-    setSmsResult(null);
-    try {
-      const res = await fetch("/api/vonage/send", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          to: med.phoneForAlerts,
-          text: `ZorabiHealth Test 🔔 This is a test alert for ${med.name} ${med.dosage}. Reply TAKEN to confirm or SNOOZE to delay. - ZorabiHealth`,
-        }),
-      });
-      const data = await res.json();
-      if (data.success || data.simulated) {
-        setSmsResult({
-          id: med.id,
-          ok: true,
-          msg: data.simulated
-            ? "Simulated (add API keys to send real SMS)"
-            : `Sent! ID: ${data.messageId}`,
-        });
-      } else {
-        setSmsResult({ id: med.id, ok: false, msg: data.errorText ?? "Failed to send" });
-      }
-    } catch {
-      setSmsResult({ id: med.id, ok: false, msg: "Network error" });
-    } finally {
-      setSendingTestSMS(null);
-    }
+
+    setConfirmDialog({
+      open: true,
+      title: "Test Emergency Escalation",
+      message: `This will send a test notification to ${med.emergencyContact?.name} at ${med.emergencyContact?.phone}. Continue?`,
+      confirmLabel: "Send Test",
+      variant: "warning",
+      onConfirm: async () => {
+        setConfirmDialog({ ...confirmDialog, open: false });
+        setSendingTestSMS(med.id);
+        setSmsResult(null);
+        try {
+          const testTime = new Date(Date.now() - 5 * 60 * 1000);
+          const { error } = await supabase.from("medication_logs").insert({
+            medication_id: med.id,
+            medication_name: med.name,
+            scheduled_at: testTime.toISOString(),
+            status: "pending",
+            dose: med.dosage,
+            note: "System Test Alarm Event",
+          });
+
+          if (error) throw error;
+
+          const { showToast } = await import("@/components/ui/toast");
+          showToast(
+            `Test alert sent to ${med.emergencyContact?.name} at ${med.emergencyContact?.phone}`,
+            "success"
+          );
+
+          setSmsResult({
+            id: med.id,
+            ok: true,
+            msg: `Test alert sent to ${med.emergencyContact?.name} at ${med.emergencyContact?.phone}`,
+          });
+        } catch (err: unknown) {
+          setSmsResult({
+            id: med.id,
+            ok: false,
+            msg: err instanceof Error ? err.message : "Failed to trigger test alarm",
+          });
+        } finally {
+          setSendingTestSMS(null);
+        }
+      },
+      onCancel: () => setConfirmDialog({ ...confirmDialog, open: false }),
+    });
   };
 
   const startEdit = (med: Medication) => {
+    setPhoneError(null);
+    setEmergencyPhoneError(null);
     setEditingMed(med);
     setForm({
       name: med.name,
@@ -468,6 +565,8 @@ export default function MedicationsPage() {
   };
 
   const resetForm = () => {
+    setPhoneError(null);
+    setEmergencyPhoneError(null);
     setEditingMed(null);
     setForm({
       name: "",
@@ -555,6 +654,14 @@ export default function MedicationsPage() {
             My Meds ({meds.filter((m) => m.isActive).length})
           </Button>
           <Button
+            variant={showExpired ? "default" : "outline"}
+            size="sm"
+            onClick={() => setShowExpired(!showExpired)}
+            className="text-xs rounded-xl shadow-sm"
+          >
+            {showExpired ? "Hide Expired" : "Show Expired"}
+          </Button>
+          <Button
             variant={tab === "add" ? "default" : "outline"}
             size="sm"
             onClick={() => {
@@ -605,7 +712,7 @@ export default function MedicationsPage() {
             <motion.div layout className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
               <AnimatePresence mode="popLayout">
                 {meds
-                  .filter((m) => m.isActive)
+                  .filter((m) => showExpired || m.isActive)
                   .map((med) => (
                     <motion.div
                       key={med.id}
@@ -617,6 +724,13 @@ export default function MedicationsPage() {
                       className="bg-white rounded-2xl p-5 border border-slate-100 shadow-sm hover:shadow-md transition-all flex flex-col gap-3 group relative overflow-hidden"
                     >
                       <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-blue-400 to-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                      {med.endDate && new Date(med.endDate) < new Date() && (
+                        <div className="absolute top-3 right-3">
+                          <span className="text-[9px] font-bold px-2 py-0.5 rounded-full bg-red-100 text-red-600 border border-red-200">
+                            Expired
+                          </span>
+                        </div>
+                      )}
                       {/* Top row */}
                       <div className="flex items-start justify-between">
                         <div>
@@ -687,6 +801,16 @@ export default function MedicationsPage() {
                         Refill alert at {med.refillAt} pills left
                       </div>
 
+                      {/* Renew Prescription */}
+                      {med.endDate && new Date(med.endDate) < new Date() && (
+                        <button
+                          onClick={() => (window.location.href = "/dashboard/doctor")}
+                          className="w-full bg-red-50 text-red-600 border border-red-200 py-2 rounded-xl text-xs font-bold hover:bg-red-100 transition-colors flex items-center justify-center gap-1.5"
+                        >
+                          Renew Prescription
+                        </button>
+                      )}
+
                       {/* SMS Alert */}
                       <div className="border-t border-slate-100 pt-3.5 mt-1 flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-xs">
@@ -700,7 +824,7 @@ export default function MedicationsPage() {
                           ) : (
                             <>
                               <BellOff className="w-3.5 h-3.5 text-slate-300" />
-                              <span className="text-slate-400 font-medium">No SMS alert set</span>
+                              <span className="text-slate-400 font-medium">No SMS/Push alerts</span>
                             </>
                           )}
                         </div>
@@ -711,8 +835,8 @@ export default function MedicationsPage() {
                               disabled={sendingTestSMS === med.id}
                               className="text-[11px] px-2.5 py-1.5 rounded-xl bg-violet-50 text-violet-700 hover:bg-violet-100 transition-colors font-semibold disabled:opacity-50 flex items-center gap-1 border border-violet-100 shadow-sm"
                             >
-                              <Smartphone className="w-3 h-3" />
-                              {sendingTestSMS === med.id ? "Sending..." : "Test SMS"}
+                              <Bell className="w-3 h-3" />
+                              {sendingTestSMS === med.id ? "Triggering..." : "Test Alarm"}
                             </button>
                           )}
                           <button
@@ -748,7 +872,7 @@ export default function MedicationsPage() {
                   ))}
               </AnimatePresence>
 
-              {meds.filter((m) => m.isActive).length === 0 && (
+              {meds.filter((m) => showExpired || m.isActive).length === 0 && (
                 <div className="col-span-3 text-center py-20 text-slate-400 bg-white rounded-3xl border border-slate-100 shadow-sm">
                   <Pill className="w-12 h-12 mx-auto mb-3 opacity-30 text-blue-500 animate-bounce" />
                   <p className="font-bold text-slate-600 text-lg">No Medications Found</p>
@@ -936,24 +1060,29 @@ export default function MedicationsPage() {
               />
             </div>
 
-            {/* SMS Alert Setup */}
+            {/* Synchronized Device Alarm Setup */}
             <div className="bg-violet-50/50 border border-violet-100 rounded-2xl p-5 space-y-4 shadow-sm">
               <h3 className="text-sm font-black text-violet-700 flex items-center gap-1.5">
-                <Smartphone className="w-4 h-4" /> Vonage SMS Reminder System
+                <Smartphone className="w-4 h-4" /> Synchronized Device Alarm System & Alerts
               </h3>
               <div>
                 <label className="text-xs font-bold text-slate-600 mb-1.5 block">
                   Alert Phone Number{" "}
                   <span className="font-normal text-slate-400">
-                    (E.164 format e.g. +91XXXXXXXXXX)
+                    (E.164 phone e.g. +91xxxxxxxxxx)
                   </span>
                 </label>
                 <Input
                   placeholder="+919876543210"
                   value={form.phoneForAlerts}
                   onChange={(e) => setForm({ ...form, phoneForAlerts: e.target.value })}
-                  className="rounded-xl bg-white"
+                  className={`rounded-xl bg-white ${phoneError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                 />
+                {phoneError && (
+                  <p className="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                    <AlertTriangle className="w-3.5 h-3.5" /> {phoneError}
+                  </p>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
@@ -969,14 +1098,20 @@ export default function MedicationsPage() {
                 </div>
                 <div>
                   <label className="text-xs font-bold text-slate-600 mb-1.5 block">
-                    Emergency Phone
+                    Emergency Contact Alerts{" "}
+                    <span className="font-normal text-slate-400">(Phone number)</span>
                   </label>
                   <Input
                     placeholder="+919876543210"
                     value={form.emergencyPhone}
                     onChange={(e) => setForm({ ...form, emergencyPhone: e.target.value })}
-                    className="rounded-xl bg-white"
+                    className={`rounded-xl bg-white ${emergencyPhoneError ? "border-red-500 focus-visible:ring-red-500" : ""}`}
                   />
+                  {emergencyPhoneError && (
+                    <p className="text-xs text-red-600 mt-1 font-semibold flex items-center gap-1">
+                      <AlertTriangle className="w-3.5 h-3.5" /> {emergencyPhoneError}
+                    </p>
+                  )}
                 </div>
               </div>
               <div>
@@ -996,10 +1131,9 @@ export default function MedicationsPage() {
                 </select>
               </div>
               <p className="text-[11px] text-violet-500 leading-relaxed">
-                🔔 The patient will receive a Vonage SMS reminder at the scheduled times. Replying{" "}
-                <strong>TAKEN</strong> updates the logs immediately. Replying{" "}
-                <strong>SNOOZE</strong> delays it 30 mins. Missing scheduled doses escalates an SMS
-                warning to the designated emergency contact.
+                🔔 The patient will receive a synchronized visual and audio alarm alert on both
+                mobile and web dashboard devices. marking as taken or snoozing on one device
+                immediately silences the alarm on all other active devices.
               </p>
             </div>
 
@@ -1096,8 +1230,8 @@ export default function MedicationsPage() {
           <div className="bg-white rounded-3xl p-6 max-w-sm w-full shadow-2xl border border-slate-100">
             <h3 className="font-black text-slate-800 text-lg mb-2">Remove Medication?</h3>
             <p className="text-sm text-slate-500 leading-relaxed mb-5">
-              This action will delete this medication schedule and stop all associated Vonage SMS
-              alerts. Historic logs remain intact.
+              This action will delete this medication schedule and stop all associated SMS alerts.
+              Historic logs remain intact.
             </p>
             <div className="flex gap-3">
               <Button
@@ -1118,6 +1252,16 @@ export default function MedicationsPage() {
           </div>
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmDialog.open}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmLabel={confirmDialog.confirmLabel}
+        variant={confirmDialog.variant}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={confirmDialog.onCancel}
+      />
     </div>
   );
 }
