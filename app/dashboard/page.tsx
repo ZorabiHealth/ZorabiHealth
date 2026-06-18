@@ -47,6 +47,7 @@ export default function DashboardOverview() {
   const { role, loading: roleLoading } = useUserRole();
   const router = useRouter();
 
+  const [displayName, setDisplayName] = useState("Patient");
   useEffect(() => {
     if (!roleLoading) {
       if (role === "doctor") {
@@ -80,6 +81,18 @@ export default function DashboardOverview() {
         } = await supabase.auth.getSession();
         if (!s) return;
         setSession(s);
+
+        const { data: patientProfile } = await supabase
+          .from("patient_profiles")
+          .select("full_name")
+          .eq("id", s.user.id)
+          .maybeSingle();
+
+        const fallbackName =
+          s.user.user_metadata?.full_name ||
+          s.user.email?.split("@")[0]?.replace(/[._]/g, " ") ||
+          "Patient";
+        setDisplayName(patientProfile?.full_name || fallbackName);
 
         // Fetch medications
         const { data: medications } = await supabase
@@ -556,7 +569,7 @@ export default function DashboardOverview() {
 
           <header className="relative z-10">
             <h2 className="text-2xl font-bold tracking-tight leading-snug">
-              Welcome back, Dr. Jenkins
+              Welcome back, {displayName}
               <br />
               <span className="text-base font-medium opacity-85">
                 Your personalized health summary
