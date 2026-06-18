@@ -233,9 +233,10 @@ const DotHeart = () => {
 
 interface SignInCardProps {
   defaultMode?: "signin" | "signup";
+  redirectTo?: string;
 }
 
-const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
+const SignInCard = ({ defaultMode = "signin", redirectTo = "/dashboard" }: SignInCardProps) => {
   const router = useRouter();
   const [isSignUp, setIsSignUp] = useState(defaultMode === "signup");
   const [isPasswordVisible, setIsPasswordVisible] = useState(false);
@@ -368,7 +369,7 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
           if (signInError) throw signInError;
 
           localStorage.setItem("zh_login_time", new Date().toISOString());
-          router.push("/dashboard");
+          router.push(redirectTo);
         }
       }
     } catch (err) {
@@ -758,7 +759,7 @@ const SignInCard = ({ defaultMode = "signin" }: SignInCardProps) => {
   );
 };
 
-const Index = ({ defaultMode = "signin" }: SignInCardProps) => {
+const Index = ({ defaultMode = "signin", redirectTo }: SignInCardProps) => {
   const router = useRouter();
 
   return (
@@ -775,7 +776,7 @@ const Index = ({ defaultMode = "signin" }: SignInCardProps) => {
         ← Back to landing
       </button>
 
-      <SignInCard defaultMode={defaultMode} />
+      <SignInCard defaultMode={defaultMode} redirectTo={redirectTo} />
     </div>
   );
 };

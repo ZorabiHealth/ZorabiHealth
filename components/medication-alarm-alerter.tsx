@@ -25,12 +25,12 @@ export function MedicationAlarmAlerter() {
   const [activeAlarms, setActiveAlarms] = useState<
     { med: Medication; time: string; logId?: string }[]
   >([]);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<import("@supabase/supabase-js").Session | null>(null);
   const channelsRef = useRef<{ unsubscribe: () => void }[]>([]);
 
   // Audio state refs
   const audioCtxRef = useRef<AudioContext | null>(null);
-  const intervalIdRef = useRef<any>(null);
+  const intervalIdRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const userInteracted = useRef<boolean>(false);
 
   const stopAlarmSound = () => {
@@ -52,7 +52,9 @@ export function MedicationAlarmAlerter() {
     if (typeof window === "undefined" || !userInteracted.current) return;
     if (audioCtxRef.current) return;
 
-    const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+    const AudioContextClass =
+      window.AudioContext ||
+      (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!AudioContextClass) return;
 
     try {

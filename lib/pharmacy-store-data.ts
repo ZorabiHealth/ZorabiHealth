@@ -383,21 +383,58 @@ export function getProductsByCategory(category: string): PharmProduct[] {
 }
 
 const STORAGE_KEY_CART = "zobraipharm_cart";
+const STORAGE_KEY_CART_PREFIX = "zobraipharm_cart_";
 const STORAGE_KEY_ORDERS = "zobraipharm_orders";
 
-export function loadCart(): CartItem[] {
+function cartKey(userId?: string): string {
+  return userId ? `${STORAGE_KEY_CART_PREFIX}${userId}` : STORAGE_KEY_CART;
+}
+
+export function loadCart(userId?: string): CartItem[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem(STORAGE_KEY_CART);
+    const raw = localStorage.getItem(cartKey(userId));
     return raw ? (JSON.parse(raw) as CartItem[]) : [];
   } catch {
     return [];
   }
 }
 
-export function saveCart(items: CartItem[]): void {
+export function saveCart(items: CartItem[], userId?: string): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY_CART, JSON.stringify(items));
+  localStorage.setItem(cartKey(userId), JSON.stringify(items));
+}
+
+export async function syncCartToSupabase(userId: string): Promise<void> {
+  const items = loadCart(userId);
+  try {
+    await fetch("/api/store/cart", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ userId, items }),
+    });
+  } catch (err) {
+    console.warn("[cart] Supabase sync failed:", err);
+  }
+}
+
+export async function loadCartFromSupabase(userId: string): Promise<CartItem[]> {
+  try {
+    const {
+      data: { session },
+    } = await import("@/lib/supabase").then((m) => m.supabase.auth.getSession());
+    const token = session?.access_token;
+    const res = await fetch(`/api/store/cart?userId=${userId}`, {
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+    });
+    if (res.ok) {
+      const data = await res.json();
+      const items = data?.items || [];
+      saveCart(items, userId);
+      return items;
+    }
+  } catch {}
+  return loadCart(userId);
 }
 
 export function loadOrders(): PharmOrder[] {

@@ -226,8 +226,8 @@ export default function DoctorOnboarding() {
       });
 
       setStep(6);
-    } catch (err: any) {
-      setError(err.message || "Failed to complete onboarding");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to complete onboarding");
     } finally {
       setSaving(false);
     }

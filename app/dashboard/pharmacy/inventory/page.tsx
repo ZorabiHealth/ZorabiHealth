@@ -18,6 +18,7 @@ import {
   RefreshCw,
   ShoppingBag,
   ExternalLink,
+  ChevronRight,
   GripHorizontal,
   Eye,
   Pill,
@@ -78,6 +79,45 @@ export default function PharmacyInventoryPage() {
   // CSV upload state
   const [csvUploading, setCsvUploading] = useState(false);
   const [csvResult, setCsvResult] = useState<{ ok: boolean; msg: string } | null>(null);
+
+  // Active orders state
+  const [activeOrders, setActiveOrders] = useState<Record<string, unknown>[]>([]);
+  const [ordersLoading, setOrdersLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchOrders = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+        const res = await fetch("/api/store/orders", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setActiveOrders(
+            data.filter(
+              (o: Record<string, unknown>) => o.status !== "DELIVERED" && o.status !== "CANCELLED"
+            )
+          );
+        }
+      } catch {
+      } finally {
+        setOrdersLoading(false);
+      }
+    };
+    fetchOrders();
+  }, []);
+
+  const ORDER_BADGE: Record<string, { label: string; color: string; bg: string }> = {
+    PENDING: { label: "Pending", color: "text-yellow-800", bg: "bg-yellow-100" },
+    CONFIRMED: { label: "Confirmed", color: "text-blue-800", bg: "bg-blue-100" },
+    PREPARING: { label: "Preparing", color: "text-amber-800", bg: "bg-amber-100" },
+    DISPATCHED: { label: "Dispatched", color: "text-emerald-800", bg: "bg-emerald-100" },
+    DELIVERED: { label: "Delivered", color: "text-green-800", bg: "bg-green-100" },
+    CANCELLED: { label: "Cancelled", color: "text-red-800", bg: "bg-red-100" },
+  };
 
   const downloadCsvTemplate = () => {
     const headers = "drug_name,category,stock_quantity,price\n";
@@ -188,17 +228,15 @@ export default function PharmacyInventoryPage() {
               }
               seenDrugs.set(row.drugName.toLowerCase(), drugId!);
             }
-            const { error: invErr } = await supabase
-              .from("pharmacy_inventory")
-              .upsert(
-                {
-                  pharmacy_id: pharmacyId,
-                  drug_id: drugId,
-                  stock: row.stockQty,
-                  price_per_unit: row.price,
-                },
-                { onConflict: "pharmacy_id, drug_id" }
-              );
+            const { error: invErr } = await supabase.from("pharmacy_inventory").upsert(
+              {
+                pharmacy_id: pharmacyId,
+                drug_id: drugId,
+                stock: row.stockQty,
+                price_per_unit: row.price,
+              },
+              { onConflict: "pharmacy_id, drug_id" }
+            );
             if (invErr) {
               errors++;
               continue;
@@ -215,22 +253,14 @@ export default function PharmacyInventoryPage() {
         msg: `Imported ${imported} item${imported !== 1 ? "s" : ""}${errors > 0 ? ` (${errors} error${errors !== 1 ? "s" : ""})` : ""}`,
       });
       fetchPharmacyAndInventory();
-    } catch (err: any) {
-      setCsvResult({ ok: false, msg: err.message || "CSV import failed" });
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "CSV import failed";
+      setCsvResult({ ok: false, msg: message });
     } finally {
       setCsvUploading(false);
       e.target.value = "";
     }
   };
-
-  useEffect(() => {
-    if (role === null) return;
-    if (role !== "pharmacy_vendor") {
-      router.push("/dashboard");
-      return;
-    }
-    fetchPharmacyAndInventory();
-  }, [role, userId, router]);
 
   const fetchPharmacyAndInventory = async () => {
     setLoading(true);
@@ -314,13 +344,23 @@ export default function PharmacyInventoryPage() {
 
       setInventory(items);
       setLastFetchTime(Date.now());
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Inv] Failed to fetch inventory:", err);
-      setFetchError(err.message || "Failed to load inventory");
+      const message = err instanceof Error ? err.message : "Failed to load inventory";
+      setFetchError(message);
     } finally {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    if (role === null) return;
+    if (role !== "pharmacy_vendor") {
+      router.push("/dashboard");
+      return;
+    }
+    fetchPharmacyAndInventory();
+  }, [role, userId, router]);
 
   const searchDrugs = async (q: string) => {
     setDrugSearch(q);
@@ -345,14 +385,19 @@ export default function PharmacyInventoryPage() {
 
       const catalogDrugs = (
         catalogRes.status === "fulfilled" ? (catalogRes.value.data ?? []) : []
-      ).map((d: any) => ({
-        id: d.id,
-        name: d.name,
-        category: d.category,
+      ).map((d: Record<string, unknown>) => ({
+        id: d.id as string,
+        name: d.name as string,
+        category: d.category as string,
         source: "catalog" as const,
       }));
       const storeDrugs = (storeRes.status === "fulfilled" ? (storeRes.value.data ?? []) : []).map(
-        (d: any) => ({ id: d.id, name: d.name, category: d.category, source: "store" as const })
+        (d: Record<string, unknown>) => ({
+          id: d.id as string,
+          name: d.name as string,
+          category: d.category as string,
+          source: "store" as const,
+        })
       );
 
       const seen = new Set<string>();
@@ -564,8 +609,8 @@ export default function PharmacyInventoryPage() {
       });
       if (!res.ok) throw new Error((await res.json()).error || "Sync failed");
       fetchPharmacyAndInventory();
-    } catch (err: any) {
-      console.error("[Inv] Failed to sync to store:", err);
+    } catch {
+      console.error("[Inv] Failed to sync to store:");
     }
   };
 
@@ -662,6 +707,67 @@ export default function PharmacyInventoryPage() {
           </button>
         </div>
       </div>
+
+      {/* Active Orders */}
+      <section className="bg-white rounded-2xl border border-slate-100 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-5 pt-4 pb-2">
+          <div className="flex items-center gap-2">
+            <ShoppingBag className="w-5 h-5 text-emerald-600" />
+            <h2 className="text-base font-bold text-slate-800">Active Orders</h2>
+            {!ordersLoading && (
+              <span className="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                {activeOrders.length}
+              </span>
+            )}
+          </div>
+          <Link
+            href="/dashboard/pharmacy/orders"
+            className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+          >
+            View All <ChevronRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+        <div className="px-5 pb-4">
+          {ordersLoading ? (
+            <div className="flex items-center gap-3 py-3">
+              <RefreshCw className="w-4 h-4 animate-spin text-slate-400" />
+              <span className="text-xs text-slate-500">Loading orders...</span>
+            </div>
+          ) : activeOrders.length === 0 ? (
+            <p className="text-xs text-slate-400 py-3">No active orders</p>
+          ) : (
+            <div className="space-y-2 mt-1">
+              {activeOrders.slice(0, 5).map((order: Record<string, unknown>) => (
+                <Link
+                  key={order.id as string}
+                  href="/dashboard/pharmacy/orders"
+                  className="flex items-center justify-between p-3 rounded-xl bg-slate-50 hover:bg-slate-100 transition-colors"
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <Package className="w-4 h-4 text-slate-400 shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-xs font-bold text-slate-800 font-mono truncate">
+                        {order.tracking_id as string}
+                      </p>
+                      <p className="text-[10px] text-slate-500 truncate">
+                        ₹{Number(order.total as string).toFixed(2)} ·{" "}
+                        {new Date(order.created_at as string).toLocaleDateString()}
+                      </p>
+                    </div>
+                  </div>
+                  <span
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-full shrink-0 ${
+                      ORDER_BADGE[order.status as string]?.bg || "bg-slate-100"
+                    } ${ORDER_BADGE[order.status as string]?.color || "text-slate-700"}`}
+                  >
+                    {ORDER_BADGE[order.status as string]?.label || (order.status as string)}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
 
       {/* CSV Import Result */}
       {csvResult && (

@@ -23,11 +23,9 @@ export async function GET(req: Request) {
 
     const data = await apiRes.json();
     return NextResponse.json(data);
-  } catch (err: any) {
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "Failed to search JioSaavn";
     console.error("[JioSaavn API Proxy Error]", err);
-    return NextResponse.json(
-      { success: false, error: err.message || "Failed to search JioSaavn" },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: message }, { status: 500 });
   }
 }

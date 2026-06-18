@@ -35,7 +35,10 @@ export async function GET(req: NextRequest) {
         is_same_account: p.web_user_id === p.mobile_user_id,
       })),
     });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Internal error" },
+      { status: 500 }
+    );
   }
 }

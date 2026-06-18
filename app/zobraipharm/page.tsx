@@ -27,6 +27,7 @@ import {
 } from "lucide-react";
 import { CATEGORIES, type PharmProduct, loadCart, saveCart } from "@/lib/pharmacy-store-data";
 import { fetchStoreProducts } from "@/lib/store-products";
+import { supabase } from "@/lib/supabase";
 
 const categoryIcons: Record<string, React.ReactNode> = {
   "All Products": <Package className="h-4 w-4" />,
@@ -45,20 +46,23 @@ const categoryIcons: Record<string, React.ReactNode> = {
 
 function HeroBanner() {
   return (
-    <section className="relative overflow-hidden bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-950">
+    <section className="grid grid-cols-12 gap-8 px-4 md:px-6 lg:px-8 pt-10 pb-16 md:pb-20 items-center min-h-[calc(100vh-8rem)] relative bg-gradient-to-br from-emerald-900 via-emerald-800 to-emerald-950 overflow-hidden">
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(16,185,129,0.3),transparent_50%)]" />
-      <div className="mx-auto max-w-7xl px-4 py-16 md:px-6 md:py-24 lg:px-8">
-        <div className="relative z-10 max-w-2xl">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-4 py-1.5 text-xs font-medium text-emerald-200 backdrop-blur-sm">
+      {/* Left Column: Copy */}
+      <div className="col-span-12 md:col-span-5 relative z-10">
+        <div className="flex flex-col gap-4 mb-6">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-500/20 px-4 py-1.5 text-xs font-medium text-emerald-200 backdrop-blur-sm w-fit">
             <Sparkles className="h-3.5 w-3.5" />
             Powered by ZorabiHealth
           </div>
-          <h1 className="mb-4 text-3xl font-bold leading-tight tracking-tight text-white md:text-5xl">
+          <h1 className="text-4xl md:text-5xl font-bold leading-[1.1] mb-6 text-white">
             Your Trusted
             <br />
-            <span className="text-emerald-400">Online Pharmacy</span>
+            <span className="bg-gradient-to-r from-emerald-300 to-emerald-400 bg-clip-text text-transparent">
+              Online Pharmacy
+            </span>
           </h1>
-          <p className="mb-8 max-w-lg text-base leading-relaxed text-emerald-100/80">
+          <p className="text-base leading-relaxed text-emerald-100/80 max-w-lg mb-8">
             Browse our extensive catalog of genuine medications. Safe, secure, and delivered to your
             doorstep with real-time tracking.
           </p>
@@ -76,6 +80,42 @@ function HeroBanner() {
             >
               Shop by Category
             </Link>
+          </div>
+        </div>
+      </div>
+
+      {/* Right Column: Video */}
+      <div className="col-span-12 md:col-span-7 relative h-full min-h-[400px] md:min-h-[600px]">
+        <div className="absolute inset-0 w-full h-full flex items-center justify-center rounded-2xl overflow-hidden">
+          <video
+            src="/video/pharmback.mp4"
+            autoPlay
+            muted
+            loop
+            playsInline
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-emerald-900/60 via-transparent to-transparent" />
+          {/* Floating UI Elements */}
+          <div className="content-overlay w-full h-full flex flex-col items-center justify-center relative">
+            {/* Top Right Product Tag */}
+            <div className="absolute top-4 md:top-8 right-4 md:right-8">
+              <span className="bg-white/90 backdrop-blur-sm px-4 py-2 rounded-full text-xs font-medium flex items-center gap-2 shadow-sm text-emerald-800">
+                ZorabiHealth <span className="text-[10px]">▼</span>
+              </span>
+            </div>
+            {/* Bottom Tabs */}
+            <div className="absolute bottom-4 md:bottom-8 flex gap-2 md:gap-3">
+              <span className="bg-white/90 backdrop-blur-sm px-3 md:px-4 py-1.5 rounded-full text-[10px] text-emerald-800 font-semibold border border-white shadow-sm">
+                Clinical Voice
+              </span>
+              <span className="bg-white/90 backdrop-blur-sm px-3 md:px-4 py-1.5 rounded-full text-[10px] text-emerald-800 font-semibold border border-white shadow-sm">
+                Auto-Refills
+              </span>
+              <span className="bg-white/90 backdrop-blur-sm px-3 md:px-4 py-1.5 rounded-full text-[10px] text-emerald-800 font-semibold border border-white shadow-sm">
+                Pharmacy
+              </span>
+            </div>
           </div>
         </div>
       </div>
@@ -155,12 +195,17 @@ function ProductCard({
   product,
   cart,
   onAddToCart,
+  onAutoRefill,
+  refillStatus,
 }: {
   product: PharmProduct;
   cart: Record<string, number>;
   onAddToCart: (id: string) => void;
+  onAutoRefill: (product: PharmProduct) => void;
+  refillStatus: Record<string, "idle" | "loading" | "done" | "error">;
 }) {
   const qty = cart[product.id] || 0;
+  const rf = refillStatus[product.id] || "idle";
 
   return (
     <div className="group relative flex flex-col overflow-hidden rounded-2xl border border-slate-100 bg-white shadow-sm transition-all hover:shadow-lg hover:shadow-emerald-500/5">
@@ -189,7 +234,7 @@ function ProductCard({
           </h3>
           <p className="text-xs text-slate-500">{product.manufacturer}</p>
         </Link>
-        <div className="mt-auto flex items-end justify-between pt-3">
+        <div className="flex flex-wrap items-end justify-between gap-2 pt-3">
           <div>
             <span className="text-lg font-bold text-emerald-800">₹{product.price}</span>
             <span className="ml-1.5 text-xs text-slate-400 line-through">₹{product.mrp}</span>
@@ -197,34 +242,55 @@ function ProductCard({
               {Math.round(((product.mrp - product.price) / product.mrp) * 100)}% off
             </span>
           </div>
-          {qty > 0 ? (
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5">
+            {qty > 0 ? (
+              <>
+                <button
+                  onClick={() => onAddToCart(product.id)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+                <span className="min-w-[20px] text-center text-sm font-semibold text-emerald-800">
+                  {qty}
+                </span>
+                <button
+                  onClick={() => onAddToCart(product.id)}
+                  className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white transition-colors hover:bg-emerald-700"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                </button>
+              </>
+            ) : (
               <button
                 onClick={() => onAddToCart(product.id)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 transition-colors hover:bg-emerald-100"
+                className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-700"
               >
-                <Check className="h-3.5 w-3.5" />
+                <ShoppingCart className="h-3.5 w-3.5" />
+                Add
               </button>
-              <span className="min-w-[20px] text-center text-sm font-semibold text-emerald-800">
-                {qty}
-              </span>
-              <button
-                onClick={() => onAddToCart(product.id)}
-                className="flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white transition-colors hover:bg-emerald-700"
-              >
-                <Plus className="h-3.5 w-3.5" />
-              </button>
-            </div>
-          ) : (
-            <button
-              onClick={() => onAddToCart(product.id)}
-              className="flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white transition-all hover:bg-emerald-700"
-            >
-              <ShoppingCart className="h-3.5 w-3.5" />
-              Add
-            </button>
-          )}
+            )}
+          </div>
         </div>
+        <button
+          onClick={() => onAutoRefill(product)}
+          disabled={rf === "loading" || rf === "done"}
+          className={`mt-2 w-full rounded-lg py-1.5 text-[11px] font-semibold transition-all ${
+            rf === "done"
+              ? "bg-emerald-100 text-emerald-700"
+              : rf === "error"
+                ? "bg-red-50 text-red-600"
+                : "bg-slate-50 text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"
+          }`}
+        >
+          {rf === "loading"
+            ? "Setting up..."
+            : rf === "done"
+              ? "Auto-Refill On"
+              : rf === "error"
+                ? "Retry"
+                : "Auto Refill"}
+        </button>
       </div>
     </div>
   );
@@ -272,6 +338,9 @@ export default function ZoraipharmPage() {
   const [loadingProducts, setLoadingProducts] = useState(true);
   const [activeCategory, setActiveCategory] = useState("all");
   const [searchQuery, setSearchQuery] = useState("");
+  const [refillStatus, setRefillStatus] = useState<
+    Record<string, "idle" | "loading" | "done" | "error">
+  >({});
   const [cart, setCart] = useState<Record<string, number>>(() => {
     const items = loadCart();
     const map: Record<string, number> = {};
@@ -287,6 +356,40 @@ export default function ZoraipharmPage() {
       setLoadingProducts(false);
     });
   }, []);
+
+  const handleAutoRefill = async (product: PharmProduct) => {
+    if (refillStatus[product.id] === "loading" || refillStatus[product.id] === "done") return;
+    setRefillStatus((p) => ({ ...p, [product.id]: "loading" }));
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        setRefillStatus((p) => ({ ...p, [product.id]: "error" }));
+        return;
+      }
+      const res = await fetch("/api/store/refill", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          medicationId: product.id,
+          medicationName: product.name,
+          dosage: product.dosage,
+          quantity: 30,
+        }),
+      });
+      if (res.ok) {
+        setRefillStatus((p) => ({ ...p, [product.id]: "done" }));
+      } else {
+        setRefillStatus((p) => ({ ...p, [product.id]: "error" }));
+      }
+    } catch {
+      setRefillStatus((p) => ({ ...p, [product.id]: "error" }));
+    }
+  };
 
   const filtered = useMemo(() => {
     let list = products;
@@ -365,6 +468,8 @@ export default function ZoraipharmPage() {
                       product={product}
                       cart={cart}
                       onAddToCart={handleAddToCart}
+                      onAutoRefill={handleAutoRefill}
+                      refillStatus={refillStatus}
                     />
                   ))}
                 </div>
@@ -378,6 +483,8 @@ export default function ZoraipharmPage() {
                   product={product}
                   cart={cart}
                   onAddToCart={handleAddToCart}
+                  onAutoRefill={handleAutoRefill}
+                  refillStatus={refillStatus}
                 />
               ))}
             </div>

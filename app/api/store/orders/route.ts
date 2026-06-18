@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, supabaseAdmin } from "@/lib/supabase";
-import { verifyAuth } from "@/lib/auth-utils";
+import { verifyAuth, getAdminClient } from "@/lib/auth-utils";
 
 interface OrderItemInput {
   productId?: string;
@@ -187,6 +187,98 @@ export async function GET(req: NextRequest) {
     return NextResponse.json(orders || []);
   } catch (err) {
     console.error("[store-orders] GET error:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+
+// PATCH /api/store/orders — Update order status, auto-create medications on DELIVERED
+export async function PATCH(req: NextRequest) {
+  try {
+    const authResult = await verifyAuth(req);
+    if ("error" in authResult) {
+      return NextResponse.json({ error: authResult.error }, { status: authResult.status });
+    }
+
+    const userId = authResult.user.id;
+    const body = await req.json();
+    const { id, status } = body;
+
+    if (!id || !status) {
+      return NextResponse.json({ error: "id and status are required" }, { status: 400 });
+    }
+
+    const client = supabaseAdmin || supabase;
+
+    // Update order status
+    const { data: order, error: updateErr } = await client
+      .from("store_orders")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .eq("user_id", userId)
+      .select("id, user_id, tracking_id")
+      .single();
+
+    if (updateErr || !order) {
+      return NextResponse.json({ error: "Order not found or update failed" }, { status: 404 });
+    }
+
+    // Insert status event
+    await client.from("store_order_events").insert({
+      order_id: id,
+      status,
+      note: `Status updated to ${status}`,
+      timestamp: new Date().toISOString(),
+    });
+
+    // Auto-create medications when order is DELIVERED
+    if (status === "DELIVERED") {
+      const { data: items } = await client.from("store_order_items").select("*").eq("order_id", id);
+
+      const admin = getAdminClient();
+
+      for (const item of items || []) {
+        // Check if medication already exists with same name for this user
+        const { data: existing } = await admin
+          .from("medications")
+          .select("id, product_id")
+          .eq("user_id", userId)
+          .eq("name", item.product_name)
+          .maybeSingle();
+
+        if (!existing) {
+          await admin.from("medications").insert({
+            user_id: userId,
+            name: item.product_name,
+            generic_name: null,
+            dosage: "As prescribed",
+            frequency: "daily",
+            scheduled_times: ["09:00"],
+            start_date: new Date().toISOString().split("T")[0],
+            current_stock: item.quantity * 30,
+            refill_at: 7,
+            category: "Store Purchase",
+            color: "blue",
+            is_active: true,
+            product_id: item.product_id || null,
+            notes: `Auto-created from order ${order.tracking_id}`,
+          });
+        } else {
+          const updateData: Record<string, unknown> = {
+            current_stock: item.quantity * 30,
+            is_active: true,
+          };
+          // Link product_id if not already set
+          if (!existing.product_id && item.product_id) {
+            updateData.product_id = item.product_id;
+          }
+          await admin.from("medications").update(updateData).eq("id", existing.id);
+        }
+      }
+    }
+
+    return NextResponse.json({ success: true, status });
+  } catch (err) {
+    console.error("[store-orders] PATCH error:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }

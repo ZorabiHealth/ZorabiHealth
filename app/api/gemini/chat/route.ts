@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+import { callGemini } from "@/lib/gemini";
 
 const SYSTEM_PROMPT = `You are ZorabiHealth's "Diet Banner of the Day". Generate ONE diet/nutrition tip.
 
@@ -129,84 +128,54 @@ function getDefaultBanner(): Banner {
   return defaults[getDaySeed() % defaults.length];
 }
 
-export async function POST(req: Request) {
-  try {
-    const body = await req.json().catch(() => ({}));
-    const message: string | undefined = body?.message;
-
-    if (!GEMINI_API_KEY) {
-      return NextResponse.json(getDefaultBanner(), { headers: { "Cache-Control": "no-store" } });
-    }
-
-    const todayStr = new Date().toISOString().slice(0, 10);
-    const userPrompt = message?.trim()
-      ? `Generate a diet banner tip related to: ${message}`
-      : `Date: ${todayStr}. Generate a unique diet banner tip for today.`;
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [{ text: `${SYSTEM_PROMPT}\n\n${userPrompt}` }],
-            },
-          ],
-          generationConfig: { temperature: 1.0, maxOutputTokens: 150 },
-        }),
-        cache: "no-store",
-      }
-    );
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      console.warn("[Gemini API Error]", data?.error?.message || JSON.stringify(data));
-      return NextResponse.json(getDefaultBanner());
-    }
-
-    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || "";
-    if (!raw) {
-      console.warn("[Gemini] Empty response");
-      return NextResponse.json(getDefaultBanner());
-    }
-
-    const parsed = tryParseJson(raw);
-    if (parsed?.emoji && parsed?.title && parsed?.description) {
-      return NextResponse.json(parsed, { headers: { "Cache-Control": "no-store" } });
-    }
-
-    console.warn("[Gemini] Parse failed for:", raw.slice(0, 300));
-    return NextResponse.json(getDefaultBanner(), { headers: { "Cache-Control": "no-store" } });
-  } catch (err) {
-    console.error("[Gemini Chat Error]", err);
-    return NextResponse.json(getDefaultBanner(), { headers: { "Cache-Control": "no-store" } });
-  }
-}
-
 function tryParseJson(text: string): Banner | null {
   try {
     const cleaned = text
       .replace(/```[a-z]*\s*/gi, "")
       .replace(/\s*```/g, "")
       .trim();
-
     const start = cleaned.indexOf("{");
     const end = cleaned.lastIndexOf("}");
     if (start === -1 || end === -1 || end <= start) return null;
-
     const parsed = JSON.parse(cleaned.slice(start, end + 1));
     if (!parsed || typeof parsed !== "object") return null;
-
     return {
-      emoji: String(parsed.emoji ?? ""),
-      title: String(parsed.title ?? ""),
-      description: String(parsed.description ?? ""),
+      emoji: String((parsed as Record<string, unknown>).emoji ?? ""),
+      title: String((parsed as Record<string, unknown>).title ?? ""),
+      description: String((parsed as Record<string, unknown>).description ?? ""),
     };
   } catch {
     return null;
+  }
+}
+
+export async function POST(req: Request) {
+  try {
+    const body = await req.json().catch(() => ({}));
+    const message: string | undefined = (body as Record<string, unknown>)?.message as
+      | string
+      | undefined;
+    const todayStr = new Date().toISOString().slice(0, 10);
+    const userPrompt = message?.trim()
+      ? `Generate a diet banner tip related to: ${message}`
+      : `Date: ${todayStr}. Generate a unique diet banner tip for today.`;
+
+    const result = await callGemini(`${SYSTEM_PROMPT}\n\n${userPrompt}`, {
+      model: "gemini-1.5-flash",
+      maxTokens: 150,
+    });
+
+    if (result.error || !result.text) {
+      return NextResponse.json(getDefaultBanner(), { headers: { "Cache-Control": "no-store" } });
+    }
+
+    const parsed = tryParseJson(result.text);
+    if (parsed?.emoji && parsed?.title && parsed?.description) {
+      return NextResponse.json(parsed, { headers: { "Cache-Control": "no-store" } });
+    }
+
+    return NextResponse.json(getDefaultBanner(), { headers: { "Cache-Control": "no-store" } });
+  } catch {
+    return NextResponse.json(getDefaultBanner(), { headers: { "Cache-Control": "no-store" } });
   }
 }

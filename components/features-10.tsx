@@ -140,7 +140,7 @@ const CardDecorator = () => (
 );
 
 interface CardHeadingProps {
-  icon: any;
+  icon: React.ElementType;
   title: string;
   description: string;
   text: string;

@@ -55,11 +55,12 @@ async function sendWebPush(device: PushDevice, payload: PushPayload): Promise<Se
     );
 
     return { ok: true, statusCode: result.statusCode };
-  } catch (err: any) {
-    if (err.statusCode === 410 || err.statusCode === 404) {
-      return { ok: false, statusCode: err.statusCode, error: "Endpoint expired" };
+  } catch (err: unknown) {
+    const wpErr = err as { statusCode?: number; message?: string };
+    if (wpErr.statusCode === 410 || wpErr.statusCode === 404) {
+      return { ok: false, statusCode: wpErr.statusCode, error: "Endpoint expired" };
     }
-    return { ok: false, error: err.message || "Web push failed" };
+    return { ok: false, error: wpErr.message || "Web push failed" };
   }
 }
 
@@ -97,8 +98,8 @@ async function sendExpoPush(device: PushDevice, payload: PushPayload): Promise<S
       return { ok: false, statusCode: 400, error: errorMsg || "Expo push failed" };
     }
     return { ok: true };
-  } catch (err: any) {
-    return { ok: false, error: err.message || "Expo push request failed" };
+  } catch (err: unknown) {
+    return { ok: false, error: err instanceof Error ? err.message : "Expo push request failed" };
   }
 }
 

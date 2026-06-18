@@ -93,14 +93,14 @@ const patientNavItems: NavItem[] = [
     icon: Pill,
   },
   {
-    name: "Pharmacy & Refills",
-    href: "/dashboard/pharmacy",
+    name: "My Orders",
+    href: "/dashboard/my-orders",
     icon: ShoppingBag,
   },
   {
-    name: "My Orders",
-    href: "/dashboard/my-orders",
-    icon: ClipboardCheck,
+    name: "Messages",
+    href: "/dashboard/patient/messages",
+    icon: MessageSquare,
   },
   {
     name: "Choose Your Doctor",
@@ -158,12 +158,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     useNotifications();
   const [notifGranted, setNotifGranted] = useState(false);
   const { role, loading: roleLoading } = useUserRole();
-
-  useEffect(() => {
-    if (initialized && permission === "granted") {
-      setNotifGranted((prev) => prev || true);
-    }
-  }, [initialized, permission]);
 
   useEffect(() => {
     if (!roleLoading && role === null && !checkingAuth) {
@@ -302,11 +296,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   if (role === "doctor") {
     return (
       <div className="flex h-screen w-screen overflow-hidden clinical-bg-gradient font-sans">
-        <DoctorSidebar
-          onSwitchToPatient={() => {
-            router.push("/dashboard");
-          }}
-        />
+        <DoctorSidebar />
 
         {/* Main Content shifted to the right by 80px (w-20) */}
         <main

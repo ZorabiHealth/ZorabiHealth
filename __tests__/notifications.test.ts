@@ -42,7 +42,7 @@ describe("NotificationDispatch", () => {
   it("notification pagination — cursor-based fetch returns all pages", () => {
     const allNotifications = Array.from({ length: 25 }, (_, i) => ({ id: String(i + 1) }));
     const pageSize = 10;
-    const pages: any[][] = [];
+    const pages: { id: string }[][] = [];
     let cursor: string | null = null;
     do {
       const start = cursor ? parseInt(cursor) : 0;
@@ -57,7 +57,7 @@ describe("NotificationDispatch", () => {
   });
 
   it("dispatch with no devices returns gracefully", () => {
-    const devices: any[] = [];
+    const devices: string[] = [];
     expect(devices.length).toBe(0);
   });
 

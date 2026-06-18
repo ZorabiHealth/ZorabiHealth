@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
@@ -9,9 +9,7 @@ import {
   MapPin,
   IndianRupee,
   Globe,
-  Star,
   ShieldCheck,
-  Clock,
   Video,
   MessageSquare,
   User,
@@ -48,12 +46,17 @@ export default function BookAppointment() {
   const [searchQuery, setSearchQuery] = useState("");
   const [specializationFilter, setSpecializationFilter] = useState("");
   const [specializations, setSpecializations] = useState<string[]>([]);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
   const [selectedDoctor, setSelectedDoctor] = useState<Doctor | null>(null);
   const [showBookingModal, setShowBookingModal] = useState(false);
 
   // Booking form
-  const [bookingDate, setBookingDate] = useState("");
+  const [bookingDate, setBookingDate] = useState(() => {
+    const d = new Date();
+    d.setDate(d.getDate() + 1);
+    return d.toLocaleDateString("sv-SE");
+  });
   const [bookingStart, setBookingStart] = useState("10:00");
   const [bookingEnd, setBookingEnd] = useState("10:30");
   const [bookingType, setBookingType] = useState<"physical" | "video" | "chat">("physical");
@@ -63,32 +66,9 @@ export default function BookAppointment() {
 
   const [doctorAvatars, setDoctorAvatars] = useState<Record<string, string>>({});
 
-  useEffect(() => {
-    if (!authLoading && !userId) {
-      router.push("/login");
-      return;
-    }
-    if (!authLoading && role !== "patient") {
-      router.push("/dashboard");
-      return;
-    }
-  }, [authLoading, role, userId, router]);
-
-  useEffect(() => {
-    if (!userId) return;
-    fetchDoctors();
-  }, [userId]);
-
-  useEffect(() => {
-    if (!bookingDate) {
-      const tomorrow = new Date();
-      tomorrow.setDate(tomorrow.getDate() + 1);
-      setBookingDate(tomorrow.toLocaleDateString("sv-SE"));
-    }
-  }, []);
-
-  const fetchDoctors = async () => {
+  const fetchDoctors = useCallback(async () => {
     setLoading(true);
+    setFetchError(null);
     try {
       const { data, error } = await supabase
         .from("doctor_profiles")
@@ -116,10 +96,30 @@ export default function BookAppointment() {
       setDoctorAvatars(avatars);
     } catch (err) {
       console.error("Failed to fetch doctors:", err);
+      setFetchError("Failed to load doctors. Please try again.");
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    if (!authLoading && !userId) {
+      router.push("/login");
+      return;
+    }
+    if (!authLoading && role !== "patient") {
+      router.push("/dashboard");
+      return;
+    }
+  }, [authLoading, role, router, userId]);
+
+  useEffect(() => {
+    if (!userId) return;
+
+    queueMicrotask(() => {
+      void fetchDoctors();
+    });
+  }, [userId, fetchDoctors]);
 
   const filteredDoctors = doctors.filter((doc) => {
     const q = searchQuery.toLowerCase();
@@ -161,7 +161,7 @@ export default function BookAppointment() {
       const { data: patientProfile } = await supabase
         .from("patient_profiles")
         .select("id")
-        .eq("id", userId)
+        .eq("user_id", userId)
         .single();
 
       if (!patientProfile) {
@@ -188,10 +188,12 @@ export default function BookAppointment() {
         setShowBookingModal(false);
         setSelectedDoctor(null);
       }, 2000);
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : "Failed to book appointment. Please try again.";
       console.error("Failed to book appointment:", err);
       const { showToast } = await import("@/components/ui/toast");
-      showToast(err?.message || "Failed to book appointment. Please try again.", "error");
+      showToast(message, "error");
     } finally {
       setSaving(false);
     }
@@ -259,7 +261,20 @@ export default function BookAppointment() {
         </div>
 
         {/* Results */}
-        {filteredDoctors.length === 0 ? (
+        {fetchError ? (
+          <div className="text-center py-12">
+            <p className="text-red-500 text-sm font-medium">{fetchError}</p>
+            <button
+              onClick={() => {
+                setFetchError(null);
+                fetchDoctors();
+              }}
+              className="mt-3 text-[#0c4381] text-xs font-semibold underline"
+            >
+              Try Again
+            </button>
+          </div>
+        ) : filteredDoctors.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center">
             <User className="w-16 h-16 text-gray-200 mb-4" />
             <h4 className="text-base font-medium text-gray-900 mb-1">No doctors found</h4>
@@ -331,13 +346,24 @@ export default function BookAppointment() {
                 </div>
 
                 {/* Actions */}
-                <div className="px-5 pb-4 pt-1">
+                <div className="px-5 pb-4 pt-1 flex gap-2">
                   <button
                     onClick={() => openBooking(doc)}
-                    className="w-full flex items-center justify-center gap-2 py-2.5 bg-[#0c4381] text-white rounded-xl hover:bg-[#093262] transition-colors text-xs font-bold shadow-sm"
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-[#0c4381] text-white rounded-xl hover:bg-[#093262] transition-colors text-xs font-bold shadow-sm"
                   >
                     <Calendar className="w-3.5 h-3.5" />
-                    Book Appointment
+                    Book
+                  </button>
+                  <button
+                    onClick={() =>
+                      router.push(
+                        `/dashboard/patient/messages?doctor=${doc.id}&doctorUser=${doc.user_id}`
+                      )
+                    }
+                    className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-emerald-600 text-white rounded-xl hover:bg-emerald-700 transition-colors text-xs font-bold shadow-sm"
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    Chat
                   </button>
                 </div>
               </div>

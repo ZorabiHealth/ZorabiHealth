@@ -25,6 +25,7 @@ import {
 import { cleanAndValidatePhone } from "@/lib/validation";
 import { loadCart, saveCart, type PharmProduct, type CartItem } from "@/lib/pharmacy-store-data";
 import { fetchStoreProducts } from "@/lib/store-products";
+import { supabase } from "@/lib/supabase";
 
 type Step = "cart" | "details" | "payment" | "review";
 
@@ -60,11 +61,13 @@ export default function CheckoutPage() {
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
-    setCartItems(loadCart());
-    fetchStoreProducts().then((data) => {
+    const init = async () => {
+      setCartItems(loadCart());
+      const data = await fetchStoreProducts();
       setProducts(data);
       setLoadingProducts(false);
-    });
+    };
+    init();
   }, []);
 
   const productMap = useMemo(() => {
@@ -126,9 +129,18 @@ export default function CheckoutPage() {
   const handlePlaceOrder = async () => {
     setSubmitting(true);
     try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const token = session?.access_token;
+      if (!token) throw new Error("Not authenticated");
+
       const res = await fetch("/api/store/orders", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
         body: JSON.stringify({
           items: enrichedItems.map((i) => ({
             productId: i.productId,

@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 export const dynamic = "force-dynamic";
 
 export async function GET() {
-  const checks: Record<string, any> = {
+  const checks: Record<string, boolean> = {
     vapid_public_key: !!process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
     vapid_private_key: !!process.env.VAPID_PRIVATE_KEY,
   };

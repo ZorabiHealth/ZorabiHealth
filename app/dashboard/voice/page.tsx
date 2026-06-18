@@ -404,9 +404,9 @@ export default function VoiceAgentPage() {
         default:
           return "";
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Voice Intent Log Error]", err);
-      return `I encountered an error logging that: ${err.message || "database connection failed"}.`;
+      return `I encountered an error logging that: ${err instanceof Error ? err.message : "database connection failed"}.`;
     }
   };
 

@@ -1,5 +1,13 @@
 "use client";
 
+declare let pendo: {
+  initialize: (config: Record<string, unknown>) => void;
+  identify: (visitor: Record<string, unknown>) => void;
+  pageLoad: () => void;
+  clearSession?: () => void;
+  [key: string]: unknown;
+};
+
 import React from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -19,11 +27,7 @@ import {
   HeartPulse,
 } from "lucide-react";
 
-interface DoctorSidebarProps {
-  onSwitchToPatient?: () => void;
-}
-
-export function DoctorSidebar({ onSwitchToPatient }: DoctorSidebarProps) {
+export function DoctorSidebar() {
   const pathname = usePathname();
   const router = useRouter();
 
@@ -95,16 +99,6 @@ export function DoctorSidebar({ onSwitchToPatient }: DoctorSidebarProps) {
       </div>
 
       <div className="flex flex-col gap-4 mt-auto items-center">
-        {onSwitchToPatient && (
-          <button
-            onClick={onSwitchToPatient}
-            title="Switch to Patient View"
-            className="text-emerald-600 p-3 hover:bg-emerald-50 rounded-xl transition-all duration-200 cursor-pointer"
-          >
-            <HeartPulse className="w-5 h-5" />
-          </button>
-        )}
-
         <button
           onClick={handleHelp}
           title="Help"

@@ -23,7 +23,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ unpaired: true, count: updated?.length || 0 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Internal error" },
+      { status: 500 }
+    );
   }
 }

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import {
   Settings,
   Save,
@@ -22,13 +23,76 @@ import {
   X,
   ChevronDown,
   ChevronUp,
+  ExternalLink,
 } from "lucide-react";
+
+interface DoctorProfile {
+  id: string;
+  doctor_name: string;
+  workspace_name: string;
+  avatar_url: string;
+  signature_url: string;
+  specialization: string;
+  qualification: string;
+  hospital_affiliation: string;
+  consultation_fee: number;
+  bio: string;
+  languages: string;
+  [key: string]: unknown;
+}
+
+function Section({
+  id,
+  title,
+  icon,
+  children,
+  isOpen,
+  onToggle,
+}: {
+  id: string;
+  title: string;
+  icon: React.ReactNode;
+  children: React.ReactNode;
+  isOpen: boolean;
+  onToggle: (id: string) => void;
+}) {
+  return (
+    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+      <button
+        onClick={() => onToggle(isOpen ? "" : id)}
+        className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-lg bg-[#0c4381]/10 flex items-center justify-center text-[#0c4381]">
+            {icon}
+          </div>
+          <span className="text-sm font-semibold text-gray-900">{title}</span>
+        </div>
+        {isOpen ? (
+          <ChevronUp className="w-4 h-4 text-gray-400" />
+        ) : (
+          <ChevronDown className="w-4 h-4 text-gray-400" />
+        )}
+      </button>
+      {isOpen && <div className="px-6 pb-6">{children}</div>}
+    </div>
+  );
+}
+
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1.5">
+      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</label>
+      {children}
+    </div>
+  );
+}
 
 export default function DoctorSettings() {
   const { role, userId, loading: authLoading } = useUserRole();
   const router = useRouter();
 
-  const [doctorProfile, setDoctorProfile] = useState<any>(null);
+  const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -48,11 +112,18 @@ export default function DoctorSettings() {
   const [refillAlerts, setRefillAlerts] = useState(true);
   const [apptReminders, setApptReminders] = useState(true);
 
+  // Prescriptions list
+  const [prescriptions, setPrescriptions] = useState<
+    { id: string; diagnosis: string; status: string; created_at: string; hasPdf: boolean }[]
+  >([]);
+  const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
+
   // Avatar & Signature
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [sigFile, setSigFile] = useState<File | null>(null);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [sigPreview, setSigPreview] = useState<string | null>(null);
+  const [doctorEmail, setDoctorEmail] = useState("");
 
   // Accordion
   const [openSection, setOpenSection] = useState<string>("profile");
@@ -70,7 +141,7 @@ export default function DoctorSettings() {
 
   useEffect(() => {
     if (!userId) return;
-    const fetchProfile = async () => {
+    const fetchProfile = async (): Promise<{ id: string } | null> => {
       try {
         setLoading(true);
         const { data: profile } = await supabase
@@ -93,6 +164,11 @@ export default function DoctorSettings() {
           );
           setWorkspaceName(profile.workspace_name || "");
 
+          const {
+            data: { user },
+          } = await supabase.auth.getUser();
+          if (user?.email) setDoctorEmail(user.email);
+
           if (profile.avatar_url) {
             const { data } = supabase.storage
               .from("doctor_assets")
@@ -105,6 +181,8 @@ export default function DoctorSettings() {
               .getPublicUrl(profile.signature_url);
             setSigPreview(data.publicUrl);
           }
+
+          return profile;
         }
 
         const { data: prefs } = await supabase
@@ -119,11 +197,47 @@ export default function DoctorSettings() {
         }
       } catch (err) {
         console.error("Failed to load profile:", err);
+        return null;
       } finally {
         setLoading(false);
       }
+      return null;
     };
-    fetchProfile();
+    fetchProfile().then(async (profile) => {
+      if (profile?.id) {
+        const doctorId = profile.id;
+        setLoadingPrescriptions(true);
+        try {
+          const { data: rxData } = await supabase
+            .from("prescriptions")
+            .select("id, diagnosis, status, created_at")
+            .eq("doctor_id", doctorId)
+            .order("created_at", { ascending: false })
+            .limit(50);
+
+          if (rxData) {
+            const rxIds = rxData.map((r) => r.id);
+            const { data: docData } = await supabase
+              .from("prescription_documents")
+              .select("prescription_id")
+              .in("prescription_id", rxIds);
+
+            const hasPdfSet = new Set(docData?.map((d) => d.prescription_id) ?? []);
+
+            setPrescriptions(
+              rxData.map((r) => ({
+                ...r,
+                hasPdf: hasPdfSet.has(r.id),
+              }))
+            );
+          }
+        } catch (err) {
+          console.error("Failed to load prescriptions:", err);
+        } finally {
+          setLoadingPrescriptions(false);
+        }
+      }
+    });
   }, [userId]);
 
   useEffect(() => {
@@ -131,6 +245,18 @@ export default function DoctorSettings() {
     const t = setTimeout(() => setToast(null), 4000);
     return () => clearTimeout(t);
   }, [toast]);
+
+  useEffect(() => {
+    return () => {
+      if (avatarPreview?.startsWith("blob:")) URL.revokeObjectURL(avatarPreview);
+    };
+  }, [avatarFile]);
+
+  useEffect(() => {
+    return () => {
+      if (sigPreview?.startsWith("blob:")) URL.revokeObjectURL(sigPreview);
+    };
+  }, [sigFile]);
 
   const handleSaveProfile = async () => {
     if (!doctorProfile) return;
@@ -187,28 +313,35 @@ export default function DoctorSettings() {
         { onConflict: "user_id" }
       );
 
-      setDoctorProfile((prev: any) => ({
-        ...prev,
-        doctor_name: doctorName.trim() || prev.doctor_name,
-        specialization: specialization.trim() || prev.specialization,
-        qualification: qualification.trim() || prev.qualification,
-        hospital_affiliation: hospitalAffiliation.trim() || prev.hospital_affiliation,
-        consultation_fee: consultationFee ? parseFloat(consultationFee) : prev.consultation_fee,
-        bio: bio.trim(),
-        languages: languages.trim()
-          ? languages
-              .split(",")
-              .map((l) => l.trim())
-              .filter(Boolean)
-          : [],
-        workspace_name: workspaceName.trim() || prev.workspace_name,
-        avatar_url: avatarUrl,
-        signature_url: sigUrl,
-      }));
+      setDoctorProfile((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          doctor_name: doctorName.trim() || prev.doctor_name,
+          specialization: specialization.trim() || prev.specialization,
+          qualification: qualification.trim() || prev.qualification,
+          hospital_affiliation: hospitalAffiliation.trim() || prev.hospital_affiliation,
+          consultation_fee: consultationFee ? parseFloat(consultationFee) : prev.consultation_fee,
+          bio: bio.trim(),
+          languages: languages.trim()
+            ? languages
+                .split(",")
+                .map((l) => l.trim())
+                .filter(Boolean)
+                .join(", ")
+            : "",
+          workspace_name: workspaceName.trim() || prev.workspace_name,
+          avatar_url: avatarUrl,
+          signature_url: sigUrl,
+        };
+      });
       setToast({ message: "Settings saved successfully!", type: "success" });
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to save settings:", err);
-      setToast({ message: err?.message || "Failed to save settings.", type: "error" });
+      setToast({
+        message: err instanceof Error ? err.message : "Failed to save settings.",
+        type: "error",
+      });
     } finally {
       setSaving(false);
     }
@@ -222,49 +355,13 @@ export default function DoctorSettings() {
       );
       if (error) throw error;
       setToast({ message: "Password reset email sent!", type: "success" });
-    } catch (err: any) {
-      setToast({ message: err?.message || "Failed to send reset email.", type: "error" });
+    } catch (err: unknown) {
+      setToast({
+        message: err instanceof Error ? err.message : "Failed to send reset email.",
+        type: "error",
+      });
     }
   };
-
-  const Section = ({
-    id,
-    title,
-    icon,
-    children,
-  }: {
-    id: string;
-    title: string;
-    icon: React.ReactNode;
-    children: React.ReactNode;
-  }) => (
-    <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-      <button
-        onClick={() => setOpenSection(openSection === id ? "" : id)}
-        className="w-full flex items-center justify-between px-6 py-4 hover:bg-gray-50 transition-colors"
-      >
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-lg bg-[#0c4381]/10 flex items-center justify-center text-[#0c4381]">
-            {icon}
-          </div>
-          <span className="text-sm font-semibold text-gray-900">{title}</span>
-        </div>
-        {openSection === id ? (
-          <ChevronUp className="w-4 h-4 text-gray-400" />
-        ) : (
-          <ChevronDown className="w-4 h-4 text-gray-400" />
-        )}
-      </button>
-      {openSection === id && <div className="px-6 pb-6">{children}</div>}
-    </div>
-  );
-
-  const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <div className="space-y-1.5">
-      <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide">{label}</label>
-      {children}
-    </div>
-  );
 
   if (authLoading || loading) {
     return (
@@ -354,7 +451,7 @@ export default function DoctorSettings() {
                 {doctorProfile?.specialization || "General Medicine"}
               </p>
               <p className="text-xs text-gray-400 mt-0.5">
-                License: {doctorProfile?.license_number}
+                License: {String(doctorProfile?.license_number ?? "")}
               </p>
             </div>
             <div className="text-center">
@@ -389,7 +486,13 @@ export default function DoctorSettings() {
         </div>
 
         {/* Profile Section */}
-        <Section id="profile" title="Profile Information" icon={<User className="w-4 h-4" />}>
+        <Section
+          id="profile"
+          title="Profile Information"
+          icon={<User className="w-4 h-4" />}
+          isOpen={openSection === "profile"}
+          onToggle={(id) => setOpenSection(id)}
+        >
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
             <Field label="Your Full Name">
               <input
@@ -473,6 +576,8 @@ export default function DoctorSettings() {
           id="notifications"
           title="Notification Preferences"
           icon={<Bell className="w-4 h-4" />}
+          isOpen={openSection === "notifications"}
+          onToggle={(id) => setOpenSection(id)}
         >
           <div className="space-y-3 mt-4">
             <label className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer">
@@ -516,12 +621,102 @@ export default function DoctorSettings() {
           </div>
         </Section>
 
+        {/* Prescriptions & Documents Section */}
+        <Section
+          id="prescriptions"
+          title="Prescriptions &amp; Documents"
+          icon={<FileText className="w-4 h-4" />}
+          isOpen={openSection === "prescriptions"}
+          onToggle={(id) => setOpenSection(id)}
+        >
+          <div className="mt-4 space-y-3">
+            {loadingPrescriptions ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-5 h-5 animate-spin text-[#0c4381]" />
+              </div>
+            ) : prescriptions.length === 0 ? (
+              <p className="text-sm text-gray-400 text-center py-8">No prescriptions yet.</p>
+            ) : (
+              prescriptions.map((rx) => (
+                <div
+                  key={rx.id}
+                  className="flex items-center justify-between p-3 rounded-xl bg-gray-50 hover:bg-gray-100 transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-gray-900 truncate">
+                      {rx.diagnosis || "No diagnosis"}
+                    </p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      <span className="text-[10px] text-gray-400">
+                        {new Date(rx.created_at).toLocaleDateString()}
+                      </span>
+                      <span
+                        className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${
+                          rx.status === "completed"
+                            ? "bg-emerald-100 text-emerald-700"
+                            : rx.status === "active"
+                              ? "bg-blue-100 text-blue-700"
+                              : "bg-gray-100 text-gray-500"
+                        }`}
+                      >
+                        {rx.status}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0 ml-3">
+                    {rx.hasPdf && (
+                      <button
+                        onClick={async () => {
+                          try {
+                            const { data: docData } = await supabase
+                              .from("prescription_documents")
+                              .select("storage_path")
+                              .eq("prescription_id", rx.id)
+                              .single();
+                            if (docData?.storage_path) {
+                              const { data: signed } = await supabase.storage
+                                .from("prescription_pdfs")
+                                .createSignedUrl(docData.storage_path, 3600);
+                              if (signed?.signedUrl) {
+                                window.open(signed.signedUrl, "_blank");
+                              }
+                            }
+                          } catch (err) {
+                            console.error("Failed to open PDF:", err);
+                          }
+                        }}
+                        className="flex items-center gap-1 px-2.5 py-1.5 bg-[#0c4381]/10 text-[#0c4381] rounded-lg text-[10px] font-semibold hover:bg-[#0c4381]/20 transition-colors"
+                      >
+                        <ExternalLink className="w-3 h-3" /> PDF
+                      </button>
+                    )}
+                    <Link
+                      href={`/dashboard/doctor?edit=${rx.id}`}
+                      className="text-[10px] text-gray-400 hover:text-[#0c4381] font-semibold transition-colors"
+                    >
+                      Edit
+                    </Link>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </Section>
+
         {/* Account Section */}
-        <Section id="account" title="Account & Security" icon={<FileText className="w-4 h-4" />}>
+        <Section
+          id="account"
+          title="Account & Security"
+          icon={<FileText className="w-4 h-4" />}
+          isOpen={openSection === "account"}
+          onToggle={(id) => setOpenSection(id)}
+        >
           <div className="mt-4 space-y-4">
             <div className="p-4 rounded-xl bg-gray-50">
               <p className="text-sm font-medium text-gray-900">Email Address</p>
-              <p className="text-sm text-gray-500 mt-0.5">{doctorProfile?.user_id || userId}</p>
+              <p className="text-sm text-gray-500 mt-0.5">
+                {doctorEmail || String(doctorProfile?.user_id ?? userId)}
+              </p>
             </div>
             <button
               onClick={resetPassword}

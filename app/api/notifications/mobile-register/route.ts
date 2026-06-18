@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
       .eq(lookupField, lookupValue)
       .maybeSingle();
 
-    const payload: Record<string, any> = {
+    const payload: Record<string, string | null | boolean | Record<string, unknown>> = {
       device_name: device_name || req.headers.get("User-Agent") || "Mobile App",
       device_os: device_os || null,
       app_version: app_version || null,
@@ -80,7 +80,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ device_id: inserted.id, registered: true, updated: false });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Internal error" },
+      { status: 500 }
+    );
   }
 }

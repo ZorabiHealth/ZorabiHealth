@@ -524,11 +524,11 @@ export default function MedicationsPage() {
             ok: true,
             msg: `Test alert sent to ${med.emergencyContact?.name} at ${med.emergencyContact?.phone}`,
           });
-        } catch (err: any) {
+        } catch (err: unknown) {
           setSmsResult({
             id: med.id,
             ok: false,
-            msg: err.message || "Failed to trigger test alarm",
+            msg: err instanceof Error ? err.message : "Failed to trigger test alarm",
           });
         } finally {
           setSendingTestSMS(null);

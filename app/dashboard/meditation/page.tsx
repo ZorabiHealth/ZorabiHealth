@@ -26,6 +26,18 @@ interface Exercise {
   description: string;
 }
 
+interface YouTubeVideo {
+  id?: { videoId?: string };
+  snippet?: {
+    title?: string;
+    channelTitle?: string;
+    thumbnails?: {
+      medium?: { url: string };
+      high?: { url: string };
+    };
+  };
+}
+
 const exercises: Exercise[] = [
   {
     id: "journey-1",
@@ -92,7 +104,7 @@ export default function MeditationPage() {
   );
 
   // YouTube video suggestions
-  const [youtubeVideos, setYoutubeVideos] = useState<any[]>([]);
+  const [youtubeVideos, setYoutubeVideos] = useState<YouTubeVideo[]>([]);
   const [ytLoading, setYtLoading] = useState(true);
 
   useEffect(() => {
@@ -110,8 +122,8 @@ export default function MeditationPage() {
       .then((results) => {
         const all = results.flatMap((r) => r.items || []);
         const unique = all.filter(
-          (v: any, i: number, self: any[]) =>
-            self.findIndex((s: any) => s.id?.videoId === v.id?.videoId) === i
+          (v: YouTubeVideo, i: number, self: YouTubeVideo[]) =>
+            self.findIndex((s: YouTubeVideo) => s.id?.videoId === v.id?.videoId) === i
         );
         setYoutubeVideos(unique.slice(0, 12));
       })
@@ -123,7 +135,9 @@ export default function MeditationPage() {
   const playPhaseChime = (freq: number, type: "sine" | "triangle" = "sine", duration = 0.5) => {
     if (typeof window === "undefined") return;
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
       const osc = ctx.createOscillator();
       const gainNode = ctx.createGain();
@@ -176,7 +190,9 @@ export default function MeditationPage() {
       if (soundType === "None" || typeof window === "undefined") return;
 
       try {
-        const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+        const AudioCtx =
+          window.AudioContext ||
+          (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
         const ctx = new AudioCtx();
         audioCtxRef.current = ctx;
 
@@ -248,7 +264,9 @@ export default function MeditationPage() {
   const startVideoSynth = () => {
     if (typeof window === "undefined") return;
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       const ctx = new AudioCtx();
       videoCtxRef.current = ctx;
 
@@ -770,7 +788,7 @@ export default function MeditationPage() {
                     <div className="h-2 bg-slate-100 rounded w-1/3" />
                   </div>
                 ))
-              : youtubeVideos.slice(0, 4).map((video: any) => {
+              : youtubeVideos.slice(0, 4).map((video: YouTubeVideo) => {
                   const videoId = video.id?.videoId || video.snippet?.title || "";
                   let hash = 0;
                   for (let i = 0; i < videoId.length; i++) {
@@ -795,9 +813,10 @@ export default function MeditationPage() {
                         <Image
                           src={
                             video.snippet?.thumbnails?.medium?.url ||
-                            video.snippet?.thumbnails?.high?.url
+                            video.snippet?.thumbnails?.high?.url ||
+                            ""
                           }
-                          alt={video.snippet?.title}
+                          alt={video.snippet?.title || ""}
                           fill
                           className="object-cover group-hover:scale-105 transition-transform"
                           sizes="100%"

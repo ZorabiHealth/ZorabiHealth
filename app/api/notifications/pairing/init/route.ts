@@ -27,7 +27,10 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ code, expires_in: 600 });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Internal error" },
+      { status: 500 }
+    );
   }
 }

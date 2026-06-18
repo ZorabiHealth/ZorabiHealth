@@ -76,6 +76,18 @@ interface MealSuggestion {
   severity: "info" | "warning" | "critical";
 }
 
+interface YouTubeVideo {
+  id: { videoId: string };
+  snippet: {
+    title: string;
+    channelTitle: string;
+    thumbnails: {
+      high?: { url: string };
+      medium?: { url: string };
+    };
+  };
+}
+
 let USER_ID = "";
 
 const CategoryIcon = ({
@@ -117,11 +129,18 @@ const difficultyColor: Record<string, string> = {
 };
 
 async function apiFetch(url: string, options?: RequestInit) {
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  const token = session?.access_token;
   const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
     ...options,
   });
-  let json: any;
+  let json;
   try {
     json = await res.json();
   } catch {
@@ -172,9 +191,9 @@ export default function WorkoutDashboardPage() {
   const [sessionPaused, setSessionPaused] = useState(false);
   const sessionIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  const [youtubeVideos, setYoutubeVideos] = useState<any[]>([]);
+  const [youtubeVideos, setYoutubeVideos] = useState<YouTubeVideo[]>([]);
   const [loadingVideos, setLoadingVideos] = useState(false);
-  const [selectedVideo, setSelectedVideo] = useState<any | null>(null);
+  const [selectedVideo, setSelectedVideo] = useState<YouTubeVideo | null>(null);
 
   const [mealSuggestions, setMealSuggestions] = useState<MealSuggestion[]>([]);
   const [mealLoading, setMealLoading] = useState(false);
@@ -220,8 +239,8 @@ export default function WorkoutDashboardPage() {
       setSchedule(sRes.data || []);
       setNutrition(nRes.data || []);
       setStreak(stRes.data || null);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
       setLoading(false);
     }
@@ -236,8 +255,28 @@ export default function WorkoutDashboardPage() {
   }, []);
 
   useEffect(() => {
-    fetchAllData();
-  }, [selectedDate, fetchAllData]);
+    const loadData = async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const [wRes, sRes, nRes, stRes] = await Promise.all([
+          apiFetch(`/api/workouts?userId=${USER_ID}`),
+          apiFetch(`/api/workouts/schedule?userId=${USER_ID}&date=${selectedDate}`),
+          apiFetch(`/api/workouts/nutrition?userId=${USER_ID}&date=${selectedDate}`),
+          apiFetch(`/api/workouts/streaks?userId=${USER_ID}`),
+        ]);
+        setWorkouts(wRes.data || []);
+        setSchedule(sRes.data || []);
+        setNutrition(nRes.data || []);
+        setStreak(stRes.data || null);
+      } catch (err: unknown) {
+        setError(err instanceof Error ? err.message : "Failed to load data");
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadData();
+  }, [selectedDate]);
 
   const changeDate = (offset: number) => {
     const next = new Date(d);
@@ -888,8 +927,9 @@ export default function WorkoutDashboardPage() {
                 >
                   <Image
                     src={
-                      youtubeVideos[0].snippet.thumbnails.high?.url ||
-                      youtubeVideos[0].snippet.thumbnails.medium?.url
+                      youtubeVideos[0].snippet.thumbnails.high?.url ??
+                      youtubeVideos[0].snippet.thumbnails.medium?.url ??
+                      ""
                     }
                     alt={youtubeVideos[0].snippet.title}
                     fill
@@ -945,8 +985,9 @@ export default function WorkoutDashboardPage() {
                 >
                   <Image
                     src={
-                      youtubeVideos[1].snippet.thumbnails.high?.url ||
-                      youtubeVideos[1].snippet.thumbnails.medium?.url
+                      youtubeVideos[1].snippet.thumbnails.high?.url ??
+                      youtubeVideos[1].snippet.thumbnails.medium?.url ??
+                      ""
                     }
                     alt={youtubeVideos[1].snippet.title}
                     fill
@@ -1032,7 +1073,7 @@ export default function WorkoutDashboardPage() {
                   >
                     <div className="aspect-video rounded-xl mb-2.5 relative overflow-hidden bg-slate-200">
                       <Image
-                        src={video.snippet.thumbnails.medium?.url}
+                        src={video.snippet.thumbnails.medium?.url ?? ""}
                         alt={video.snippet.title}
                         fill
                         className="absolute inset-0 object-cover group-hover:scale-105 transition-transform duration-300"
@@ -1120,7 +1161,7 @@ export default function WorkoutDashboardPage() {
                   >
                     <div className="aspect-video relative rounded-lg overflow-hidden bg-slate-200 shadow-sm">
                       <Image
-                        src={video.snippet.thumbnails.medium.url}
+                        src={video.snippet.thumbnails.medium?.url ?? ""}
                         alt={video.snippet.title}
                         fill
                         className="object-cover group-hover:scale-105 transition-transform duration-300"

@@ -7,16 +7,12 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseLike = any;
+
 export async function syncOfflineQueue(
   items: SyncQueueItem[],
-  supabaseClient: {
-    from: (table: string) => {
-      insert: (payload: Record<string, unknown>) => any;
-      upsert: (payload: Record<string, unknown>) => any;
-      update: (payload: Record<string, unknown>) => any;
-      delete: () => any;
-    };
-  }
+  supabaseClient: SupabaseLike
 ): Promise<SyncQueueItem[]> {
   if (items.length === 0) return [];
 

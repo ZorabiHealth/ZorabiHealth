@@ -17,11 +17,13 @@ on conflict (id) do nothing;
 -- (already enabled by default in Supabase)
 
 -- Allow authenticated users to read doctor assets (public bucket)
+drop policy if exists "Anyone can view doctor assets" on storage.objects;
 create policy "Anyone can view doctor assets"
   on storage.objects for select
   using (bucket_id = 'doctor_assets');
 
 -- Allow doctors to upload their own assets
+drop policy if exists "Doctors upload own assets" on storage.objects;
 create policy "Doctors upload own assets"
   on storage.objects for insert
   with check (
@@ -30,6 +32,7 @@ create policy "Doctors upload own assets"
   );
 
 -- Allow doctors to update/delete their own assets
+drop policy if exists "Doctors manage own assets" on storage.objects;
 create policy "Doctors manage own assets"
   on storage.objects for all
   using (

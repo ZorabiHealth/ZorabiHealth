@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+import { callGemini } from "@/lib/gemini";
 
 const MEAL_SYSTEM_PROMPT = `You are ZorabiHealth's clinical nutrition AI. 
 Given a list of symptoms and active medications, suggest meal recommendations.
@@ -13,71 +12,86 @@ Return a JSON array of meal suggestions. Each suggestion must have:
 
 Return ONLY valid JSON, no markdown.`;
 
-export async function POST(req: Request) {
+interface MealSuggestion {
+  id: string;
+  title: string;
+  description: string;
+  foods: string[];
+  avoid: string[];
+  severity: "info" | "warning" | "critical";
+}
+
+interface MealsRequestBody {
+  symptoms?: string[];
+  medications?: string[];
+}
+
+const fallbackSuggestions: MealSuggestion[] = [
+  {
+    id: "fallback-1",
+    title: "Balanced Nutrition",
+    description: "Focus on whole foods, lean proteins, and plenty of vegetables.",
+    foods: ["Leafy greens", "Lean chicken", "Brown rice", "Berries", "Nuts"],
+    avoid: ["Processed foods", "Excess sugar", "Fried items"],
+    severity: "info",
+  },
+];
+
+function parseSuggestions(text: string): MealSuggestion[] {
   try {
-    const { symptoms, medications } = await req.json();
-
-    if (!GEMINI_API_KEY) {
-      return NextResponse.json({
-        suggestions: [
-          {
-            id: "fallback-1",
-            title: "Balanced Nutrition",
-            description: "Focus on whole foods, lean proteins, and plenty of vegetables.",
-            foods: ["Leafy greens", "Lean chicken", "Brown rice", "Berries", "Nuts"],
-            avoid: ["Processed foods", "Excess sugar", "Fried items"],
-            severity: "info",
-          },
-        ],
-      });
-    }
-
-    const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: "user",
-              parts: [
-                {
-                  text: `${MEAL_SYSTEM_PROMPT}\n\nSymptoms: ${JSON.stringify(symptoms)}\nActive medications: ${JSON.stringify(medications)}\n\nGenerate 2-3 meal suggestions:`,
-                },
-              ],
-            },
-          ],
-          generationConfig: { temperature: 0.4, maxOutputTokens: 500 },
-        }),
-      }
-    );
-
-    const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || "[]";
     const cleaned = text
       .replace(/```json\s*/g, "")
       .replace(/```\s*/g, "")
       .trim();
-    let suggestions;
-    try {
-      suggestions = JSON.parse(cleaned);
-    } catch {
-      suggestions = [
-        {
-          id: "parse-1",
-          title: "Balanced Meal Plan",
-          description: "Prioritise whole foods and adequate hydration.",
-          foods: ["Vegetables", "Lean protein", "Whole grains"],
-          avoid: ["Processed sugar", "Excess sodium"],
-          severity: "info",
-        },
-      ];
+    const parsed = JSON.parse(cleaned);
+    if (Array.isArray(parsed) && parsed.length > 0) {
+      return parsed.map((item: Record<string, unknown>, index: number) => ({
+        id: `meal-${index + 1}`,
+        title: String(item.title ?? ""),
+        description: String(item.description ?? ""),
+        foods: Array.isArray(item.foods) ? item.foods.map(String) : [],
+        avoid: Array.isArray(item.avoid) ? item.avoid.map(String) : [],
+        severity: (["info", "warning", "critical"].includes(String(item.severity))
+          ? String(item.severity)
+          : "info") as "info" | "warning" | "critical",
+      }));
+    }
+  } catch {
+    // fall through to fallback
+  }
+  return [
+    {
+      id: "parse-1",
+      title: "Balanced Meal Plan",
+      description: "Prioritise whole foods and adequate hydration.",
+      foods: ["Vegetables", "Lean protein", "Whole grains"],
+      avoid: ["Processed sugar", "Excess sodium"],
+      severity: "info",
+    },
+  ];
+}
+
+export async function POST(req: Request) {
+  try {
+    const body: MealsRequestBody = (await req.json()) as MealsRequestBody;
+    const { symptoms = [], medications = [] } = body;
+
+    if (!Array.isArray(symptoms) || !Array.isArray(medications)) {
+      return NextResponse.json({ suggestions: fallbackSuggestions }, { status: 200 });
     }
 
-    return NextResponse.json({ suggestions });
-  } catch (err) {
-    console.error("[Gemini Meals Error]", err);
+    const result = await callGemini(
+      `${MEAL_SYSTEM_PROMPT}\n\nSymptoms: ${JSON.stringify(symptoms)}\nActive medications: ${JSON.stringify(medications)}\n\nGenerate 2-3 meal suggestions:`,
+      { model: "gemini-1.5-flash", maxTokens: 500 }
+    );
+
+    if (result.error || !result.text) {
+      return NextResponse.json({ suggestions: fallbackSuggestions }, { status: 200 });
+    }
+
+    const suggestions = parseSuggestions(result.text);
+    return NextResponse.json({ suggestions }, { status: 200 });
+  } catch {
     return NextResponse.json(
       {
         suggestions: [
@@ -87,7 +101,7 @@ export async function POST(req: Request) {
             description: "Stick to whole foods and stay hydrated.",
             foods: ["Fruits", "Vegetables", "Lean meats", "Water"],
             avoid: ["Junk food", "Sugary drinks"],
-            severity: "info",
+            severity: "info" as const,
           },
         ],
       },

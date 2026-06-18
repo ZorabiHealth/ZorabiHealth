@@ -61,6 +61,7 @@ interface UnifiedOrder {
   estimatedDelivery?: string;
   sourceTable: string;
   sourceId: string;
+  productId?: string | null;
 }
 
 type StatusFilter = "all" | "new" | "active" | "history";
@@ -119,15 +120,146 @@ export default function PharmacyOrdersPage() {
   const [pharmacyId, setPharmacyId] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<UnifiedOrder | null>(null);
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [vendorProducts, setVendorProducts] = useState<
+    { id: string; name: string; price: number }[]
+  >([]);
+  const [linkingProductFor, setLinkingProductFor] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
-    if (role === null) return;
-    if (role !== "pharmacy_vendor") {
-      router.push("/dashboard");
-      return;
+    if (!toast) return;
+    const t = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(t);
+  }, [toast]);
+
+  const fetchStoreOrders = async (): Promise<UnifiedOrder[]> => {
+    try {
+      const { data, error } = await supabase
+        .from("store_orders")
+        .select("*, store_order_items(*)")
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error || !data) return [];
+      return data.map((o: Record<string, unknown>) => {
+        const orderItems = (o.store_order_items as Array<Record<string, unknown>>) || [];
+        return {
+          id: o.tracking_id as string,
+          type: "store" as const,
+          typeLabel: "Store Order",
+          trackingId: o.tracking_id as string,
+          customerName: o.customer_name as string,
+          phone: o.phone as string,
+          address: o.address as string,
+          city: o.city as string,
+          pincode: o.pincode as string,
+          status: (o.status as string) || "PENDING",
+          total: Number(o.total) || 0,
+          items: orderItems.map((item: Record<string, unknown>) => ({
+            name: (item.product_name as string) || "Product",
+            quantity: Number(item.quantity) || 1,
+            price: Number(item.product_price) || 0,
+          })),
+          events: [],
+          createdAt: (o.created_at as string) || new Date().toISOString(),
+          estimatedDelivery: o.estimated_delivery as string | undefined,
+          sourceTable: "store_orders",
+          sourceId: o.id as string,
+        };
+      });
+    } catch {
+      return [];
     }
-    fetchOrders();
-  }, [role, userId, router]);
+  };
+
+  const fetchRefillOrders = async (): Promise<UnifiedOrder[]> => {
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+      const res = await fetch("/api/vendor/refill", { headers });
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!Array.isArray(data)) return [];
+      return data.map((o: Record<string, unknown>) => {
+        const profile = o.patient_profiles as Record<string, unknown> | null;
+        return {
+          id: o.tracking_id as string,
+          type: "refill" as const,
+          typeLabel: "Refill Request",
+          trackingId: o.tracking_id as string,
+          customerName:
+            (profile?.full_name as string) ||
+            (o.patient_email as string) ||
+            (o.vendor_name as string) ||
+            "Patient",
+          phone: (o.patient_phone as string) || "",
+          email: (o.patient_email as string) || (profile?.email as string) || "",
+          address: (o.delivery_address as string) || "",
+          city: "",
+          pincode: "",
+          status: (o.status as string) || "PENDING",
+          total: Number(o.total_price) || 0,
+          items: [
+            {
+              name: (o.medication_name as string) || "Medication",
+              quantity: Number(o.quantity) || 1,
+              price: Number(o.total_price) || 0,
+            },
+          ],
+          events: [],
+          createdAt: (o.created_at as string) || new Date().toISOString(),
+          estimatedDelivery: o.estimated_delivery as string | undefined,
+          productId: o.product_id as string | null | undefined,
+          sourceTable: "refill_orders",
+          sourceId: o.id as string,
+        };
+      });
+    } catch {
+      return [];
+    }
+  };
+
+  const fetchPrescriptionOrders = async (pharmId: string): Promise<UnifiedOrder[]> => {
+    try {
+      const { data, error } = await supabase
+        .from("orders")
+        .select("*, patient_profiles(full_name, email)")
+        .eq("pharmacy_id", pharmId)
+        .order("created_at", { ascending: false })
+        .limit(50);
+
+      if (error || !data) return [];
+      return data.map((o: Record<string, unknown>) => ({
+        id: o.tracking_id as string,
+        type: "prescription" as const,
+        typeLabel: "Prescription",
+        trackingId: o.tracking_id as string,
+        customerName:
+          ((o.patient_profiles as Record<string, unknown> | null)?.full_name as string) ||
+          "Patient",
+        phone: (o.patient_phone as string) || "",
+        email:
+          ((o.patient_profiles as Record<string, unknown> | null)?.email as string) ||
+          (o.patient_email as string) ||
+          "",
+        address: (o.delivery_address as string) || "",
+        city: (o.delivery_city as string) || "",
+        pincode: (o.delivery_pincode as string) || "",
+        status: (o.status as string) || "PENDING",
+        total: Number(o.total_amount) || 0,
+        items: [],
+        events: [],
+        createdAt: (o.created_at as string) || new Date().toISOString(),
+        sourceTable: "orders",
+        sourceId: o.id as string,
+      }));
+    } catch {
+      return [];
+    }
+  };
 
   const fetchOrders = async () => {
     setLoading(true);
@@ -159,119 +291,50 @@ export default function PharmacyOrdersPage() {
 
       allOrders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
       setOrders(allOrders);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[Orders] Failed:", err);
-      setFetchError(err.message || "Failed to load orders");
+      const message = err instanceof Error ? err.message : "Failed to load orders";
+      setFetchError(message);
     } finally {
       setLoading(false);
     }
   };
 
-  const fetchStoreOrders = async (): Promise<UnifiedOrder[]> => {
-    try {
-      const { data, error } = await supabase
-        .from("store_orders")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (error || !data) return [];
-      return data.map((o: Record<string, unknown>) => ({
-        id: o.tracking_id as string,
-        type: "store" as const,
-        typeLabel: "Store Order",
-        trackingId: o.tracking_id as string,
-        customerName: o.customer_name as string,
-        phone: o.phone as string,
-        address: o.address as string,
-        city: o.city as string,
-        pincode: o.pincode as string,
-        status: (o.status as string) || "PENDING",
-        total: Number(o.total) || 0,
-        items: [],
-        events: [],
-        createdAt: (o.created_at as string) || new Date().toISOString(),
-        estimatedDelivery: o.estimated_delivery as string | undefined,
-        sourceTable: "store_orders",
-        sourceId: o.id as string,
-      }));
-    } catch {
-      return [];
+  useEffect(() => {
+    if (role === null) return;
+    if (role !== "pharmacy_vendor") {
+      router.push("/dashboard");
+      return;
     }
-  };
-
-  const fetchRefillOrders = async (): Promise<UnifiedOrder[]> => {
-    try {
-      const { data, error } = await supabase
-        .from("refill_orders")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (error || !data) return [];
-      return data.map((o: Record<string, unknown>) => ({
-        id: o.tracking_id as string,
-        type: "refill" as const,
-        typeLabel: "Refill Request",
-        trackingId: o.tracking_id as string,
-        customerName: (o.patient_email as string) || (o.vendor_name as string) || "Patient",
-        phone: (o.patient_phone as string) || "",
-        address: (o.delivery_address as string) || "",
-        city: "",
-        pincode: "",
-        status: (o.status as string) || "PENDING",
-        total: Number(o.total_price) || 0,
-        items: [
-          {
-            name: (o.medication_name as string) || "Medication",
-            quantity: Number(o.quantity) || 1,
-            price: Number(o.total_price) || 0,
-          },
-        ],
-        events: [],
-        createdAt: (o.created_at as string) || new Date().toISOString(),
-        estimatedDelivery: o.estimated_delivery as string | undefined,
-        sourceTable: "refill_orders",
-        sourceId: o.id as string,
-      }));
-    } catch {
-      return [];
-    }
-  };
-
-  const fetchPrescriptionOrders = async (pharmId: string): Promise<UnifiedOrder[]> => {
-    try {
-      const { data, error } = await supabase
-        .from("orders")
-        .select("*")
-        .eq("pharmacy_id", pharmId)
-        .order("created_at", { ascending: false })
-        .limit(50);
-
-      if (error || !data) return [];
-      return data.map((o: Record<string, unknown>) => ({
-        id: o.tracking_id as string,
-        type: "prescription" as const,
-        typeLabel: "Prescription",
-        trackingId: o.tracking_id as string,
-        customerName: (o.delivery_address as string) || "Patient",
-        phone: (o.patient_phone as string) || "",
-        email: (o.patient_email as string) || "",
-        address: (o.delivery_address as string) || "",
-        city: (o.delivery_city as string) || "",
-        pincode: (o.delivery_pincode as string) || "",
-        status: (o.status as string) || "PENDING",
-        total: Number(o.total_amount) || 0,
-        items: [],
-        events: [],
-        createdAt: (o.created_at as string) || new Date().toISOString(),
-        sourceTable: "orders",
-        sourceId: o.id as string,
-      }));
-    } catch {
-      return [];
-    }
-  };
+    const load = async () => {
+      await fetchOrders();
+      // Fetch products for linking
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const headers: Record<string, string> = {};
+        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+        const res = await fetch("/api/store/products", { headers });
+        if (res.ok) {
+          const json = await res.json();
+          const list = json.products || json.data || [];
+          setVendorProducts(
+            Array.isArray(list)
+              ? list.map((p: Record<string, unknown>) => ({
+                  id: p.id as string,
+                  name: p.name as string,
+                  price: Number(p.price) || 0,
+                }))
+              : []
+          );
+        }
+      } catch {
+        /* silent */
+      }
+    };
+    load();
+  }, [role, userId, router]);
 
   const updateOrderStatus = async (order: UnifiedOrder, newStatus: string) => {
     setUpdatingId(order.sourceId);
@@ -288,15 +351,41 @@ export default function PharmacyOrdersPage() {
         await supabase
           .from("store_order_events")
           .insert({ order_id: order.sourceId, status: newStatus, timestamp: now });
+        // Notify the patient
+        const { data: so } = await supabase
+          .from("store_orders")
+          .select("user_id")
+          .eq("id", order.sourceId)
+          .single();
+        if (so?.user_id) {
+          await supabase.from("notifications").insert({
+            user_id: so.user_id,
+            title: "Order Status Updated",
+            body: `Your order ${order.trackingId} is now ${newStatus}`,
+            category: "order",
+            priority: "normal",
+            data: { order_id: order.sourceId, tracking_id: order.trackingId, status: newStatus },
+          });
+        }
       } else if (order.sourceTable === "refill_orders") {
-        const { error } = await supabase
-          .from("refill_orders")
-          .update(updatePayload)
-          .eq("id", order.sourceId);
-        if (error) throw error;
-        await supabase
-          .from("refill_order_events")
-          .insert({ order_id: order.sourceId, status: newStatus, timestamp: now });
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const headers: Record<string, string> = { "Content-Type": "application/json" };
+        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+        const apiRes = await fetch("/api/orders/status", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            tracking_id: order.trackingId,
+            status: newStatus,
+            note: `Status updated by pharmacy to ${newStatus}`,
+          }),
+        });
+        if (!apiRes.ok) {
+          const errBody = await apiRes.json().catch(() => ({}));
+          throw new Error(errBody.error || `API returned ${apiRes.status}`);
+        }
       } else if (order.sourceTable === "orders") {
         const { error } = await supabase
           .from("orders")
@@ -306,6 +395,21 @@ export default function PharmacyOrdersPage() {
         await supabase
           .from("order_events")
           .insert({ order_id: order.sourceId, status: newStatus, timestamp: now });
+        const { data: v2o } = await supabase
+          .from("orders")
+          .select("patient_id")
+          .eq("id", order.sourceId)
+          .single();
+        if (v2o?.patient_id) {
+          await supabase.from("notifications").insert({
+            user_id: v2o.patient_id,
+            title: "Prescription Order Updated",
+            body: `Your prescription order ${order.trackingId} is now ${newStatus}`,
+            category: "order",
+            priority: "normal",
+            data: { order_id: order.sourceId, tracking_id: order.trackingId, status: newStatus },
+          });
+        }
       }
 
       setOrders((prev) =>
@@ -313,7 +417,7 @@ export default function PharmacyOrdersPage() {
       );
       if (selectedOrder?.sourceId === order.sourceId)
         setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus } : null));
-    } catch (err: any) {
+    } catch (err) {
       console.error("[Orders] Status update failed:", err);
     } finally {
       setUpdatingId(null);
@@ -322,16 +426,41 @@ export default function PharmacyOrdersPage() {
 
   const fetchOrderEvents = async (order: UnifiedOrder): Promise<OrderEvent[]> => {
     try {
+      // Refill orders: use vendor API (bypasses RLS)
+      if (order.sourceTable === "refill_orders") {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const headers: Record<string, string> = {};
+        if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`;
+        const res = await fetch(`/api/vendor/refill?id=${order.sourceId}`, { headers });
+        if (res.ok) {
+          const json = await res.json();
+          const events = json.events || [];
+          return events.map((e: Record<string, unknown>) => ({
+            status: e.status as string,
+            timestamp: e.timestamp as string,
+            note: e.note as string | undefined,
+          }));
+        }
+        return [];
+      }
+
       let table = "";
-      if (order.sourceTable === "store_orders") table = "store_order_events";
-      else if (order.sourceTable === "refill_orders") table = "refill_order_events";
-      else if (order.sourceTable === "orders") table = "order_events";
+      let idColumn = "order_id";
+      if (order.sourceTable === "store_orders") {
+        table = "store_order_events";
+        idColumn = "order_id";
+      } else if (order.sourceTable === "orders") {
+        table = "order_events";
+        idColumn = "order_id";
+      }
       if (!table) return [];
 
       const { data } = await supabase
         .from(table)
         .select("*")
-        .eq("order_id", order.sourceId)
+        .eq(idColumn, order.sourceId)
         .order("timestamp", { ascending: true });
 
       if (!data) return [];
@@ -406,6 +535,21 @@ export default function PharmacyOrdersPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-7xl mx-auto space-y-5">
+      {/* Toast notification */}
+      {toast && (
+        <div
+          className={`fixed top-4 right-4 z-[100] flex items-center gap-2 rounded-xl px-4 py-3 shadow-lg text-sm font-medium transition-all ${
+            toast.type === "error" ? "bg-red-600 text-white" : "bg-emerald-600 text-white"
+          }`}
+        >
+          {toast.type === "error" ? (
+            <AlertCircle className="h-4 w-4 shrink-0" />
+          ) : (
+            <Check className="h-4 w-4 shrink-0" />
+          )}
+          {toast.message}
+        </div>
+      )}
       {/* Header */}
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -569,6 +713,16 @@ export default function PharmacyOrdersPage() {
                       <p className="mt-0.5 text-sm font-semibold text-slate-900 truncate">
                         {order.customerName}
                       </p>
+                      {order.items.length > 0 && (
+                        <p className="text-xs text-slate-600 truncate">
+                          {(() => {
+                            const linked = order.productId
+                              ? vendorProducts.find((p) => p.id === order.productId)
+                              : null;
+                            return linked ? linked.name : order.items[0].name;
+                          })()}
+                        </p>
+                      )}
                       <div className="mt-0.5 flex items-center gap-3 text-xs text-slate-500">
                         {order.items.length > 0 && (
                           <span>
@@ -783,6 +937,133 @@ export default function PharmacyOrdersPage() {
                         <span className="text-emerald-700">₹{selectedOrder.total.toFixed(2)}</span>
                       </div>
                     )}
+                  </div>
+                </div>
+              )}
+
+              {/* Product linking for refill orders */}
+              {selectedOrder.type === "refill" && (
+                <div>
+                  <h3 className="mb-2 text-xs font-semibold uppercase tracking-wider text-slate-500">
+                    Linked Product
+                  </h3>
+                  <div className="rounded-xl border border-slate-100 p-4">
+                    {(() => {
+                      const linked = selectedOrder.productId
+                        ? vendorProducts.find((p) => p.id === selectedOrder.productId)
+                        : null;
+                      const medName = selectedOrder.items[0]?.name || "";
+                      if (linked) {
+                        return (
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <p className="text-sm text-slate-800">{linked.name}</p>
+                              <p className="text-[10px] text-slate-400">for {medName}</p>
+                            </div>
+                            <span className="text-sm font-semibold text-emerald-700">
+                              ₹{linked.price.toFixed(2)}
+                            </span>
+                          </div>
+                        );
+                      }
+                      if (linkingProductFor === selectedOrder.sourceId) {
+                        const medNameLower = medName.toLowerCase();
+                        const sorted = [...vendorProducts].sort((a, b) => {
+                          const aMatch = a.name.toLowerCase().includes(medNameLower) ? 1 : 0;
+                          const bMatch = b.name.toLowerCase().includes(medNameLower) ? 1 : 0;
+                          return bMatch - aMatch;
+                        });
+                        return (
+                          <div className="space-y-2">
+                            <p className="text-xs font-medium text-slate-600">
+                              Linking product for:{" "}
+                              <span className="font-bold text-slate-800">{medName}</span>
+                            </p>
+                            <select
+                              value=""
+                              onChange={async (e) => {
+                                const pid = e.target.value;
+                                if (!pid) return;
+                                try {
+                                  const {
+                                    data: { session },
+                                  } = await supabase.auth.getSession();
+                                  const headers: Record<string, string> = {
+                                    "Content-Type": "application/json",
+                                  };
+                                  if (session?.access_token)
+                                    headers.Authorization = `Bearer ${session.access_token}`;
+                                  const res = await fetch("/api/vendor/refill", {
+                                    method: "POST",
+                                    headers,
+                                    body: JSON.stringify({
+                                      refill_order_id: selectedOrder.sourceId,
+                                      product_id: pid,
+                                    }),
+                                  });
+                                  if (res.ok) {
+                                    const newProduct = vendorProducts.find((p) => p.id === pid);
+                                    const updatedItems = selectedOrder.items.map((item) => ({
+                                      ...item,
+                                      name: newProduct?.name || item.name,
+                                      price: newProduct?.price || item.price,
+                                    }));
+                                    setOrders((prev) =>
+                                      prev.map((o) =>
+                                        o.sourceId === selectedOrder.sourceId
+                                          ? {
+                                              ...o,
+                                              productId: pid,
+                                              items: updatedItems,
+                                              total: newProduct?.price || o.total,
+                                            }
+                                          : o
+                                      )
+                                    );
+                                    setSelectedOrder({
+                                      ...selectedOrder,
+                                      productId: pid,
+                                      items: updatedItems,
+                                      total: newProduct?.price || selectedOrder.total,
+                                    });
+                                  }
+                                } catch (err) {
+                                  console.error("Failed to link product:", err);
+                                  setToast({
+                                    message: "Failed to link product. Please try again.",
+                                    type: "error",
+                                  });
+                                }
+                                setLinkingProductFor(null);
+                              }}
+                              className="w-full text-sm rounded-lg border border-slate-200 bg-white px-3 py-2 text-slate-700 outline-none focus:border-emerald-400"
+                            >
+                              <option value="">Select a product...</option>
+                              {sorted.map((p) => (
+                                <option key={p.id} value={p.id}>
+                                  {p.name} — ₹{p.price.toFixed(2)}
+                                  {p.name.toLowerCase().includes(medNameLower) ? " ✓" : ""}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                        );
+                      }
+                      return (
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <span className="text-sm text-amber-600 font-medium">Not linked</span>
+                            <p className="text-[10px] text-slate-400">for {medName}</p>
+                          </div>
+                          <button
+                            onClick={() => setLinkingProductFor(selectedOrder.sourceId)}
+                            className="text-xs font-bold text-emerald-600 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-3 py-1.5 rounded-lg transition-colors"
+                          >
+                            + Link Product
+                          </button>
+                        </div>
+                      );
+                    })()}
                   </div>
                 </div>
               )}

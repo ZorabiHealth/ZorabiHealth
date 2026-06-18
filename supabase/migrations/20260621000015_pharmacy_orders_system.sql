@@ -165,6 +165,7 @@ begin
   from pharmacy_profiles pp
   left join store_orders so on so.pharmacy_id = pp.id and so.status in ('PENDING', 'CONFIRMED')
   where pp.is_active = true
+  group by pp.id
   order by count(so.id) asc nulls first
   limit 1;
 

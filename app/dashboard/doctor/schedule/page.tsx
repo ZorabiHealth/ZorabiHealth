@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
+import { showToast } from "@/components/ui/toast";
 import {
   ChevronLeft,
   ChevronRight,
@@ -97,14 +98,17 @@ export default function DoctorSchedule() {
   const [newPatientPhone, setNewPatientPhone] = useState("");
   const [creatingPatient, setCreatingPatient] = useState(false);
 
-  useEffect(() => {
-    if (role === null) return;
-    if (role !== "doctor") {
-      router.push("/dashboard");
-      return;
-    }
-    loadAppointments();
-  }, [role, userId, router, currentDate, viewMode]);
+  // Week view: generate 7 days starting from Sunday of current week
+  const weekDays = useMemo(() => {
+    const d = new Date(currentDate);
+    const day = d.getDay();
+    d.setDate(d.getDate() - day);
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = new Date(d);
+      date.setDate(date.getDate() + i);
+      return date.toISOString().slice(0, 10);
+    });
+  }, [currentDate]);
 
   const loadAppointments = async () => {
     setLoading(true);
@@ -182,6 +186,16 @@ export default function DoctorSchedule() {
     }
   };
 
+  useEffect(() => {
+    if (role === null || loading) return;
+    if (role !== "doctor") {
+      router.push("/dashboard");
+      return;
+    }
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    loadAppointments();
+  }, [role, userId, router, currentDate, viewMode, loading]);
+
   const searchPatients = async (q: string) => {
     setPatientSearch(q);
     if (q.length < 2) {
@@ -235,7 +249,6 @@ export default function DoctorSchedule() {
       setNewPatientPhone("");
     } catch (err) {
       console.error("Failed to create patient:", err);
-      const { showToast } = await import("@/components/ui/toast");
       showToast("Failed to create patient.", "error");
     } finally {
       setCreatingPatient(false);
@@ -245,7 +258,6 @@ export default function DoctorSchedule() {
   const createAppointment = async () => {
     if (!selectedPatient || !doctorProfileId) return;
     if (apptEnd <= apptStart) {
-      const { showToast } = await import("@/components/ui/toast");
       showToast("End time must be after start time.", "error");
       return;
     }
@@ -261,7 +273,6 @@ export default function DoctorSchedule() {
       (a) => a.start_time < apptEnd && a.end_time > apptStart
     );
     if (hasConflict) {
-      const { showToast } = await import("@/components/ui/toast");
       showToast("Time slot conflicts with an existing appointment.", "warning");
       return;
     }
@@ -285,7 +296,6 @@ export default function DoctorSchedule() {
       loadAppointments();
     } catch (err) {
       console.error("Failed to create appointment:", err);
-      const { showToast } = await import("@/components/ui/toast");
       showToast("Failed to create appointment. Please try again.", "error");
     } finally {
       setSaving(false);
@@ -323,18 +333,6 @@ export default function DoctorSchedule() {
   const currentDayNum = parseInt(currentDate.slice(8, 10));
   const currentMonthNum = parseInt(currentDate.slice(5, 7)) - 1;
   const currentYearNum = parseInt(currentDate.slice(0, 4));
-
-  // Week view: generate 7 days starting from Sunday of current week
-  const weekDays = useMemo(() => {
-    const d = new Date(currentDate);
-    const day = d.getDay();
-    d.setDate(d.getDate() - day);
-    return Array.from({ length: 7 }, (_, i) => {
-      const date = new Date(d);
-      date.setDate(date.getDate() + i);
-      return date.toISOString().slice(0, 10);
-    });
-  }, [currentDate]);
 
   if (role !== "doctor") return null;
 
@@ -848,7 +846,7 @@ export default function DoctorSchedule() {
                           }}
                           className="w-full text-left px-3 py-2.5 text-sm text-[#0c4381] font-semibold hover:bg-[#0c4381]/10 flex items-center gap-2 border-t border-dashed border-slate-200"
                         >
-                          <UserPlus className="w-4 h-4" /> Create "{patientSearch}"
+                          <UserPlus className="w-4 h-4" /> Create &quot;{patientSearch}&quot;
                         </button>
                       )}
                     </div>

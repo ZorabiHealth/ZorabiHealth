@@ -94,7 +94,7 @@ export default function PharmacyProductsPage() {
   const [error, setError] = useState("");
   const [safetyInput, setSafetyInput] = useState("");
   const [success, setSuccess] = useState("");
-  const [previewUrl, setPreviewUrl] = useState("");
+  const [previewUrl, setPreviewUrl] = useState(emptyForm.image_url);
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -103,19 +103,6 @@ export default function PharmacyProductsPage() {
   const apiUrl =
     process.env.NEXT_PUBLIC_API_URL ||
     (typeof window !== "undefined" ? window.location.origin : "");
-
-  useEffect(() => {
-    fetchProducts();
-  }, []);
-
-  useEffect(() => {
-    setPreviewUrl(form.image_url);
-    // Clean up any stale blob URL when form resets
-    if (blobUrlRef.current && form.image_url !== blobUrlRef.current) {
-      URL.revokeObjectURL(blobUrlRef.current);
-      blobUrlRef.current = "";
-    }
-  }, [form.image_url]);
 
   const fetchProducts = async () => {
     try {
@@ -131,6 +118,20 @@ export default function PharmacyProductsPage() {
       setLoading(false);
     }
   };
+
+  useEffect(() => {
+    const load = async () => {
+      await fetchProducts();
+    };
+    load();
+  }, []);
+
+  useEffect(() => {
+    if (blobUrlRef.current && form.image_url !== blobUrlRef.current) {
+      URL.revokeObjectURL(blobUrlRef.current);
+      blobUrlRef.current = "";
+    }
+  }, [form.image_url]);
 
   const uploadImage = async (file: File): Promise<string> => {
     if (!file.type.startsWith("image/")) throw new Error("Only image files allowed");
@@ -180,9 +181,9 @@ export default function PharmacyProductsPage() {
       const url = await uploadImage(file);
       setForm((prev) => ({ ...prev, image_url: url }));
       setPreviewUrl(url);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setPreviewUrl("");
-      setError(err.message);
+      setError(err instanceof Error ? err.message : "An error occurred");
     }
   };
 
@@ -196,9 +197,9 @@ export default function PharmacyProductsPage() {
       const url = await uploadImage(file);
       setForm((prev) => ({ ...prev, image_url: url }));
       setPreviewUrl(url);
-    } catch (err: any) {
+    } catch (err: unknown) {
       setPreviewUrl("");
-      setError(err.message);
+      setError(err instanceof Error ? err.message : "An error occurred");
     }
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
@@ -293,8 +294,8 @@ export default function PharmacyProductsPage() {
       setShowForm(false);
       fetchProducts();
       setTimeout(() => setSuccess(""), 3000);
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "An error occurred");
     } finally {
       setSaving(false);
     }

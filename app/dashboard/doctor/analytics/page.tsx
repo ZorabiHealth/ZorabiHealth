@@ -139,8 +139,8 @@ export default function DoctorAnalytics() {
 
       setRecentPrescriptions(allPrescriptions.slice(0, 10));
       setRecentAppointments(allAppointments.slice(0, 10));
-    } catch (error: any) {
-      console.error("Failed to load analytics data:", error);
+    } catch {
+      console.error("Failed to load analytics data");
       setError("Failed to load analytics data. Please try again.");
     } finally {
       setLoading(false);

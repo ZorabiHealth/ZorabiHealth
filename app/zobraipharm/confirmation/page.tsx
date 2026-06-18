@@ -3,6 +3,7 @@
 import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 import {
   CheckCircle2,
   Package,
@@ -97,19 +98,65 @@ function ConfirmationContent() {
   useEffect(() => {
     const fetchData = async () => {
       try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const headers: Record<string, string> = {};
+        if (token) headers.Authorization = `Bearer ${token}`;
+
         // Fetch all user orders for sidebar
-        const listRes = await fetch("/api/store/orders");
+        const listRes = await fetch("/api/store/orders", { headers });
         if (listRes.ok) {
           const list = await listRes.json();
           setAllOrders(list);
         }
 
-        // Fetch specific order
+        // Fetch specific order - try store orders first, then refill via orders/status
         if (orderId) {
-          const res = await fetch(`/api/store/orders?id=${orderId}`);
+          const res = await fetch(`/api/store/orders?id=${orderId}`, { headers });
           if (res.ok) {
             const data = await res.json();
             setOrder(data);
+          } else {
+            // Try refill order via orders/status (accepts both UUID and tracking_id)
+            const refillRes = await fetch(`/api/orders/status?id=${orderId}`, { headers });
+            if (refillRes.ok) {
+              const refillData = await refillRes.json();
+              // Normalize refill order into StoreOrder shape for display
+              setOrder({
+                id: orderId,
+                tracking_id: refillData.tracking_id,
+                customer_name: refillData.patient_email || refillData.patient_phone || "Order",
+                status: refillData.status,
+                total: refillData.total_price || 0,
+                estimated_delivery: refillData.estimated_delivery,
+                created_at: refillData.created_at,
+                updated_at: refillData.updated_at,
+                phone: refillData.patient_phone || "",
+                address: refillData.delivery_address || "",
+                city: "",
+                pincode: "",
+                items: [
+                  {
+                    id: "refill-item",
+                    product_id: refillData.product_id || null,
+                    product_name: refillData.medication_name || "Medication",
+                    product_price: refillData.total_price || 0,
+                    quantity: refillData.quantity || 1,
+                  },
+                ],
+                events: (refillData.events || refillData.timeline || []).map(
+                  (e: { status: string; timestamp: string; note?: string }) => ({
+                    id: e.timestamp,
+                    order_id: orderId,
+                    status: e.status,
+                    note: e.note || null,
+                    timestamp: e.timestamp,
+                  })
+                ),
+              });
+            }
           }
         }
       } catch (err) {
@@ -308,7 +355,7 @@ function ConfirmationContent() {
           Continue Shopping
         </Link>
         <Link
-          href="/zobraipharm/checkout"
+          href={`/dashboard/my-orders/summary/${orderId || ""}`}
           className="inline-flex items-center gap-2 rounded-xl bg-emerald-600 px-6 py-3 text-sm font-semibold text-white transition-all hover:bg-emerald-700"
         >
           <Package className="h-4 w-4" />

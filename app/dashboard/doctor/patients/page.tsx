@@ -82,14 +82,45 @@ export default function DoctorPatients() {
 
         if (profileErr) throw profileErr;
 
-        const { data, error } = await supabase
-          .from("patient_profiles")
-          .select("id, full_name, email, phone, created_at")
-          .eq("created_by", doctorProfile.id)
-          .order("created_at", { ascending: false });
+        // Fetch patients created by the doctor AND patients with prescriptions from this doctor
+        const [createdRes, rxPatientsRes] = await Promise.all([
+          supabase
+            .from("patient_profiles")
+            .select("id, full_name, email, phone, created_at")
+            .eq("created_by", doctorProfile.id)
+            .order("created_at", { ascending: false }),
+          supabase
+            .from("prescriptions")
+            .select("patient_id")
+            .eq("doctor_id", doctorProfile.id)
+            .not("patient_id", "is", null),
+        ]);
 
-        if (error) throw error;
-        setPatients(data || []);
+        if (createdRes.error) throw createdRes.error;
+        if (rxPatientsRes.error) throw rxPatientsRes.error;
+
+        const createdPatientIds = new Set((createdRes.data || []).map((p) => p.id));
+        const rxPatientIds = rxPatientsRes.data
+          ? [...new Set(rxPatientsRes.data.map((r: { patient_id: string }) => r.patient_id))]
+          : [];
+
+        // Fetch profiles of patients from prescriptions who aren't already in created list
+        const missingIds = rxPatientIds.filter((id) => !createdPatientIds.has(id));
+        let additionalPatients: typeof createdRes.data = [];
+        if (missingIds.length > 0) {
+          const { data: extra, error: extraErr } = await supabase
+            .from("patient_profiles")
+            .select("id, full_name, email, phone, created_at")
+            .in("id", missingIds);
+          if (extraErr) throw extraErr;
+          additionalPatients = extra || [];
+        }
+
+        const allPatients = [...(createdRes.data || []), ...additionalPatients];
+        allPatients.sort(
+          (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+        );
+        setPatients(allPatients);
       } catch (err) {
         console.error("Failed to fetch patients:", err);
         setToast({ message: "Failed to load patients.", type: "error" });
@@ -204,6 +235,8 @@ export default function DoctorPatients() {
       </div>
     );
   }
+
+  if (!authLoading && role !== "doctor") return null;
 
   return (
     <div className="min-h-full bg-slate-50 p-6">

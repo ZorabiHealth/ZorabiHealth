@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { Suspense, useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -56,14 +56,14 @@ function formatDate(dateStr: string): string {
   });
 }
 
-export default function PrescriptionsPage() {
+function PrescriptionsPageContent() {
   const { role, userId } = useUserRole();
   const router = useRouter();
   const searchParams = useSearchParams();
   const [prescriptions, setPrescriptions] = useState<Prescription[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [doctorProfileId, setDoctorProfileId] = useState<string | null>(null);
+
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [patientNames, setPatientNames] = useState<Map<string, string>>(new Map());
 
@@ -80,7 +80,6 @@ export default function PrescriptionsPage() {
         .eq("user_id", userId)
         .single();
       if (profile) {
-        setDoctorProfileId(profile.id);
         setLoading(true);
         const { data, error } = await supabase
           .from("prescriptions")
@@ -368,5 +367,17 @@ export default function PrescriptionsPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function PrescriptionsPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-full text-slate-500">Loading...</div>
+      }
+    >
+      <PrescriptionsPageContent />
+    </Suspense>
   );
 }

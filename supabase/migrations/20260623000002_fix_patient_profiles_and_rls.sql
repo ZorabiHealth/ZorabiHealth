@@ -13,6 +13,7 @@ create index if not exists idx_patient_profiles_email
 
 -- 3. Fix "Anyone can read" → only doctors who created the patient
 drop policy if exists "Anyone can read patient_profiles" on patient_profiles;
+drop policy if exists "Doctors read own patients" on patient_profiles;
 create policy "Doctors read own patients"
   on patient_profiles for select
   using (

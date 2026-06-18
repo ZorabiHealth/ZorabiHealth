@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabase } from "@/lib/supabase";
+import type { RealtimePostgresChangesPayload } from "@supabase/supabase-js";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { QRCodeSVG } from "qrcode.react";
@@ -46,6 +47,13 @@ interface SleepSession {
   stages: { time: string; stage: "Awake" | "REM" | "Light" | "Deep" }[];
 }
 
+interface DailyStepsRow {
+  steps: number;
+  calories: number;
+  active_minutes: number;
+  [key: string]: unknown;
+}
+
 export default function SleepCompanionPage() {
   // --- Audio Synthesis Helper ---
   const synthIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -53,7 +61,9 @@ export default function SleepCompanionPage() {
   const playSynthesizedChime = (type: string) => {
     if (typeof window === "undefined") return;
     try {
-      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      const AudioCtx =
+        window.AudioContext ||
+        (window as { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
       if (!AudioCtx) return;
       const ctx = new AudioCtx();
       const now = ctx.currentTime;
@@ -124,7 +134,7 @@ export default function SleepCompanionPage() {
   const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [generatingPairCode, setGeneratingPairCode] = useState(false);
   const [codeExpiresIn, setCodeExpiresIn] = useState(0);
-  const [pairingCountdown, setPairingCountdown] = useState<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
 
   // Telemetry Metrics
   const [steps, setSteps] = useState(6420);
@@ -282,13 +292,14 @@ export default function SleepCompanionPage() {
           .on(
             "postgres_changes",
             { event: "*", schema: "public", table: "daily_steps", filter: `user_id=eq.${uid}` },
-            (payload: any) => {
+            (payload: RealtimePostgresChangesPayload<Record<string, unknown>>) => {
               if (payload.new) {
-                setSteps(payload.new.steps);
-                setCalories(payload.new.calories);
-                setActiveMinutes(payload.new.active_minutes);
+                const { steps, calories, active_minutes } = payload.new as DailyStepsRow;
+                setSteps(steps);
+                setCalories(calories);
+                setActiveMinutes(active_minutes);
                 setSyncTimestamp("Just now");
-                triggerToast(`Steps counter synchronized: ${payload.new.steps} steps`);
+                triggerToast(`Steps counter synchronized: ${steps} steps`);
               }
             }
           )
@@ -342,9 +353,9 @@ export default function SleepCompanionPage() {
 
     return () => {
       stopAlarmRingtoneLoop();
-      if (pairingCountdown) clearInterval(pairingCountdown);
+      if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [fetchRealData, setupRealtimeSubscriptions, userId, stopAlarmRingtoneLoop, pairingCountdown]);
+  }, [fetchRealData, setupRealtimeSubscriptions, userId, stopAlarmRingtoneLoop]);
 
   // --- Sleep Cycle Coaching Info ---
   const calculateSleepCoaching = () => {
@@ -517,7 +528,7 @@ export default function SleepCompanionPage() {
         return prev - 1;
       });
     }, 1000);
-    setPairingCountdown(interval);
+    intervalRef.current = interval;
     return () => clearInterval(interval);
   }, [pairingCode, codeExpiresIn]);
 
@@ -530,8 +541,12 @@ export default function SleepCompanionPage() {
       });
       const json = await res.json();
       if (json.devices) {
-        const hasMobile = json.devices.some((d: any) => d.platform !== "web" && d.is_active);
-        const isNowPaired = json.devices.some((d: any) => d.platform !== "web");
+        const hasMobile = json.devices.some(
+          (d: { platform: string; is_active: boolean }) => d.platform !== "web" && d.is_active
+        );
+        const isNowPaired = json.devices.some(
+          (d: { platform: string; is_active: boolean }) => d.platform !== "web"
+        );
         if (hasMobile && !isPaired) {
           setIsPaired(true);
           setSyncHistory((prev) => [

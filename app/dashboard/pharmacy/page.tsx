@@ -134,6 +134,8 @@ export default function PharmacyPage() {
   useEffect(() => {
     if (role === "pharmacy_vendor") {
       router.replace("/dashboard/pharmacy/inventory");
+    } else {
+      router.replace("/dashboard/my-orders");
     }
   }, [role, router]);
 
@@ -289,13 +291,14 @@ export default function PharmacyPage() {
       // Map Orders
       const mappedOrders: RefillOrder[] = (dbOrders || []).map((db) => {
         const events: OrderEvent[] = (db.refill_order_events || [])
-          .map((e: any) => ({
+          .map((e: Record<string, unknown>) => ({
             status: e.status as OrderStatus,
             timestamp: e.timestamp,
             note: e.note || undefined,
           }))
           .sort(
-            (a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            (a: Record<string, unknown>, b: Record<string, unknown>) =>
+              new Date(a.timestamp as string).getTime() - new Date(b.timestamp as string).getTime()
           );
 
         return {
@@ -713,6 +716,28 @@ export default function PharmacyPage() {
           ))}
         </div>
       </header>
+
+      {/* Hero Section with Video */}
+      <div className="relative overflow-hidden rounded-2xl">
+        <video
+          src="/video/pharmback.mp4"
+          autoPlay
+          muted
+          loop
+          playsInline
+          className="absolute inset-0 w-full h-full object-cover"
+        />
+        <div className="relative bg-gradient-to-r from-emerald-600/95 via-emerald-600/80 to-emerald-500/60">
+          <div className="flex items-stretch min-h-[160px] md:min-h-[180px]">
+            <div className="flex-1 p-6 md:p-8 flex flex-col justify-center gap-2 text-white">
+              <h2 className="text-xl md:text-2xl font-black">Welcome to ZorabiHealth Pharmacy</h2>
+              <p className="text-emerald-50 text-sm md:text-base max-w-md">
+                Manage inventory, track orders, and sync with your store — all in one place.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
 
       {/* ── Urgent Refill Banner ─────────────────────────────── */}
       <AnimatePresence>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
@@ -78,81 +78,113 @@ export default function DrugCatalogPage() {
     null
   );
 
+  const getCatalogData = async () => {
+    let query = supabase.from("drug_catalog").select("*").order("name");
+    if (selectedCategory !== "All") query = query.eq("category", selectedCategory);
+    if (searchTerm) query = query.ilike("name", `%${searchTerm}%`);
+
+    const [{ data: catalogData, error: catalogErr }, { data: storeData, error: storeErr }] =
+      await Promise.all([
+        query,
+        supabase
+          .from("store_products")
+          .select("id, name, description, image_url, is_active")
+          .eq("is_active", true),
+      ]);
+
+    if (catalogErr) throw new Error(catalogErr.message);
+    if (storeErr) console.warn("[Catalog] Store fetch:", storeErr.message);
+
+    const storeMap = new Map<
+      string,
+      { id: string; image_url: string; description: string; is_active: boolean }
+    >();
+    (storeData ?? []).forEach((sp: Record<string, unknown>) => {
+      const key = ((sp.name as string) ?? "").toLowerCase().trim();
+      storeMap.set(key, {
+        id: sp.id as string,
+        image_url: (sp.image_url as string) || "",
+        description: (sp.description as string) || "",
+        is_active: sp.is_active as boolean,
+      });
+    });
+
+    return (catalogData ?? []).map((d: Record<string, unknown>) => {
+      const drugName = (d.name as string) || "";
+      const storeMatch = storeMap.get(drugName.toLowerCase().trim());
+      return {
+        id: d.id as string,
+        name: drugName,
+        generic_name: (d.generic_name as string) || "",
+        category: (d.category as string) || "",
+        manufacturer: (d.manufacturer as string) || "",
+        storeProduct: storeMatch
+          ? {
+              id: storeMatch.id,
+              image_url: storeMatch.image_url,
+              description: storeMatch.description,
+              is_active: storeMatch.is_active,
+            }
+          : null,
+      };
+    });
+  };
+
+  const fetchCatalog = async () => {
+    setLoading(true);
+    setFetchError("");
+    try {
+      const drugs = await getCatalogData();
+      setDrugs(drugs);
+    } catch (err: unknown) {
+      console.error("[Catalog] Failed:", err);
+      const message = err instanceof Error ? err.message : "Failed to load catalog";
+      setFetchError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (role === null) return;
     if (role !== "pharmacy_vendor") {
       router.push("/dashboard");
       return;
     }
-    fetchCatalog();
-  }, [role, router]);
+    const load = async () => {
+      setLoading(true);
+      setFetchError("");
+      try {
+        const drugs = await getCatalogData();
+        setDrugs(drugs);
+      } catch (err: unknown) {
+        console.error("[Catalog] Failed:", err);
+        const message = err instanceof Error ? err.message : "Failed to load catalog";
+        setFetchError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [role, router, selectedCategory, searchTerm]);
 
   useEffect(() => {
-    fetchCatalog();
-  }, [selectedCategory]);
-
-  const fetchCatalog = async () => {
-    setLoading(true);
-    setFetchError("");
-    try {
-      let query = supabase.from("drug_catalog").select("*").order("name");
-      if (selectedCategory !== "All") query = query.eq("category", selectedCategory);
-      if (searchTerm) query = query.ilike("name", `%${searchTerm}%`);
-
-      const [{ data: catalogData, error: catalogErr }, { data: storeData, error: storeErr }] =
-        await Promise.all([
-          query,
-          supabase
-            .from("store_products")
-            .select("id, name, description, image_url, is_active")
-            .eq("is_active", true),
-        ]);
-
-      if (catalogErr) throw new Error(catalogErr.message);
-      if (storeErr) console.warn("[Catalog] Store fetch:", storeErr.message);
-
-      const storeMap = new Map<
-        string,
-        { id: string; image_url: string; description: string; is_active: boolean }
-      >();
-      (storeData ?? []).forEach((sp: Record<string, unknown>) => {
-        const key = ((sp.name as string) ?? "").toLowerCase().trim();
-        storeMap.set(key, {
-          id: sp.id as string,
-          image_url: (sp.image_url as string) || "",
-          description: (sp.description as string) || "",
-          is_active: sp.is_active as boolean,
-        });
-      });
-
-      setDrugs(
-        (catalogData ?? []).map((d: Record<string, unknown>) => {
-          const drugName = (d.name as string) || "";
-          const storeMatch = storeMap.get(drugName.toLowerCase().trim());
-          return {
-            id: d.id as string,
-            name: drugName,
-            generic_name: (d.generic_name as string) || "",
-            category: (d.category as string) || "",
-            manufacturer: (d.manufacturer as string) || "",
-            storeProduct: storeMatch
-              ? {
-                  id: storeMatch.id,
-                  image_url: storeMatch.image_url,
-                  description: storeMatch.description,
-                  is_active: storeMatch.is_active,
-                }
-              : null,
-          };
-        })
-      );
-    } catch (err: any) {
-      console.error("[Catalog] Failed:", err);
-      setFetchError(err.message || "Failed to load catalog");
-    } finally {
-      setLoading(false);
-    }
-  };
+    const load = async () => {
+      setLoading(true);
+      setFetchError("");
+      try {
+        const drugs = await getCatalogData();
+        setDrugs(drugs);
+      } catch (err: unknown) {
+        console.error("[Catalog] Failed:", err);
+        const message = err instanceof Error ? err.message : "Failed to load catalog";
+        setFetchError(message);
+      } finally {
+        setLoading(false);
+      }
+    };
+    load();
+  }, [selectedCategory, searchTerm]);
 
   const addToInventory = async (drug: Drug) => {
     setAddingId(drug.id);
@@ -170,8 +202,8 @@ export default function DrugCatalogPage() {
           { onConflict: "pharmacy_id, drug_id" }
         );
       if (error) throw error;
-    } catch (err: any) {
-      console.error("[Catalog] Add to inventory failed:", err);
+    } catch {
+      console.error("[Catalog] Add to inventory failed:");
     } finally {
       setAddingId(null);
     }
@@ -208,8 +240,8 @@ export default function DrugCatalogPage() {
       }
       setAddToStorePrice(null);
       fetchCatalog();
-    } catch (err: any) {
-      console.error("[Catalog] Add to store failed:", err);
+    } catch {
+      console.error("[Catalog] Add to store failed:");
     } finally {
       setAddingId(null);
     }
@@ -229,8 +261,8 @@ export default function DrugCatalogPage() {
       setShowAddForm(false);
       setNewDrug({ name: "", generic_name: "", category: "General", manufacturer: "" });
       fetchCatalog();
-    } catch (err: any) {
-      console.error("[Catalog] Add drug failed:", err);
+    } catch {
+      console.error("[Catalog] Add drug failed:");
     } finally {
       setSaving(false);
     }

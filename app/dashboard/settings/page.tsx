@@ -17,6 +17,7 @@ import {
   RefreshCw,
   Package,
   Stethoscope,
+  MapPin,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { supabase } from "@/lib/supabase";
@@ -34,10 +35,17 @@ interface PairedDevice {
 
 export default function SettingsPage() {
   const { role } = useUserRole();
-  const [name, setName] = useState("Dr. Sarah Jenkins");
-  const [age, setAge] = useState("34");
-  const [height, setHeight] = useState("168");
-  const [weight, setWeight] = useState("62");
+  const [name, setName] = useState("");
+  const [age, setAge] = useState("");
+  const [height, setHeight] = useState("");
+  const [weight, setWeight] = useState("");
+
+  // Delivery address state
+  const [phone, setPhone] = useState("");
+  const [address, setAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [pincode, setPincode] = useState("");
+  const [defaultPayment, setDefaultPayment] = useState("COD");
 
   // Alert Preferences State
   const [isHRAlertsOn, setIsHRAlertsOn] = useState(true);
@@ -52,7 +60,7 @@ export default function SettingsPage() {
   const [testPushResult, setTestPushResult] = useState<{ ok: boolean; msg: string } | null>(null);
 
   // Supabase session state
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<import("@supabase/supabase-js").Session | null>(null);
 
   // Paired devices state
   const [pairedDevices, setPairedDevices] = useState<PairedDevice[]>([]);
@@ -97,6 +105,25 @@ export default function SettingsPage() {
               : "Clinician";
             setName(s.user.user_metadata?.full_name || formattedName);
           }
+
+          // Fetch patient_profiles
+          const { data: profile } = await supabase
+            .from("patient_profiles")
+            .select("*")
+            .eq("id", s.user.id)
+            .maybeSingle();
+
+          if (profile) {
+            if (profile.full_name) setName(profile.full_name);
+            if (profile.age) setAge(profile.age);
+            if (profile.height) setHeight(profile.height);
+            if (profile.weight) setWeight(profile.weight);
+            if (profile.phone) setPhone(profile.phone);
+            if (profile.delivery_address) setAddress(profile.delivery_address);
+            if (profile.delivery_city) setCity(profile.delivery_city);
+            if (profile.delivery_pincode) setPincode(profile.delivery_pincode);
+            if (profile.default_payment_method) setDefaultPayment(profile.default_payment_method);
+          }
         }
       } catch (e) {
         console.error("Failed to fetch session:", e);
@@ -109,7 +136,25 @@ export default function SettingsPage() {
   useEffect(() => {
     if (!session) return;
 
-    fetchDevices();
+    const initialFetch = async () => {
+      try {
+        const {
+          data: { session: fresh },
+        } = await supabase.auth.refreshSession();
+        const token = fresh?.access_token;
+        if (!token) return;
+        const res = await fetch("/api/notifications/devices", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        if (json.devices) setPairedDevices(json.devices);
+      } catch (e) {
+        console.error("Failed to fetch paired devices:", e);
+      } finally {
+        setLoadingDevices(false);
+      }
+    };
+    initialFetch();
 
     const deviceChannel = supabase
       .channel(`web-devices-${session.user?.id}`)
@@ -136,12 +181,40 @@ export default function SettingsPage() {
     };
   }, [session, fetchDevices]);
 
-  const handleSaveSettings = (e: React.FormEvent) => {
+  const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    setShowSuccessToast(true);
-    setTimeout(() => {
-      setShowSuccessToast(false);
-    }, 4000);
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user?.id) return;
+
+      const { error } = await supabase.from("patient_profiles").upsert(
+        {
+          id: session.user.id,
+          full_name: name,
+          age: age || null,
+          height: height || null,
+          weight: weight || null,
+          phone,
+          delivery_address: address,
+          delivery_city: city,
+          delivery_pincode: pincode,
+          default_payment_method: defaultPayment,
+        },
+        { onConflict: "id" }
+      );
+
+      if (error) {
+        console.error("[settings] Save error:", error);
+        return;
+      }
+
+      setShowSuccessToast(true);
+      setTimeout(() => setShowSuccessToast(false), 4000);
+    } catch (err) {
+      console.error("[settings] Save error:", err);
+    }
   };
 
   const getFreshToken = async (): Promise<string | null> => {
@@ -211,8 +284,8 @@ export default function SettingsPage() {
           msg: json.detail || json.error || "Failed to create notification",
         });
       }
-    } catch (err: any) {
-      setTestPushResult({ ok: false, msg: err.message || "Request failed" });
+    } catch (err: unknown) {
+      setTestPushResult({ ok: false, msg: err instanceof Error ? err.message : "Request failed" });
     } finally {
       setSendingTestPush(false);
     }
@@ -274,36 +347,97 @@ export default function SettingsPage() {
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Age (yrs)
                 </label>
-                <Input
-                  type="number"
-                  value={age}
-                  onChange={(e) => setAge(e.target.value)}
-                  required
-                />
+                <Input type="number" value={age} onChange={(e) => setAge(e.target.value)} />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Height (cm)
                 </label>
-                <Input
-                  type="number"
-                  value={height}
-                  onChange={(e) => setHeight(e.target.value)}
-                  required
-                />
+                <Input type="number" value={height} onChange={(e) => setHeight(e.target.value)} />
               </div>
 
               <div>
                 <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
                   Weight (kg)
                 </label>
+                <Input type="number" value={weight} onChange={(e) => setWeight(e.target.value)} />
+              </div>
+            </div>
+          </section>
+
+          {/* Delivery Address Section */}
+          <section className="bg-white border border-slate-100 rounded-[2.5rem] p-8 shadow-sm space-y-6">
+            <div className="flex gap-2.5 items-center mb-2">
+              <div className="h-10 w-10 rounded-xl bg-emerald-50 flex items-center justify-center">
+                <MapPin className="text-emerald-500 h-5.5 w-5.5" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-800">Delivery Address</h3>
+                <p className="text-slate-500 text-xs font-semibold">
+                  Used for medication refill deliveries.
+                </p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Phone Number
+                </label>
                 <Input
-                  type="number"
-                  value={weight}
-                  onChange={(e) => setWeight(e.target.value)}
-                  required
+                  type="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+91XXXXXXXXXX"
                 />
+              </div>
+              <div className="md:col-span-2">
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Address
+                </label>
+                <Input
+                  type="text"
+                  value={address}
+                  onChange={(e) => setAddress(e.target.value)}
+                  placeholder="Flat / House No., Street, Locality"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  City
+                </label>
+                <Input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="City"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Pincode
+                </label>
+                <Input
+                  type="text"
+                  value={pincode}
+                  onChange={(e) => setPincode(e.target.value)}
+                  placeholder="XXXXXX"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-bold text-slate-700 uppercase tracking-wider mb-1.5">
+                  Default Payment Method
+                </label>
+                <select
+                  value={defaultPayment}
+                  onChange={(e) => setDefaultPayment(e.target.value)}
+                  className="w-full rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+                >
+                  <option value="COD">Cash on Delivery</option>
+                  <option value="CARD">Card Payment</option>
+                  <option value="UPI">UPI</option>
+                </select>
               </div>
             </div>
           </section>

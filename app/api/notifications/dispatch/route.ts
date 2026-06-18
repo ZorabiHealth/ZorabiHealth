@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
       .eq("is_active", true);
 
     const pairedUserIds = (pairings || []).map((p) => p.mobile_user_id);
-    let pairedDeviceRows: any[] = [];
+    let pairedDeviceRows: Record<string, unknown>[] = [];
     if (pairedUserIds.length > 0) {
       const { data: pd } = await admin
         .from("notification_devices")
@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
     // Merge and deduplicate by id
     const deviceMap = new Map<string, PushDevice>();
     for (const d of (directDevices || []) as PushDevice[]) deviceMap.set(d.id, d);
-    for (const d of (pairedDeviceRows || []) as PushDevice[]) deviceMap.set(d.id, d);
+    for (const d of (pairedDeviceRows || []) as unknown as PushDevice[]) deviceMap.set(d.id, d);
     const devices = Array.from(deviceMap.values());
 
     if (!devices || devices.length === 0) continue;

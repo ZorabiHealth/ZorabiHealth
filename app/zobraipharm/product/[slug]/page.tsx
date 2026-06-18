@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { loadCart, saveCart, type PharmProduct } from "@/lib/pharmacy-store-data";
 import { fetchProductBySlug, fetchStoreProducts } from "@/lib/store-products";
+import { supabase } from "@/lib/supabase";
 
 export default function ProductDetailPage() {
   const params = useParams();
@@ -29,6 +30,7 @@ export default function ProductDetailPage() {
   const [product, setProduct] = useState<PharmProduct | null>(null);
   const [products, setProducts] = useState<PharmProduct[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refillStatus, setRefillStatus] = useState<"idle" | "loading" | "done" | "error">("idle");
 
   const [cart, setCart] = useState<Record<string, number>>(() => {
     const items = loadCart();
@@ -38,6 +40,36 @@ export default function ProductDetailPage() {
     });
     return map;
   });
+
+  const handleAutoRefill = async () => {
+    if (!product || refillStatus === "loading" || refillStatus === "done") return;
+    setRefillStatus("loading");
+    try {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) {
+        setRefillStatus("error");
+        return;
+      }
+      const res = await fetch("/api/store/refill", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({
+          medicationId: product.id,
+          medicationName: product.name,
+          dosage: product.dosage,
+          quantity: 30,
+        }),
+      });
+      setRefillStatus(res.ok ? "done" : "error");
+    } catch {
+      setRefillStatus("error");
+    }
+  };
 
   useEffect(() => {
     Promise.all([fetchProductBySlug(slug), fetchStoreProducts()]).then(
@@ -202,6 +234,38 @@ export default function ProductDetailPage() {
                 {badge.text}
               </div>
             ))}
+          </div>
+
+          {/* Automated Refill */}
+          <div className="mt-6 rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-bold text-emerald-800">
+                  <span className="mr-1.5">🔄</span>
+                  Automated Refill
+                </h3>
+                <p className="mt-0.5 text-xs text-emerald-600">
+                  Get this medicine delivered automatically every month
+                </p>
+              </div>
+              <button
+                onClick={handleAutoRefill}
+                disabled={refillStatus === "loading" || refillStatus === "done"}
+                className={`rounded-xl px-5 py-2.5 text-sm font-semibold transition-all ${
+                  refillStatus === "done"
+                    ? "bg-emerald-600 text-white"
+                    : "bg-white text-emerald-700 shadow-sm hover:bg-emerald-100 border border-emerald-200"
+                }`}
+              >
+                {refillStatus === "loading"
+                  ? "Setting up..."
+                  : refillStatus === "done"
+                    ? "Active"
+                    : refillStatus === "error"
+                      ? "Retry"
+                      : "Enable"}
+              </button>
+            </div>
           </div>
 
           {/* Description */}

@@ -1,7 +1,7 @@
 "use client";
 
 import Image from "next/image";
-import { motion, useScroll, useTransform } from "framer-motion";
+import { motion, MotionValue, useScroll, useTransform } from "framer-motion";
 import { useRef, useState, useEffect } from "react";
 
 const projects = [
@@ -44,7 +44,7 @@ const StickyCard_001 = ({
   i: number;
   title: string;
   src: string;
-  progress: any;
+  progress: MotionValue<number>;
   range: [number, number];
   targetScale: number;
   gradient: string;

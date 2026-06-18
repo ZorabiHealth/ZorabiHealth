@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -68,13 +68,45 @@ interface CatalogDrug {
   category: string;
 }
 
+interface DoctorProfile {
+  id: string;
+  doctor_name: string;
+  workspace_name: string;
+  avatar_url: string;
+  signature_url: string;
+  specialization: string;
+  qualification: string;
+  hospital_affiliation: string;
+  consultation_fee: number;
+  bio: string;
+  languages: string;
+  [key: string]: unknown;
+}
+
+interface PastVisitItem {
+  drug_name: string;
+  dosage: string;
+  frequency: string;
+  duration: string;
+  notes?: string;
+}
+
+interface PastVisit {
+  id: string;
+  date: string;
+  diagnosis: string;
+  doctor: string;
+  notes: string;
+  items: PastVisitItem[];
+}
+
 export default function DoctorDashboard() {
   const { role, userId } = useUserRole();
   const router = useRouter();
   const searchParams = useSearchParams();
 
   // Doctor Profile
-  const [doctorProfile, setDoctorProfile] = useState<any>(null);
+  const [doctorProfile, setDoctorProfile] = useState<DoctorProfile | null>(null);
   const [doctorName, setDoctorName] = useState("Dr. [Loading...]");
   const [loadingDoctor, setLoadingDoctor] = useState(true);
   // Allergy data
@@ -94,7 +126,7 @@ export default function DoctorDashboard() {
   const [temp, setTemp] = useState("98.6");
   const [height, setHeight] = useState("175");
   const [weight, setWeight] = useState("70");
-  const [bmi, setBmi] = useState("22.9");
+  // bmi is derived via useMemo below
 
   // Symptoms & Diagnosis states
   const [symptoms, setSymptoms] = useState("");
@@ -132,12 +164,13 @@ export default function DoctorDashboard() {
   const [creatingPatient, setCreatingPatient] = useState(false);
 
   // Past Visits & AI warnings
-  const [pastVisits, setPastVisits] = useState<any[]>([]);
+  const [pastVisits, setPastVisits] = useState<PastVisit[]>([]);
   const [loadingPastVisits, setLoadingPastVisits] = useState(false);
-  const [selectedPastVisit, setSelectedPastVisit] = useState<any | null>(null);
+  const [selectedPastVisit, setSelectedPastVisit] = useState<PastVisit | null>(null);
 
   // UI status overlays
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submittingRef = useRef(false);
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [successToast, setSuccessToast] = useState<string | null>(null);
   const [languagePopupOpen, setLanguagePopupOpen] = useState(false);
@@ -165,14 +198,13 @@ export default function DoctorDashboard() {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   // Auto calculate BMI when height/weight changes
-  useEffect(() => {
+  const bmi = useMemo(() => {
     const h = parseFloat(height);
     const w = parseFloat(weight);
     if (h > 0 && w > 0) {
-      setBmi((w / ((h / 100) * (h / 100))).toFixed(1));
-    } else {
-      setBmi("");
+      return (w / ((h / 100) * (h / 100))).toFixed(1);
     }
+    return "";
   }, [height, weight]);
 
   // Fetch / Create doctor profile and load patients
@@ -187,13 +219,15 @@ export default function DoctorDashboard() {
       setLoadingDoctor(true);
       try {
         // Fetch or create profile
-        let { data: profile, error: profileErr } = await supabase
+        const { data: profileData, error: profileErr } = await supabase
           .from("doctor_profiles")
           .select("*")
           .eq("user_id", userId)
           .maybeSingle();
 
         if (profileErr) throw profileErr;
+
+        let profile = profileData;
 
         if (!profile) {
           const { data: newProfile, error: createErr } = await supabase
@@ -273,7 +307,7 @@ export default function DoctorDashboard() {
     };
 
     initDoctor();
-  }, [role, userId, router]);
+  }, [role, userId]);
 
   // Derived image URLs from doctor profile (used in preview, print, and PDF)
   const doctorAvatarUrl = doctorProfile?.avatar_url
@@ -287,7 +321,6 @@ export default function DoctorDashboard() {
   // Fetch allergy data for the selected patient
   useEffect(() => {
     if (!activePatient) {
-      setPatientAllergies([]);
       return;
     }
     const fetchAllergies = async () => {
@@ -337,17 +370,17 @@ export default function DoctorDashboard() {
 
         if (data && data.length > 0) {
           setPastVisits(
-            data.map((rx: any) => ({
-              id: rx.id,
-              date: new Date(rx.created_at).toLocaleDateString("en-US", {
+            data.map((rx: Record<string, unknown>) => ({
+              id: String(rx.id ?? ""),
+              date: new Date(String(rx.created_at)).toLocaleDateString("en-US", {
                 day: "numeric",
                 month: "short",
                 year: "2-digit",
               }),
-              diagnosis: rx.diagnosis || "General Consult",
+              diagnosis: String(rx.diagnosis || "General Consult"),
               doctor: "Dr. Sarah Smith",
-              notes: rx.notes,
-              items: rx.prescription_items || [],
+              notes: String(rx.notes || ""),
+              items: (rx.prescription_items || []) as PastVisitItem[],
             }))
           );
         } else {
@@ -366,7 +399,6 @@ export default function DoctorDashboard() {
   // Drug Catalog autocomplete search
   useEffect(() => {
     if (drugSearchQuery.trim().length < 2) {
-      setCatalogSuggestions([]);
       return;
     }
 
@@ -557,12 +589,15 @@ export default function DoctorDashboard() {
 
       if (error) throw error;
 
-      setDoctorProfile((prev: any) => ({
-        ...prev,
-        workspace_name: editWorkspaceName.trim() || prev.workspace_name,
-        avatar_url: avatarUrl,
-        signature_url: signatureUrl,
-      }));
+      setDoctorProfile((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          workspace_name: editWorkspaceName.trim() || prev.workspace_name,
+          avatar_url: avatarUrl,
+          signature_url: signatureUrl,
+        };
+      });
 
       setShowProfileEdit(false);
       setSuccessToast("Profile updated successfully!");
@@ -602,17 +637,20 @@ export default function DoctorDashboard() {
 
       if (error) throw error;
 
-      setDoctorProfile((prev: any) => ({
-        ...prev,
-        specialization: editSpecialization.trim() || prev.specialization,
-        qualification: editQualification.trim() || prev.qualification,
-        hospital_affiliation: editHospitalAffiliation.trim() || prev.hospital_affiliation,
-        consultation_fee: editConsultationFee
-          ? parseFloat(editConsultationFee)
-          : prev.consultation_fee,
-        bio: editBio.trim(),
-        languages: editLanguages.trim(),
-      }));
+      setDoctorProfile((prev) => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          specialization: editSpecialization.trim() || prev.specialization,
+          qualification: editQualification.trim() || prev.qualification,
+          hospital_affiliation: editHospitalAffiliation.trim() || prev.hospital_affiliation,
+          consultation_fee: editConsultationFee
+            ? parseFloat(editConsultationFee)
+            : prev.consultation_fee,
+          bio: editBio.trim(),
+          languages: editLanguages.trim(),
+        };
+      });
 
       setProfileEditMode(false);
       setSuccessToast("Profile updated successfully!");
@@ -657,7 +695,10 @@ export default function DoctorDashboard() {
 
   // Save Prescription (draft or active)
   const savePrescription = async (status: "draft" | "active") => {
-    if (!activePatient || !doctorProfile) return;
+    if (!activePatient || !doctorProfile) {
+      setToast({ message: "No patient selected or profile not loaded.", type: "error" });
+      return;
+    }
     if (prescribedMeds.length === 0) {
       setToast({ message: "Please add at least one medication before saving.", type: "error" });
       return;
@@ -675,6 +716,8 @@ export default function DoctorDashboard() {
       }
     }
 
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setIsSubmitting(true);
     try {
       // Build structured notes with vitals
@@ -691,6 +734,7 @@ export default function DoctorDashboard() {
           notes: combinedNotes,
           status,
           ai_assisted: allergyAlertActive,
+          followup_date: followUpDate || null,
         })
         .select()
         .single();
@@ -750,13 +794,7 @@ export default function DoctorDashboard() {
           .throwOnError();
       }
 
-      setSuccessToast(
-        `Prescription successfully ${status === "active" ? "finalized" : "saved as draft"}!`
-      );
-      setTimeout(() => setSuccessToast(null), 3000);
-
       if (status === "active") {
-        handleClearForm();
         // Pharmacy auto-refill: notify pharmacy vendors about new prescription
         try {
           const { data: pharmacies } = await supabase
@@ -837,22 +875,282 @@ export default function DoctorDashboard() {
         } catch (pharmErr) {
           console.error("Pharmacy notification + order creation failed (non-blocking):", pharmErr);
         }
+
+        // Notify patient about new prescription
+        try {
+          await supabase.from("notifications").insert({
+            user_id: activePatient.id,
+            title: "New Prescription Issued",
+            body: `Dr. ${doctorName} has issued a new prescription: ${diagnosis || "General Consultation"}`,
+            data: { prescription_id: rx.id, doctor_id: doctorProfile.id },
+            category: "prescription",
+            priority: "high",
+          });
+        } catch (notifErr) {
+          console.warn("Patient notification failed (non-blocking):", notifErr);
+        }
+
+        // Auto-mark prescription as completed
+        try {
+          await supabase.from("prescriptions").update({ status: "completed" }).eq("id", rx.id);
+        } catch (statusErr) {
+          console.warn("Failed to mark prescription as completed (non-blocking):", statusErr);
+        }
+
+        // Generate & upload PDF to bucket (non-blocking)
+        try {
+          await generateAndUploadPdf(rx.id, false);
+        } catch (pdfErr) {
+          console.error("PDF generation/upload failed (non-blocking):", pdfErr);
+        }
       }
+
+      if (status === "active") {
+        handleClearForm();
+      }
+      setSuccessToast(
+        `Prescription successfully ${status === "active" ? "finalized" : "saved as draft"}!`
+      );
+      setTimeout(() => setSuccessToast(null), 3000);
     } catch (err) {
       console.error("Failed to save prescription:", err);
       setToast({ message: "Error saving prescription. Please try again.", type: "error" });
     } finally {
       setIsSubmitting(false);
+      submittingRef.current = false;
     }
   };
 
   const [savingPdf, setSavingPdf] = useState(false);
 
+  // Shared PDF generation: generates, uploads, and optionally opens the PDF
+  const generateAndUploadPdf = async (rxId: string, openAfter: boolean): Promise<string | null> => {
+    const fetchImageAsBase64 = async (
+      storagePath: string | null | undefined
+    ): Promise<string | null> => {
+      if (!storagePath) return null;
+      try {
+        const { data } = supabase.storage.from("doctor_assets").getPublicUrl(storagePath);
+        if (!data?.publicUrl) return null;
+        const resp = await fetch(data.publicUrl, { cache: "no-cache" });
+        if (!resp.ok) return null;
+        const blob = await resp.blob();
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.readAsDataURL(blob);
+        });
+      } catch {
+        return null;
+      }
+    };
+
+    const [avatarDataUrl, sigDataUrl] = await Promise.all([
+      fetchImageAsBase64(doctorProfile?.avatar_url),
+      fetchImageAsBase64(doctorProfile?.signature_url),
+    ]);
+
+    const { default: jsPDF } = await import("jspdf");
+    const { default: autoTable } = await import("jspdf-autotable");
+
+    const doc = new jsPDF({ unit: "mm", format: "a4" });
+    const pageW = doc.internal.pageSize.getWidth();
+    const margin = 20;
+    let y = margin;
+
+    const sectionTitle = (text: string) => {
+      doc.setFontSize(12);
+      doc.setTextColor(12, 67, 129);
+      doc.setFont("helvetica", "bold");
+      doc.text(text, margin, y);
+      y += 2;
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin, y, pageW - margin, y);
+      y += 6;
+    };
+
+    const bodyText = (text: string, indent = margin) => {
+      doc.setFontSize(10);
+      doc.setTextColor(30, 41, 59);
+      doc.setFont("helvetica", "normal");
+      const lines = doc.splitTextToSize(text, pageW - margin * 2 - (indent - margin));
+      doc.text(lines, indent, y);
+      y += lines.length * 5 + 2;
+    };
+
+    const headerLeftX = margin;
+    const headerY = y;
+
+    if (avatarDataUrl) {
+      try {
+        doc.addImage(avatarDataUrl, "PNG", headerLeftX, headerY - 4, 14, 14);
+      } catch {
+        /* ignore */
+      }
+    }
+    const textX = avatarDataUrl ? headerLeftX + 18 : headerLeftX;
+    doc.setFontSize(18);
+    doc.setTextColor(12, 67, 129);
+    doc.setFont("helvetica", "bold");
+    doc.text(doctorProfile?.workspace_name || "ZorabiHealth Center", textX, headerY + 4);
+    y = headerY + 9;
+
+    doc.setFontSize(11);
+    doc.setTextColor(30, 41, 59);
+    doc.setFont("helvetica", "normal");
+    doc.text(doctorName, textX, y);
+    y += 5;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.text(`License: ${doctorProfile?.license_number || "N/A"}`, textX, y);
+    doc.text(`Date: ${new Date().toLocaleDateString()}`, pageW - margin, y, { align: "right" });
+    y += 12;
+
+    doc.setDrawColor(200, 200, 200);
+    doc.line(margin, y, pageW - margin, y);
+    y += 8;
+
+    sectionTitle("Patient Information");
+    doc.setFontSize(10);
+    doc.setTextColor(30, 41, 59);
+    doc.setFont("helvetica", "bold");
+    doc.text(`Name:`, margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(activePatient?.name || "", margin + 20, y);
+    y += 6;
+    doc.setFont("helvetica", "bold");
+    doc.text(`Email:`, margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.text(activePatient?.email || "", margin + 20, y);
+    y += 6;
+    doc.setFont("helvetica", "bold");
+    const vitalsLine = `BP: ${systolicBP}/${diastolicBP} mmHg | SpO2: ${spO2}% | Temp: ${temp}°F | BMI: ${bmi}`;
+    doc.text(`Vitals:`, margin, y);
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(9);
+    doc.text(vitalsLine, margin + 20, y);
+    y += 8;
+
+    sectionTitle("Clinical Assessment");
+    doc.setFontSize(10);
+    doc.setFont("helvetica", "bold");
+    doc.text("Symptoms:", margin, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    bodyText(symptoms || "None reported");
+    doc.setFont("helvetica", "bold");
+    doc.text("Diagnosis:", margin, y);
+    y += 5;
+    doc.setFont("helvetica", "normal");
+    bodyText(diagnosis || "General Consultation");
+
+    sectionTitle("Prescribed Medications");
+    const tableHead = [["Drug Name", "Dosage", "Frequency", "Duration", "Instructions"]];
+    const tableBody = prescribedMeds.map((m) => [
+      m.drug_name,
+      m.dosage,
+      m.frequency,
+      m.duration,
+      m.notes || "—",
+    ]);
+    autoTable(doc, {
+      head: tableHead,
+      body: tableBody,
+      startY: y,
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 9, cellPadding: 3 },
+      headStyles: { fillColor: [12, 67, 129], textColor: 255, fontStyle: "bold" },
+      alternateRowStyles: { fillColor: [245, 247, 250] },
+    });
+    y = (doc as unknown as { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
+
+    const formatDate = (dateStr: string) => {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      return isNaN(d.getTime()) ? "" : d.toLocaleDateString();
+    };
+
+    if (followUpDate && formatDate(followUpDate)) {
+      doc.setFontSize(10);
+      doc.setTextColor(12, 67, 129);
+      doc.setFont("helvetica", "bold");
+      doc.text(`Follow-up Date: ${formatDate(followUpDate)}`, margin, y);
+      y += 10;
+    }
+
+    const pageH = doc.internal.pageSize.getHeight();
+    if (y > pageH - 40) {
+      doc.addPage();
+      y = margin;
+    }
+
+    const sigX = pageW - margin - 50;
+    if (sigDataUrl) {
+      try {
+        doc.addImage(sigDataUrl, "PNG", sigX, y - 8, 40, 16);
+      } catch {
+        doc.setDrawColor(200, 200, 200);
+        doc.line(sigX, y, sigX + 50, y);
+      }
+    } else {
+      doc.setDrawColor(200, 200, 200);
+      doc.line(sigX, y, sigX + 50, y);
+    }
+    y += 2;
+    doc.setFontSize(9);
+    doc.setTextColor(100, 116, 139);
+    doc.setFont("helvetica", "bold");
+    doc.text("Authorized Signature", sigX + 25, y, { align: "center" });
+
+    const refId = `VP-RX-${Date.now().toString().slice(-6)}`;
+    doc.setFontSize(8);
+    doc.setTextColor(148, 163, 184);
+    doc.setFont("helvetica", "normal");
+    doc.text(`Ref: ${refId} | Generated by ZorabiHealth`, margin, 285);
+
+    const pdfBlob = doc.output("blob");
+    const fileName = `prescription-${Date.now()}.pdf`;
+    const filePath = `prescriptions/${activePatient?.id || "unknown"}/${fileName}`;
+
+    const { error: uploadErr } = await supabase.storage
+      .from("prescription_pdfs")
+      .upload(filePath, pdfBlob, { contentType: "application/pdf", upsert: false });
+
+    let signedUrl: string | null = null;
+
+    if (!uploadErr) {
+      const signed = await supabase.storage
+        .from("prescription_pdfs")
+        .createSignedUrl(filePath, 3600);
+      signedUrl = signed.data?.signedUrl || null;
+
+      await supabase.from("prescription_documents").insert({
+        prescription_id: rxId,
+        storage_path: filePath,
+        file_name: fileName,
+        file_size: pdfBlob.size,
+      });
+    }
+
+    if (openAfter) {
+      if (signedUrl) {
+        window.open(signedUrl, "_blank");
+      } else {
+        const pdfUrl = doc.output("datauristring");
+        const a = document.createElement("a");
+        a.href = pdfUrl;
+        a.download = fileName;
+        a.click();
+      }
+    }
+
+    return signedUrl;
+  };
+
   const handleSavePdf = async () => {
     if (!activePatient || !doctorProfile) return;
     setSavingPdf(true);
     try {
-      // Save as draft first to get a valid prescription_id
       const vitalsBlock = `Vitals Summary:\n- Blood Pressure: ${systolicBP}/${diastolicBP} mmHg\n- SpO2: ${spO2}%\n- Pulse: ${pulseRate}/min\n- Temp: ${temp}°F\n- Height: ${height}cm\n- Weight: ${weight}kg\n- BMI: ${bmi} kg/m²`;
       const combinedNotes = `${vitalsBlock}\n\nClinical Notes:\n${internalNotes || "No notes provided."}`;
 
@@ -865,12 +1163,12 @@ export default function DoctorDashboard() {
           notes: combinedNotes,
           status: "draft",
           ai_assisted: allergyAlertActive,
+          followup_date: followUpDate || null,
         })
         .select()
         .single();
       if (draftErr) throw draftErr;
 
-      // Insert prescription items
       const rxItems = prescribedMeds.map((med) => ({
         prescription_id: draftRx.id,
         drug_id: med.drug_id,
@@ -889,243 +1187,17 @@ export default function DoctorDashboard() {
         }
       }
 
-      // Fetch avatar and signature images as base64 for PDF embedding
-      const fetchImageAsBase64 = async (
-        storagePath: string | null | undefined
-      ): Promise<string | null> => {
-        if (!storagePath) return null;
-        try {
-          const { data } = supabase.storage.from("doctor_assets").getPublicUrl(storagePath);
-          if (!data?.publicUrl) return null;
-          const resp = await fetch(data.publicUrl, { cache: "no-cache" });
-          if (!resp.ok) return null;
-          const blob = await resp.blob();
-          return new Promise((resolve) => {
-            const reader = new FileReader();
-            reader.onloadend = () => resolve(reader.result as string);
-            reader.readAsDataURL(blob);
-          });
-        } catch {
-          return null;
-        }
-      };
+      await generateAndUploadPdf(draftRx.id, true);
 
-      const [avatarDataUrl, sigDataUrl] = await Promise.all([
-        fetchImageAsBase64(doctorProfile.avatar_url),
-        fetchImageAsBase64(doctorProfile.signature_url),
-      ]);
-
-      // Generate PDF with jsPDF
-      const { default: jsPDF } = await import("jspdf");
-      const { default: autoTable } = await import("jspdf-autotable");
-
-      const doc = new jsPDF({ unit: "mm", format: "a4" });
-      const pageW = doc.internal.pageSize.getWidth();
-      const margin = 20;
-      let y = margin;
-
-      // Helper
-      const sectionTitle = (text: string) => {
-        doc.setFontSize(12);
-        doc.setTextColor(12, 67, 129);
-        doc.setFont("helvetica", "bold");
-        doc.text(text, margin, y);
-        y += 2;
-        doc.setDrawColor(200, 200, 200);
-        doc.line(margin, y, pageW - margin, y);
-        y += 6;
-      };
-
-      const bodyText = (text: string, indent = margin) => {
-        doc.setFontSize(10);
-        doc.setTextColor(30, 41, 59);
-        doc.setFont("helvetica", "normal");
-        const lines = doc.splitTextToSize(text, pageW - margin * 2 - (indent - margin));
-        doc.text(lines, indent, y);
-        y += lines.length * 5 + 2;
-      };
-
-      // Header with Avatar
-      const headerLeftX = margin;
-      const headerY = y;
-
-      if (avatarDataUrl) {
-        try {
-          doc.addImage(avatarDataUrl, "PNG", headerLeftX, headerY - 4, 14, 14);
-        } catch {
-          // ignore image error
-        }
-      }
-      const textX = avatarDataUrl ? headerLeftX + 18 : headerLeftX;
-      doc.setFontSize(18);
-      doc.setTextColor(12, 67, 129);
-      doc.setFont("helvetica", "bold");
-      doc.text(doctorProfile?.workspace_name || "ZorabiHealth Center", textX, headerY + 4);
-      y = headerY + 9;
-
-      doc.setFontSize(11);
-      doc.setTextColor(30, 41, 59);
-      doc.setFont("helvetica", "normal");
-      doc.text(doctorName, textX, y);
-      y += 5;
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.text(`License: ${doctorProfile?.license_number || "N/A"}`, textX, y);
-      doc.text(`Date: ${new Date().toLocaleDateString()}`, pageW - margin, y, { align: "right" });
-      y += 12;
-
-      // Separator
-      doc.setDrawColor(200, 200, 200);
-      doc.line(margin, y, pageW - margin, y);
-      y += 8;
-
-      // Patient info
-      sectionTitle("Patient Information");
-      doc.setFontSize(10);
-      doc.setTextColor(30, 41, 59);
-      doc.setFont("helvetica", "bold");
-      doc.text(`Name:`, margin, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(activePatient.name, margin + 20, y);
-      y += 6;
-      doc.setFont("helvetica", "bold");
-      doc.text(`Email:`, margin, y);
-      doc.setFont("helvetica", "normal");
-      doc.text(activePatient.email, margin + 20, y);
-      y += 6;
-      doc.setFont("helvetica", "bold");
-      const vitalsLine = `BP: ${systolicBP}/${diastolicBP} mmHg | SpO2: ${spO2}% | Temp: ${temp}°F | BMI: ${bmi}`;
-      doc.text(`Vitals:`, margin, y);
-      doc.setFont("helvetica", "normal");
-      doc.setFontSize(9);
-      doc.text(vitalsLine, margin + 20, y);
-      y += 8;
-
-      // Symptoms & Diagnosis
-      sectionTitle("Clinical Assessment");
-      doc.setFontSize(10);
-      doc.setFont("helvetica", "bold");
-      doc.text("Symptoms:", margin, y);
-      y += 5;
-      doc.setFont("helvetica", "normal");
-      bodyText(symptoms || "None reported");
-      doc.setFont("helvetica", "bold");
-      doc.text("Diagnosis:", margin, y);
-      y += 5;
-      doc.setFont("helvetica", "normal");
-      bodyText(diagnosis || "General Consultation");
-
-      // Prescribed Medications Table
-      sectionTitle("Prescribed Medications");
-      const tableHead = [["Drug Name", "Dosage", "Frequency", "Duration", "Instructions"]];
-      const tableBody = prescribedMeds.map((m) => [
-        m.drug_name,
-        m.dosage,
-        m.frequency,
-        m.duration,
-        m.notes || "—",
-      ]);
-      autoTable(doc, {
-        head: tableHead,
-        body: tableBody,
-        startY: y,
-        margin: { left: margin, right: margin },
-        styles: { fontSize: 9, cellPadding: 3 },
-        headStyles: { fillColor: [12, 67, 129], textColor: 255, fontStyle: "bold" },
-        alternateRowStyles: { fillColor: [245, 247, 250] },
-      });
-      y = (doc as any).lastAutoTable.finalY + 10;
-
-      // Follow-up
-      if (followUpDate) {
-        doc.setFontSize(10);
-        doc.setTextColor(12, 67, 129);
-        doc.setFont("helvetica", "bold");
-        const fuText = `Follow-up Date: ${new Date(followUpDate).toLocaleDateString()}`;
-        doc.text(fuText, margin, y);
-        y += 10;
-      }
-
-      // Signature
-      const pageH = doc.internal.pageSize.getHeight();
-      if (y > pageH - 40) {
-        doc.addPage();
-        y = margin;
-      }
-
-      const sigX = pageW - margin - 50;
-      if (sigDataUrl) {
-        try {
-          doc.addImage(sigDataUrl, "PNG", sigX, y - 8, 40, 16);
-        } catch {
-          doc.setDrawColor(200, 200, 200);
-          doc.line(sigX, y, sigX + 50, y);
-        }
-      } else {
-        doc.setDrawColor(200, 200, 200);
-        doc.line(sigX, y, sigX + 50, y);
-      }
-      y += 2;
-      doc.setFontSize(9);
-      doc.setTextColor(100, 116, 139);
-      doc.setFont("helvetica", "bold");
-      doc.text("Authorized Signature", sigX + 25, y, { align: "center" });
-
-      // Footer / Ref
-      const refId = `VP-RX-${Date.now().toString().slice(-6)}`;
-      doc.setFontSize(8);
-      doc.setTextColor(148, 163, 184);
-      doc.setFont("helvetica", "normal");
-      doc.text(`Ref: ${refId} | Generated by ZorabiHealth`, margin, 285);
-
-      // Convert to blob and upload (with compression)
-      const pdfBlob = doc.output("blob");
-      // Re-compress: jsPDF already outputs compressed, but we force re-encode for smaller size
-      const compressedBlob = new Blob([pdfBlob], { type: "application/pdf" });
-      const fileName = `prescription-${Date.now()}.pdf`;
-      const filePath = `prescriptions/${doctorProfile.id}/${fileName}`;
-
-      const { error: uploadErr } = await supabase.storage
-        .from("prescription_pdfs")
-        .upload(filePath, pdfBlob, { contentType: "application/pdf", upsert: false });
-
-      let signedUrl: { signedUrl: string } | null = null;
-
-      if (!uploadErr) {
-        const signed = await supabase.storage
-          .from("prescription_pdfs")
-          .createSignedUrl(filePath, 3600);
-        signedUrl = signed.data;
-
-        await supabase.from("prescription_documents").insert({
-          prescription_id: draftRx.id,
-          storage_path: filePath,
-          file_name: fileName,
-          file_size: pdfBlob.size,
-        });
-
-        // Mark prescription as completed in DB
-        await supabase.from("prescriptions").update({ status: "completed" }).eq("id", draftRx.id);
-      }
-
-      // Always offer the PDF — fallback to data URL if storage upload failed
-      if (signedUrl?.signedUrl) {
-        window.open(signedUrl.signedUrl, "_blank");
-      } else {
-        const pdfUrl = doc.output("datauristring");
-        const a = document.createElement("a");
-        a.href = pdfUrl;
-        a.download = fileName;
-        a.click();
-      }
+      await supabase.from("prescriptions").update({ status: "completed" }).eq("id", draftRx.id);
 
       handleClearForm();
       setSuccessToast("Prescription saved as PDF!");
       setTimeout(() => setSuccessToast(null), 3000);
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("Failed to save PDF:", err);
       setToast({
-        message: `Failed: ${err?.message || err?.error_description || "Unknown error"}`,
+        message: err instanceof Error ? err.message : "Failed to save PDF.",
         type: "error",
       });
     } finally {
@@ -1260,6 +1332,7 @@ export default function DoctorDashboard() {
                           key={p.id}
                           onClick={() => {
                             setActivePatient(p);
+                            handleClearForm();
                             setPatientDropdownOpen(false);
                             setPatientSearch("");
                           }}
@@ -1288,7 +1361,7 @@ export default function DoctorDashboard() {
                             <Plus className="w-4 h-4" />
                           </div>
                           <div className="min-w-0">
-                            <p className="text-xs font-bold">Create "{patientSearch}"</p>
+                            <p className="text-xs font-bold">Create &quot;{patientSearch}&quot;</p>
                             <p className="text-[9px] text-slate-400">Add new patient record</p>
                           </div>
                         </button>
@@ -1308,7 +1381,7 @@ export default function DoctorDashboard() {
           <div className="flex items-center gap-2 self-end md:self-auto">
             <div className="text-xs font-semibold text-slate-500 mr-2">
               {doctorName} | {doctorProfile?.qualification || "MD"} | License:{" "}
-              {doctorProfile?.license_number}
+              {String(doctorProfile?.license_number ?? "")}
             </div>
             <button
               onClick={openProfileEdit}
@@ -2207,7 +2280,15 @@ export default function DoctorDashboard() {
             <span className="text-[9px] uppercase tracking-wider font-extrabold">Save Draft</span>
           </button>
           <button
-            onClick={() => savePrescription("active")}
+            onClick={() => {
+              if (
+                window.confirm(
+                  "Finalize this prescription? This will mark it as completed and notify the pharmacy and patient."
+                )
+              ) {
+                savePrescription("active");
+              }
+            }}
             disabled={isSubmitting}
             className="bg-white text-[#0c4381] px-6 py-2.5 rounded-full font-bold text-xs shadow-xl hover:scale-[1.03] active:scale-[0.98] transition-all disabled:opacity-50"
           >
@@ -2257,7 +2338,7 @@ export default function DoctorDashboard() {
                     </h3>
                     <p className="font-bold mt-1">{doctorName}</p>
                     <p className="text-slate-500 mt-0.5">
-                      License No: {doctorProfile?.license_number}
+                      License No: {String(doctorProfile?.license_number ?? "")}
                     </p>
                   </div>
                 </div>
@@ -2520,7 +2601,7 @@ export default function DoctorDashboard() {
                 </span>
                 <div className="border border-slate-100 rounded-2xl overflow-hidden mt-1.5 divide-y divide-slate-100">
                   {selectedPastVisit.items && selectedPastVisit.items.length > 0 ? (
-                    selectedPastVisit.items.map((item: any, idx: number) => (
+                    selectedPastVisit.items.map((item: PastVisitItem, idx: number) => (
                       <div
                         key={idx}
                         className="p-3 bg-white hover:bg-slate-50 flex justify-between items-center"

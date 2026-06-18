@@ -23,6 +23,14 @@ interface SymptomLog {
   notes: string;
 }
 
+interface SymptomLogRow {
+  id: string;
+  created_at: string;
+  name: string;
+  severity: string;
+  notes: string;
+}
+
 export default function VitalsPage() {
   const [logs, setLogs] = useState<SymptomLog[]>([]);
   const [userId, setUserId] = useState<string>("");
@@ -45,7 +53,7 @@ export default function VitalsPage() {
       if (error) throw error;
       if (data) {
         setLogs(
-          data.map((item: any) => ({
+          data.map((item: SymptomLogRow) => ({
             id: item.id,
             timestamp: new Date(item.created_at).toLocaleString([], {
               year: "numeric",
@@ -55,7 +63,7 @@ export default function VitalsPage() {
               minute: "2-digit",
             }),
             name: item.name,
-            severity: item.severity,
+            severity: item.severity as "Mild" | "Moderate" | "Severe",
             notes: item.notes,
           }))
         );

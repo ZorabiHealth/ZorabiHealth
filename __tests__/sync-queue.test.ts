@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 
 describe("SyncQueue", () => {
   it("enqueue adds item to queue", () => {
-    const queue: any[] = [];
+    const queue: Record<string, unknown>[] = [];
     const item = {
       id: "1",
       table: "medications",

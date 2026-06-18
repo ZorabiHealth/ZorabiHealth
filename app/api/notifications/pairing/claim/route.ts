@@ -75,7 +75,10 @@ export async function POST(req: NextRequest) {
       .eq("id", pairing.id);
 
     return NextResponse.json({ paired: true, pairing_id: inserted.id });
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Internal error" },
+      { status: 500 }
+    );
   }
 }

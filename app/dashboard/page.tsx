@@ -15,12 +15,33 @@ import {
   Sparkles,
   BookOpen,
   Search,
+  ShoppingBag,
+  Package,
+  ChevronRight,
 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import type { Session } from "@supabase/supabase-js";
+
+type JioSaavnSong = {
+  id: string;
+  name: string;
+  artists?: { primary?: { name: string }[] };
+  image?: { url: string }[];
+  downloadUrl?: { url: string }[];
+  duration: string;
+};
+
+type DashboardOrder = {
+  id: string;
+  tracking_id: string;
+  created_at: string;
+  total: number;
+  status: string;
+};
 
 export default function DashboardOverview() {
   const { role, loading: roleLoading } = useUserRole();
@@ -37,14 +58,21 @@ export default function DashboardOverview() {
   }, [role, roleLoading, router]);
 
   // Missed Medication Alerts State
-  const [session, setSession] = useState<any>(null);
-  const [missedMeds, setMissedMeds] = useState<any[]>([]);
-  const [loginTime, setLoginTime] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [missedMeds, setMissedMeds] = useState<
+    {
+      id: string;
+      name: string;
+      dosage: string;
+      time: string;
+      currentStock: number;
+    }[]
+  >([]);
+  const [loginTime, setLoginTime] = useState<string | null>(() =>
+    localStorage.getItem("zh_login_time")
+  );
 
   useEffect(() => {
-    const saved = localStorage.getItem("zh_login_time");
-    if (saved) setLoginTime(saved);
-
     const fetchSessionAndMeds = async () => {
       try {
         const {
@@ -70,7 +98,13 @@ export default function DashboardOverview() {
           .gte("scheduled_at", todayStart.toISOString());
 
         // Find missed medications
-        const missed: any[] = [];
+        const missed: {
+          id: string;
+          name: string;
+          dosage: string;
+          time: string;
+          currentStock: number;
+        }[] = [];
         const now = new Date();
 
         (medications || []).forEach((med) => {
@@ -116,7 +150,13 @@ export default function DashboardOverview() {
     return () => clearInterval(interval);
   }, []);
 
-  const handleTakeMissedMed = async (med: any) => {
+  const handleTakeMissedMed = async (med: {
+    id: string;
+    name: string;
+    dosage: string;
+    time: string;
+    currentStock: number;
+  }) => {
     if (!session?.user?.id) return;
     const now = new Date();
     const [hours, minutes] = med.time.split(":").map(Number);
@@ -181,7 +221,7 @@ export default function DashboardOverview() {
   const [audioDuration, setAudioDuration] = useState(0);
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
-  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [searchResults, setSearchResults] = useState<JioSaavnSong[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
@@ -201,6 +241,72 @@ export default function DashboardOverview() {
     weekday: "Friday",
     month: "June",
   });
+
+  // 6. Recent Orders state
+  const [recentOrders, setRecentOrders] = useState<DashboardOrder[]>([]);
+
+  useEffect(() => {
+    let channel: { unsubscribe: () => void } | null = null;
+    let cancelled = false;
+
+    const fetchOrders = async () => {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (!session?.access_token) return;
+        const res = await fetch("/api/store/orders", {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (!cancelled) setRecentOrders(data.slice(0, 5));
+        }
+      } catch {}
+    };
+
+    const setupRealtime = async () => {
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session?.user?.id || cancelled) return;
+
+      channel = supabase
+        .channel(`dash-orders-${session.user.id}`)
+        .on(
+          "postgres_changes",
+          {
+            event: "*",
+            schema: "public",
+            table: "store_orders",
+            filter: `user_id=eq.${session.user.id}`,
+          },
+          () => {
+            fetchOrders();
+          }
+        )
+        .subscribe();
+    };
+
+    if (role === "patient") {
+      fetchOrders();
+      setupRealtime();
+    }
+
+    return () => {
+      cancelled = true;
+      channel?.unsubscribe();
+    };
+  }, [role]);
+
+  const STATUS_BADGE: Record<string, { label: string; color: string; bg: string }> = {
+    PENDING: { label: "Pending", color: "text-yellow-800", bg: "bg-yellow-100" },
+    CONFIRMED: { label: "Confirmed", color: "text-blue-800", bg: "bg-blue-100" },
+    PREPARING: { label: "Preparing", color: "text-amber-800", bg: "bg-amber-100" },
+    DISPATCHED: { label: "Dispatched", color: "text-emerald-800", bg: "bg-emerald-100" },
+    DELIVERED: { label: "Delivered", color: "text-green-800", bg: "bg-green-100" },
+    CANCELLED: { label: "Cancelled", color: "text-red-800", bg: "bg-red-100" },
+  };
 
   useEffect(() => {
     const days = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -349,7 +455,7 @@ export default function DashboardOverview() {
     }
   };
 
-  const selectSong = (song: any) => {
+  const selectSong = (song: JioSaavnSong) => {
     const name = song.name;
     const artist = song.artists?.primary?.[0]?.name || "JioSaavn";
     const image = song.image?.[2]?.url || song.image?.[1]?.url || song.image?.[0]?.url || "";
@@ -390,7 +496,7 @@ export default function DashboardOverview() {
 
   return (
     <div
-      className="w-full min-h-full bg-[#f0f5ff] flex flex-col animate-slide-up p-6"
+      className="w-full min-h-full bg-[#f0f5ff] flex flex-col animate-slide-up p-4"
       data-purpose="overview-grid"
     >
       {/* Dynamic Missed Medication Sync Alerts */}
@@ -434,9 +540,9 @@ export default function DashboardOverview() {
       </AnimatePresence>
 
       {/* 4/3 Grid Core Layout */}
-      <div className="grid grid-cols-12 gap-4 flex-grow shrink-0 min-h-full">
+      <div className="grid grid-cols-12 gap-3 flex-grow shrink-0 min-h-full">
         {/* BEGIN: Heart Health Card (Top Left - 9 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-9 bg-slate-950 rounded-[32px] relative overflow-hidden p-8 flex flex-col justify-between text-white border border-white/20 shadow-md min-h-[350px]">
+        <section className="col-span-12 lg:col-span-9 bg-slate-950 rounded-[32px] relative overflow-hidden p-5 flex flex-col justify-between text-white border border-white/20 shadow-md min-h-[260px]">
           {/* Loop background video */}
           <video
             autoPlay
@@ -463,9 +569,9 @@ export default function DashboardOverview() {
             )}
           </header>
 
-          <div className="relative z-10 flex flex-col md:flex-row gap-6 mt-4 items-end justify-between">
+          <div className="relative z-10 flex flex-col md:flex-row gap-4 mt-2 items-end justify-between">
             {/* Info Box Left */}
-            <div className="bg-white/10 backdrop-blur-md p-6 rounded-[24px] max-w-xs border border-white/20 shadow-sm flex flex-col justify-between">
+            <div className="bg-white/10 backdrop-blur-md p-4 rounded-[24px] max-w-xs border border-white/20 shadow-sm flex flex-col justify-between">
               <div className="flex items-start gap-3 mb-3">
                 <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center shrink-0">
                   <Activity className="w-5 h-5 text-white" />
@@ -551,7 +657,7 @@ export default function DashboardOverview() {
           {/* Warning Valve Sticker */}
           <div
             onClick={() => setIsValveDetailOpen(true)}
-            className="relative z-10 self-start mt-6 bg-white/10 hover:bg-white/20 border border-white/20 px-5 py-3 rounded-2xl flex flex-col cursor-pointer transition-colors"
+            className="relative z-10 self-start mt-3 bg-white/10 hover:bg-white/20 border border-white/20 px-4 py-2 rounded-2xl flex flex-col cursor-pointer transition-colors"
           >
             <span className="text-xs font-bold leading-normal">
               The valve is not
@@ -564,7 +670,7 @@ export default function DashboardOverview() {
         {/* END: Heart Health Card */}
 
         {/* BEGIN: Time/Music Card (Top Right - 3 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-3 rounded-[32px] relative overflow-hidden p-6 text-white border border-white/10 shadow-md flex flex-col justify-between min-h-[350px]">
+        <section className="col-span-12 lg:col-span-3 rounded-[32px] relative overflow-hidden p-4 text-white border border-white/10 shadow-md flex flex-col justify-between min-h-[260px]">
           {/* Background Video */}
           <video
             autoPlay
@@ -622,7 +728,7 @@ export default function DashboardOverview() {
                     Searching JioSaavn...
                   </div>
                 ) : searchResults.length > 0 ? (
-                  searchResults.map((song: any) => {
+                  searchResults.map((song: JioSaavnSong) => {
                     const songName = song.name;
                     const artistName = song.artists?.primary?.[0]?.name || "JioSaavn";
                     const imgUrl = song.image?.[1]?.url || song.image?.[0]?.url || "";
@@ -717,7 +823,7 @@ export default function DashboardOverview() {
         {/* END: Time/Music Card */}
 
         {/* BEGIN: Choose Your Doctor Card (Bottom Left - 5 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-5 bg-white/40 backdrop-blur-xl border border-white/30 rounded-[32px] p-6 flex flex-col justify-between shadow-md min-h-[350px]">
+        <section className="col-span-12 lg:col-span-5 bg-white/40 backdrop-blur-xl border border-white/30 rounded-[32px] p-4 flex flex-col justify-between shadow-md min-h-[300px]">
           <div>
             <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider">
               Your Health Team
@@ -727,30 +833,26 @@ export default function DashboardOverview() {
             </h2>
           </div>
 
-          <div className="flex gap-3 justify-center py-2">
-            <div className="w-full h-32 rounded-2xl overflow-hidden border border-white/30 shadow-md relative group select-none pointer-events-none">
-              <div className="w-full h-full bg-gradient-to-br from-blue-500 via-[#0c4381] to-purple-700 transition-transform duration-700 group-hover:scale-105 flex items-center justify-center">
-                <div className="text-white/30 text-5xl font-black">+</div>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-4">
-            <p className="text-xs text-slate-500 text-center font-medium">
-              Browse verified doctors, check availability, and book instantly
-            </p>
+          <div className="flex gap-3 justify-center flex-1 py-1">
             <Link
               href="/dashboard/patient/book-appointment"
-              className="w-full block text-center bg-white/80 border border-slate-200 text-slate-700 font-bold py-3 rounded-2xl text-xs hover:bg-white transition-colors cursor-pointer shadow-sm"
+              className="w-full h-full rounded-2xl overflow-hidden border border-white/30 shadow-md relative group block"
             >
-              Find a Doctor
+              <div
+                className="w-full h-full bg-cover bg-top transition-transform duration-700 group-hover:scale-105 flex items-center justify-center"
+                style={{ backgroundImage: "url('/images/doctorpage.avif')" }}
+              >
+                <span className="text-white text-sm font-bold bg-black/50 px-4 py-2 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity z-10">
+                  Click here
+                </span>
+              </div>
             </Link>
           </div>
         </section>
         {/* END: Choose Your Doctor Card */}
 
         {/* BEGIN: Sleep Tracking Card (Bottom Middle - 3 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-3 bg-slate-900 rounded-[32px] p-6 flex flex-col justify-between text-white relative overflow-hidden shadow-md min-h-[350px]">
+        <section className="col-span-12 lg:col-span-3 bg-slate-900 rounded-[32px] p-4 flex flex-col justify-between text-white relative overflow-hidden shadow-md min-h-[300px]">
           <div className="absolute inset-0 z-0 select-none pointer-events-none">
             <Image
               alt="Clinical Floral Background"
@@ -790,7 +892,7 @@ export default function DashboardOverview() {
         {/* END: Sleep Tracking Card */}
 
         {/* BEGIN: Medical News Card (Bottom Right - 4 Cols, 3 Rows) */}
-        <section className="col-span-12 lg:col-span-4 bg-white/40 backdrop-blur-xl border border-white/30 rounded-[32px] p-6 flex flex-col gap-4 shadow-md min-h-[350px]">
+        <section className="col-span-12 lg:col-span-4 bg-white/40 backdrop-blur-xl border border-white/30 rounded-[32px] p-4 flex flex-col gap-3 shadow-md min-h-[300px]">
           <header className="flex justify-between items-start">
             <h2 className="text-xl font-bold text-slate-800 leading-tight">
               Medical
@@ -802,7 +904,7 @@ export default function DashboardOverview() {
             </span>
           </header>
 
-          <div className="flex flex-col gap-3 mt-2">
+          <div className="flex flex-col gap-2">
             {/* Article 1 */}
             <div
               onClick={() =>
@@ -840,6 +942,53 @@ export default function DashboardOverview() {
         </section>
         {/* END: Medical News Card */}
       </div>
+
+      {/* Recent Orders Section */}
+      {recentOrders.length > 0 && (
+        <section className="mt-4 bg-white rounded-[32px] border border-slate-100 shadow-sm overflow-hidden">
+          <div className="flex items-center justify-between px-6 pt-5 pb-3">
+            <div className="flex items-center gap-2">
+              <ShoppingBag className="w-5 h-5 text-emerald-600" />
+              <h2 className="text-base font-bold text-slate-800">Recent Orders</h2>
+            </div>
+            <Link
+              href="/dashboard/my-orders"
+              className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 flex items-center gap-1"
+            >
+              View All <ChevronRight className="w-3.5 h-3.5" />
+            </Link>
+          </div>
+          <div className="px-6 pb-5 space-y-2">
+            {recentOrders.map((order: DashboardOrder) => (
+              <Link
+                key={order.id}
+                href={`/zobraipharm/confirmation?id=${order.id}`}
+                className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 hover:bg-slate-100 transition-colors"
+              >
+                <div className="flex items-center gap-3">
+                  <Package className="w-4 h-4 text-slate-400 shrink-0" />
+                  <div>
+                    <p className="text-xs font-bold text-slate-800 font-mono">
+                      {order.tracking_id}
+                    </p>
+                    <p className="text-[10px] text-slate-500">
+                      {new Date(order.created_at).toLocaleDateString()} · ₹
+                      {Number(order.total).toFixed(2)}
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${
+                    STATUS_BADGE[order.status]?.bg || "bg-slate-100"
+                  } ${STATUS_BADGE[order.status]?.color || "text-slate-700"}`}
+                >
+                  {STATUS_BADGE[order.status]?.label || order.status}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* ================= MODALS & OVERLAYS ================= */}
 

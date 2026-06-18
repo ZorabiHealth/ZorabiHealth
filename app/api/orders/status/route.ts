@@ -13,8 +13,8 @@ const VALID_STATUSES = [
 
 // Status transitions that are NOT allowed (cannot go backwards)
 const FORBIDDEN_BACKWARDS: Record<string, string[]> = {
-  DELIVERED: ["PENDING", "CONFIRMED", "PREPARING", "DISPATCHED", "CANCELLED"],
-  CANCELLED: ["PENDING", "CONFIRMED", "PREPARING", "DISPATCHED", "DELIVERED"],
+  DELIVERED: ["PENDING", "CONFIRMED", "PREPARING", "CANCELLED"],
+  CANCELLED: ["DELIVERED"],
   DISPATCHED: ["PENDING", "CONFIRMED"],
   PREPARING: ["PENDING"],
 };
@@ -40,21 +40,22 @@ export async function POST(req: NextRequest) {
       );
     }
 
+    const admin = getAdminClient();
     const now = new Date().toISOString();
     const userId = authResult.user.id;
 
     // Check user role for authorization
-    const { data: userRole } = await supabase
-      .from("user_roles")
-      .select("role")
+    const { data: profile } = await admin
+      .from("pharmacy_profiles")
+      .select("id")
       .eq("user_id", userId)
-      .single();
+      .maybeSingle();
 
-    const isPharmacyVendor = userRole?.role === "pharmacy_vendor";
-    const isPatient = userRole?.role === "patient";
+    const isPharmacyVendor = !!profile;
+    const isPatient = false;
 
     // Try v1 refill_orders first, then v2 orders
-    const { data: refillOrder, error: findRefillErr } = await supabase
+    const { data: refillOrder, error: findRefillErr } = await admin
       .from("refill_orders")
       .select("id, status, user_id, medication_id, prescription_id")
       .eq("tracking_id", tracking_id)
@@ -81,18 +82,32 @@ export async function POST(req: NextRequest) {
         );
       }
 
-      const { error: updateError } = await supabase
+      const { error: updateError } = await admin
         .from("refill_orders")
         .update({ status, updated_at: now })
         .eq("id", refillOrder.id);
 
       if (updateError) throw updateError;
 
-      const { error: eventError } = await supabase
+      const { error: eventError } = await admin
         .from("refill_order_events")
-        .insert({ order_id: refillOrder.id, status, timestamp: now, note: note || null });
+        .insert({ refill_order_id: refillOrder.id, status, timestamp: now, note: note || null });
 
       if (eventError) console.error("[order-status] Failed to insert event:", eventError);
+
+      // Notify the patient
+      try {
+        await admin.from("notifications").insert({
+          user_id: refillOrder.user_id,
+          title: "Refill Order Updated",
+          body: `Your refill order ${tracking_id} is now ${status}`,
+          category: "order",
+          priority: "normal",
+          data: { order_id: refillOrder.id, tracking_id, status, order_type: "refill" },
+        });
+      } catch {
+        console.warn("[order-status] Failed to send notification");
+      }
 
       return NextResponse.json(
         { success: true, tracking_id, status, updated_at: now, order_type: "refill" },
@@ -167,19 +182,19 @@ export async function GET(req: NextRequest) {
     }
 
     const { searchParams } = new URL(req.url);
-    const tracking_id = searchParams.get("tracking_id");
+    const tracking_id = searchParams.get("tracking_id") || searchParams.get("id");
 
     if (!tracking_id) {
       return NextResponse.json(
-        { error: "tracking_id query parameter is required" },
+        { error: "tracking_id or id query parameter is required" },
         { status: 400 }
       );
     }
 
     const admin = getAdminClient();
 
-    // Try v1 refill_orders
-    const { data: refillOrder, error: refillErr } = await admin
+    // Try v1 refill_orders - first by tracking_id, then by id (UUID)
+    let { data: refillOrder, error: refillErr } = await admin
       .from("refill_orders")
       .select(
         `
@@ -193,10 +208,34 @@ export async function GET(req: NextRequest) {
 
     if (refillErr) throw refillErr;
 
-    if (refillOrder) {
-      if (refillOrder.user_id !== auth.user.id) {
-        return NextResponse.json({ error: "Not authorized" }, { status: 403 });
+    if (!refillOrder) {
+      const byId = await admin
+        .from("refill_orders")
+        .select(
+          `
+          *,
+          refill_order_events (*),
+          prescription:prescription_id (tracking_id, status, diagnosis)
+        `
+        )
+        .eq("id", tracking_id)
+        .maybeSingle();
+      if (byId.data) {
+        refillOrder = byId.data;
+        refillErr = byId.error;
       }
+    }
+
+    if (refillErr) throw refillErr;
+
+    if (refillOrder) {
+      const sortedEvents = (
+        ((refillOrder as Record<string, unknown>).refill_order_events || []) as {
+          timestamp: string;
+          status: string;
+          note?: string;
+        }[]
+      ).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
       return NextResponse.json(
         {
           order_type: "refill",
@@ -204,15 +243,25 @@ export async function GET(req: NextRequest) {
           medication_name: refillOrder.medication_name,
           dosage: refillOrder.dosage,
           quantity: refillOrder.quantity,
+          frequency: refillOrder.frequency,
+          payment_method: refillOrder.payment_method,
+          delivery_address: refillOrder.delivery_address,
+          patient_phone: refillOrder.patient_phone,
+          patient_email: refillOrder.patient_email,
+          product_id: refillOrder.product_id,
           vendor_name: refillOrder.vendor_name,
           status: refillOrder.status,
           estimated_delivery: refillOrder.estimated_delivery,
           total_price: refillOrder.total_price,
-          prescription_tracking_id: (refillOrder as any).prescription?.tracking_id ?? null,
-          prescription_status: (refillOrder as any).prescription?.status ?? null,
-          timeline: ((refillOrder as any).refill_order_events || []).sort(
-            (a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-          ),
+          prescription_tracking_id:
+            (refillOrder as Record<string, unknown>).prescription?.[
+              "tracking_id" as keyof object
+            ] ?? null,
+          prescription_status:
+            (refillOrder as Record<string, unknown>).prescription?.["status" as keyof object] ??
+            null,
+          timeline: sortedEvents,
+          events: sortedEvents,
           created_at: refillOrder.created_at,
           updated_at: refillOrder.updated_at,
         },
@@ -221,7 +270,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Try v2 orders
-    const { data: v2Order, error: v2Err } = await admin
+    const result = await admin
       .from("orders")
       .select(
         `
@@ -233,8 +282,28 @@ export async function GET(req: NextRequest) {
       )
       .eq("tracking_id", tracking_id)
       .maybeSingle();
+    let v2Order = result.data;
+    const v2Err = result.error;
 
     if (v2Err) throw v2Err;
+
+    if (!v2Order) {
+      const byId = await admin
+        .from("orders")
+        .select(
+          `
+          *,
+          order_events (*),
+          prescription:prescription_id (tracking_id, status, diagnosis),
+          pharmacy:pharmacy_id (business_name, address, phone)
+        `
+        )
+        .eq("id", tracking_id)
+        .maybeSingle();
+      if (byId.data) {
+        v2Order = byId.data;
+      }
+    }
 
     if (v2Order) {
       if (v2Order.patient_id !== auth.user.id) {
@@ -247,14 +316,24 @@ export async function GET(req: NextRequest) {
           status: v2Order.status,
           total_amount: v2Order.total_amount,
           delivery_address: v2Order.delivery_address,
-          pharmacy_name: (v2Order as any).pharmacy?.business_name ?? null,
-          pharmacy_address: (v2Order as any).pharmacy?.address ?? null,
-          pharmacy_phone: (v2Order as any).pharmacy?.phone ?? null,
-          prescription_tracking_id: (v2Order as any).prescription?.tracking_id ?? null,
-          prescription_status: (v2Order as any).prescription?.status ?? null,
-          timeline: ((v2Order as any).order_events || []).sort(
-            (a: any, b: any) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-          ),
+          pharmacy_name:
+            ((v2Order as Record<string, unknown>).pharmacy as Record<string, unknown>)
+              ?.business_name ?? null,
+          pharmacy_address:
+            ((v2Order as Record<string, unknown>).pharmacy as Record<string, unknown>)?.address ??
+            null,
+          pharmacy_phone:
+            ((v2Order as Record<string, unknown>).pharmacy as Record<string, unknown>)?.phone ??
+            null,
+          prescription_tracking_id:
+            ((v2Order as Record<string, unknown>).prescription as Record<string, unknown>)
+              ?.tracking_id ?? null,
+          prescription_status:
+            ((v2Order as Record<string, unknown>).prescription as Record<string, unknown>)
+              ?.status ?? null,
+          timeline: (
+            ((v2Order as Record<string, unknown>).order_events || []) as { timestamp: string }[]
+          ).sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()),
           created_at: v2Order.created_at,
           updated_at: v2Order.updated_at,
         },

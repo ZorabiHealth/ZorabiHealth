@@ -19,7 +19,7 @@ export function PairButton() {
   const [codeExpiresIn, setCodeExpiresIn] = useState(0);
   const [pairedDevices, setPairedDevices] = useState<PairedDevice[]>([]);
   const [loadingDevices, setLoadingDevices] = useState(true);
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<import("@supabase/supabase-js").Session | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: s } }) => {
@@ -47,11 +47,29 @@ export function PairButton() {
   }, []);
 
   useEffect(() => {
-    if (session) {
-      fetchDevices();
-    } else {
-      setLoadingDevices(false);
-    }
+    const loadDevices = async () => {
+      if (!session) {
+        setLoadingDevices(false);
+        return;
+      }
+      try {
+        const {
+          data: { session: fresh },
+        } = await supabase.auth.refreshSession();
+        const token = fresh?.access_token;
+        if (!token) return;
+        const res = await fetch("/api/notifications/devices", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const json = await res.json();
+        if (json.devices) setPairedDevices(json.devices);
+      } catch {
+        console.warn("[catch] Non-critical operation failed at pair-button.tsx");
+      } finally {
+        setLoadingDevices(false);
+      }
+    };
+    loadDevices();
   }, [session, fetchDevices]);
 
   const getFreshToken = async (): Promise<string | null> => {
@@ -156,7 +174,8 @@ export function PairButton() {
               <p className="text-[10px] font-bold text-emerald-800">Using the same email?</p>
               <p className="text-[8px] text-emerald-600 font-medium leading-relaxed">
                 Open the mobile app → <span className="font-bold">Settings</span> → tap{" "}
-                <span className="font-bold">"Quick Pair (same email)"</span>. No QR needed.
+                <span className="font-bold">&quot;Quick Pair (same email)&quot;</span>. No QR
+                needed.
               </p>
             </div>
           </div>

@@ -13,6 +13,7 @@ function AuthCallbackHandler() {
 
   useEffect(() => {
     const code = searchParams.get("code");
+    const redirectTo = searchParams.get("redirect") || "/dashboard";
 
     const handleCallback = async () => {
       try {
@@ -48,15 +49,15 @@ function AuthCallbackHandler() {
             localStorage.removeItem("zh_pending_role");
           }
 
-          setStatus("Success! Redirecting to dashboard...");
-          router.push("/dashboard");
+          setStatus("Success! Redirecting...");
+          router.push(redirectTo);
         } else {
           const {
             data: { user },
           } = await supabase.auth.getUser();
           if (user) {
             setStatus("Success! Redirecting...");
-            router.push("/dashboard");
+            router.push(redirectTo);
           } else {
             throw new Error("No active session found.");
           }

@@ -36,15 +36,6 @@ export default function PharmacyRegisterPage() {
   const [checkingExisting, setCheckingExisting] = useState(true);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
 
-  useEffect(() => {
-    if (roleLoading) return;
-    if (!userId) {
-      router.push("/login");
-      return;
-    }
-    checkExistingProfile();
-  }, [userId, roleLoading]);
-
   const checkExistingProfile = async () => {
     try {
       const { data } = await supabase
@@ -61,6 +52,18 @@ export default function PharmacyRegisterPage() {
       setCheckingExisting(false);
     }
   };
+
+  useEffect(() => {
+    if (roleLoading) return;
+    if (!userId) {
+      router.push("/login");
+      return;
+    }
+    const check = async () => {
+      await checkExistingProfile();
+    };
+    check();
+  }, [userId, roleLoading]);
 
   const geocodePincode = async (code: string) => {
     if (code.length !== 6) return;
@@ -79,9 +82,22 @@ export default function PharmacyRegisterPage() {
   };
 
   useEffect(() => {
-    if (pincode.length === 6) {
-      geocodePincode(pincode);
-    }
+    if (pincode.length !== 6) return;
+    const geocode = async () => {
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?postalcode=${pincode}&country=India&format=json&limit=1`
+        );
+        const json = await res.json();
+        if (json?.[0]) {
+          setLat(Number(json[0].lat));
+          setLng(Number(json[0].lon));
+        }
+      } catch {
+        // geocode failed silently, user can still submit
+      }
+    };
+    geocode();
   }, [pincode]);
 
   const handleSubmit = async () => {
@@ -135,8 +151,9 @@ export default function PharmacyRegisterPage() {
 
       setSuccess(true);
       setTimeout(() => router.push("/dashboard/pharmacy/inventory"), 1500);
-    } catch (err: any) {
-      setError(err.message || "Failed to register pharmacy");
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : "Failed to register pharmacy";
+      setError(message);
     } finally {
       setSaving(false);
     }

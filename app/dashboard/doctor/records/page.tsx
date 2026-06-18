@@ -75,7 +75,7 @@ interface VitalSign {
 type Tab = "history" | "prescriptions" | "vitals";
 
 export default function DoctorRecords() {
-  const { userId, loading: authLoading } = useUserRole();
+  const { role, userId, loading: authLoading } = useUserRole();
   const router = useRouter();
 
   const [patients, setPatients] = useState<PatientProfile[]>([]);
@@ -89,7 +89,6 @@ export default function DoctorRecords() {
   const [vitalSigns, setVitalSigns] = useState<VitalSign[]>([]);
   const [expandedPrescription, setExpandedPrescription] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [doctorProfileId, setDoctorProfileId] = useState<string | null>(null);
 
   const [showAddCondition, setShowAddCondition] = useState(false);
   const [newCondition, setNewCondition] = useState("");
@@ -100,23 +99,18 @@ export default function DoctorRecords() {
   useEffect(() => {
     if (!authLoading && !userId) {
       router.push("/login");
+      return;
     }
-  }, [userId, authLoading, router]);
+    if (!authLoading && role !== "doctor") {
+      router.push("/dashboard");
+      return;
+    }
+  }, [userId, role, authLoading, router]);
 
   useEffect(() => {
-    if (userId) {
-      fetchPatients();
-    }
-  }, [userId]);
-
-  useEffect(() => {
-    if (selectedPatient) {
-      fetchPatientRecords(selectedPatient.id);
-    }
-  }, [selectedPatient]);
-
-  const fetchPatients = async () => {
-    try {
+    if (!userId) return;
+    let cancelled = false;
+    (async () => {
       setLoadingPatients(true);
       setError(null);
 
@@ -126,28 +120,60 @@ export default function DoctorRecords() {
         .eq("user_id", userId)
         .single();
 
-      if (!doctorProfile) {
-        throw new Error("Doctor profile not found");
+      if (!doctorProfile || cancelled) {
+        if (!cancelled) setLoadingPatients(false);
+        if (!doctorProfile) setError("Doctor profile not found");
+        return;
       }
-      setDoctorProfileId(doctorProfile.id);
 
-      const { data, error: fetchError } = await supabase
-        .from("patient_profiles")
-        .select("*")
-        .eq("created_by", doctorProfile.id)
-        .order("full_name", { ascending: true });
+      const [createdPatients, rxPatientsRes] = await Promise.all([
+        supabase
+          .from("patient_profiles")
+          .select("id, full_name, email, phone, avatar_url, created_at")
+          .eq("created_by", doctorProfile.id)
+          .order("created_at", { ascending: false }),
+        supabase
+          .from("prescriptions")
+          .select("patient_id")
+          .eq("doctor_id", doctorProfile.id)
+          .not("patient_id", "is", null),
+      ]);
 
-      if (fetchError) throw fetchError;
-      setPatients(data || []);
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch patients");
-    } finally {
-      setLoadingPatients(false);
-    }
-  };
+      const createdList = createdPatients.data ?? [];
+      const rxPatientIds = rxPatientsRes.data
+        ? [...new Set(rxPatientsRes.data.map((r: { patient_id: string }) => r.patient_id))]
+        : [];
 
-  const fetchPatientRecords = async (patientId: string) => {
-    try {
+      const createdIdSet = new Set(createdList.map((p) => p.id));
+      const missingIds = rxPatientIds.filter((id) => !createdIdSet.has(id));
+
+      let additionalPatients: typeof createdList = [];
+      if (missingIds.length > 0) {
+        const { data: extra } = await supabase
+          .from("patient_profiles")
+          .select("id, full_name, email, phone, avatar_url, created_at")
+          .in("id", missingIds);
+        additionalPatients = extra ?? [];
+      }
+
+      const allPatients = [...createdList, ...additionalPatients];
+      allPatients.sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      );
+      if (!cancelled) {
+        setPatients(allPatients);
+        setLoadingPatients(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  useEffect(() => {
+    if (!selectedPatient) return;
+    let cancelled = false;
+    (async () => {
       setLoadingRecords(true);
       setError(null);
 
@@ -155,35 +181,40 @@ export default function DoctorRecords() {
         supabase
           .from("patient_medical_history")
           .select("id, patient_id, condition, diagnosed_date, is_active, notes")
-          .eq("patient_id", patientId)
+          .eq("patient_id", selectedPatient.id)
           .order("diagnosed_date", { ascending: false }),
         supabase
           .from("prescriptions")
           .select(
             "id, patient_id, doctor_id, diagnosis, created_at, prescription_items(id, drug_name, dosage, frequency, duration, notes)"
           )
-          .eq("patient_id", patientId)
+          .eq("patient_id", selectedPatient.id)
           .order("created_at", { ascending: false }),
         supabase
           .from("vital_signs")
           .select("*")
-          .eq("patient_id", patientId)
+          .eq("patient_id", selectedPatient.id)
           .order("recorded_at", { ascending: false }),
       ]);
 
-      if (historyRes.error) throw historyRes.error;
-      if (prescriptionsRes.error) throw prescriptionsRes.error;
-      if (vitalsRes.error) throw vitalsRes.error;
-
-      setMedicalHistory(historyRes.data || []);
-      setPrescriptions(prescriptionsRes.data || []);
-      setVitalSigns(vitalsRes.data || []);
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch patient records");
-    } finally {
+      if (cancelled) return;
+      if (historyRes.error) {
+        setError(historyRes.error.message);
+      } else if (prescriptionsRes.error) {
+        setError(prescriptionsRes.error.message);
+      } else if (vitalsRes.error) {
+        setError(vitalsRes.error.message);
+      } else {
+        setMedicalHistory(historyRes.data || []);
+        setPrescriptions(prescriptionsRes.data || []);
+        setVitalSigns(vitalsRes.data || []);
+      }
       setLoadingRecords(false);
-    }
-  };
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedPatient]);
 
   const handleAddCondition = async () => {
     if (!selectedPatient || !newCondition.trim()) return;
@@ -208,8 +239,8 @@ export default function DoctorRecords() {
       setNewDiagnosedDate("");
       setNewConditionNotes("");
       setShowAddCondition(false);
-    } catch (err: any) {
-      setError(err.message || "Failed to add condition");
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to add condition");
     } finally {
       setSavingCondition(false);
     }
@@ -238,6 +269,14 @@ export default function DoctorRecords() {
   };
 
   if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <Loader2 className="w-8 h-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!authLoading && role && role !== "doctor") {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />

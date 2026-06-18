@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
       .eq("is_active", true);
 
     const pairedUserIds = (pairings || []).map((p) => p.mobile_user_id);
-    let pairedDevices: any[] = [];
+    let pairedDevices: PushDevice[] = [];
     if (pairedUserIds.length > 0) {
       const { data: pd } = await admin
         .from("notification_devices")
@@ -136,8 +136,8 @@ export async function POST(req: NextRequest) {
               { onConflict: "notification_id,device_id,transport" }
             );
           }
-        } catch (dbErr: any) {
-          deliveryError = dbErr.message || "Delivery tracking failed";
+        } catch (dbErr: unknown) {
+          deliveryError = dbErr instanceof Error ? dbErr.message : "Delivery tracking failed";
           console.error("[Send] DB error:", dbErr);
         }
       }
@@ -148,8 +148,8 @@ export async function POST(req: NextRequest) {
             .from("notifications")
             .update({ sent_via: Array.from(sentTransports) })
             .eq("id", notification.id);
-        } catch (dbErr: any) {
-          console.error("[Send] sent_via update error:", dbErr);
+        } catch {
+          // non-critical update failure
         }
       }
     }
@@ -164,8 +164,11 @@ export async function POST(req: NextRequest) {
           ? "Notification created. No push devices registered — delivery via Realtime."
           : undefined,
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("[Send] Unhandled error:", err);
-    return NextResponse.json({ error: err.message || "Internal error" }, { status: 500 });
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Internal error" },
+      { status: 500 }
+    );
   }
 }

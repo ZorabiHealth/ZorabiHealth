@@ -25,7 +25,7 @@ export async function fetchStoreProducts(): Promise<PharmProduct[]> {
         .eq("is_active", true)
         .order("name", { ascending: true }),
       timeout(8000),
-    ])) as any;
+    ])) as { data: Record<string, unknown>[] | null; error: { message: string } | null };
 
     if (error) {
       console.warn("[StoreProducts] DB error —", error.message);
@@ -71,11 +71,53 @@ export async function fetchStoreProducts(): Promise<PharmProduct[]> {
 }
 
 export async function fetchProductBySlug(slug: string): Promise<PharmProduct | null> {
-  const products = await fetchStoreProducts();
-  return (
-    products.find((p) => p.id === slug || p.name.toLowerCase().replace(/\s+/g, "-") === slug) ??
-    null
+  const isOnline =
+    typeof window !== "undefined" &&
+    navigator.onLine &&
+    process.env.NEXT_PUBLIC_SUPABASE_URL &&
+    !process.env.NEXT_PUBLIC_SUPABASE_URL.includes("placeholder-url.supabase.co");
+
+  if (isOnline) {
+    try {
+      const { data } = (await Promise.race([
+        supabase.from("store_products").select("*").eq("id", slug).maybeSingle(),
+        timeout(8000),
+      ])) as { data: Record<string, unknown> | null };
+
+      if (data) {
+        return {
+          id: data.id as string,
+          name: data.name as string,
+          genericName: (data.generic_name as string) || "",
+          manufacturer: (data.manufacturer as string) || "",
+          category: (data.category as string) || "",
+          description: (data.description as string) || "",
+          composition: (data.composition as string) || "",
+          dosage: (data.dosage as string) || "",
+          usage: (data.usage as string) || "",
+          sideEffects: (data.side_effects as string) || "",
+          safety: (data.safety as string[] | string)
+            ? typeof data.safety === "string"
+              ? JSON.parse(data.safety as string)
+              : (data.safety as string[])
+            : [],
+          storage: (data.storage as string) || "",
+          price: Number(data.price) || 0,
+          mrp: Number(data.mrp) || 0,
+          image: (data.image_url as string) || "/images/placeholder.svg",
+          isPinned: Boolean(data.is_pinned),
+          inStock: data.in_stock !== false,
+        };
+      }
+    } catch {
+      /* fall through to static lookup */
+    }
+  }
+
+  const staticProduct = PRODUCTS.find(
+    (p) => p.id === slug || p.name.toLowerCase().replace(/\s+/g, "-") === slug
   );
+  return staticProduct ?? null;
 }
 
 export async function fetchProductsByCategory(category: string): Promise<PharmProduct[]> {
