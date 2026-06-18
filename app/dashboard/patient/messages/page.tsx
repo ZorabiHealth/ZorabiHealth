@@ -233,12 +233,22 @@ export default function PatientMessages() {
     setInput("");
 
     try {
-      const { error } = await supabase.from("messages").insert({
-        conversation_id: activeConv.id,
-        sender_id: userId,
-        content: text,
-      });
+      const { data: inserted, error } = await supabase
+        .from("messages")
+        .insert({
+          conversation_id: activeConv.id,
+          sender_id: userId,
+          content: text,
+        })
+        .select("*")
+        .single();
       if (error) throw error;
+
+      if (inserted) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === optimistic.id ? { ...inserted, content: inserted.content } : m))
+        );
+      }
 
       await supabase
         .from("conversations")

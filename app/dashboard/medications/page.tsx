@@ -36,6 +36,7 @@ import {
 } from "@/lib/medications";
 import { supabase, queueSyncItem, drainSyncQueue } from "@/lib/supabase";
 import { cleanAndValidatePhone } from "@/lib/validation";
+import { getAccessibleMedicationOwnerIds } from "@/lib/medication-access";
 
 type Tab = "list" | "add" | "logs";
 
@@ -153,21 +154,29 @@ export default function MedicationsPage() {
         throw new Error("User not authenticated");
       }
 
+      const accessibleOwnerIds = await getAccessibleMedicationOwnerIds(userId);
+
       const { data: dbMeds, error: medsError } = await supabase
         .from("medications")
         .select("*")
         .eq("is_active", true)
-        .eq("user_id", userId)
+        .in("user_id", accessibleOwnerIds)
         .order("name", { ascending: true });
 
       if (medsError) throw medsError;
 
-      // Fetch Logs (last 50 logs)
-      const { data: dbLogs, error: logsError } = await supabase
-        .from("medication_logs")
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(50);
+      const medIds = (dbMeds || []).map((med) => med.id);
+
+      // Fetch Logs only for accessible medications
+      const { data: dbLogs, error: logsError } =
+        medIds.length > 0
+          ? await supabase
+              .from("medication_logs")
+              .select("*")
+              .in("medication_id", medIds)
+              .order("created_at", { ascending: false })
+              .limit(50)
+          : { data: [], error: null };
 
       if (logsError) throw logsError;
 

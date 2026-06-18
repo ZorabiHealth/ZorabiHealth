@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
@@ -47,6 +47,7 @@ export default function DashboardOverview() {
   const { role, loading: roleLoading } = useUserRole();
   const router = useRouter();
 
+  const [displayName, setDisplayName] = useState("Patient");
   useEffect(() => {
     if (!roleLoading) {
       if (role === "doctor") {
@@ -72,32 +73,39 @@ export default function DashboardOverview() {
     localStorage.getItem("zh_login_time")
   );
 
-  useEffect(() => {
-    const fetchSessionAndMeds = async () => {
+  const refreshDashboardData = useCallback(
+    async (userId: string, sessionUser?: Session["user"]) => {
       try {
-        const {
-          data: { session: s },
-        } = await supabase.auth.getSession();
-        if (!s) return;
-        setSession(s);
+        const { data: patientProfile } = await supabase
+          .from("patient_profiles")
+          .select("full_name")
+          .eq("id", userId)
+          .maybeSingle();
 
-        // Fetch medications
+        const fallbackName =
+          sessionUser?.user_metadata?.full_name ||
+          sessionUser?.email?.split("@")[0]?.replace(/[._]/g, " ") ||
+          "Patient";
+        setDisplayName(patientProfile?.full_name || fallbackName);
+
         const { data: medications } = await supabase
           .from("medications")
           .select("*")
-          .eq("user_id", s.user.id)
+          .eq("user_id", userId)
           .eq("is_active", true);
 
-        // Fetch today's logs
+        const medicationIds = (medications ?? []).map((med) => med.id);
         const todayStart = new Date();
         todayStart.setHours(0, 0, 0, 0);
-        const { data: logs } = await supabase
-          .from("medication_logs")
-          .select("*")
-          .eq("status", "taken")
-          .gte("scheduled_at", todayStart.toISOString());
+        const { data: logs } = medicationIds.length
+          ? await supabase
+              .from("medication_logs")
+              .select("*")
+              .eq("status", "taken")
+              .gte("scheduled_at", todayStart.toISOString())
+              .in("medication_id", medicationIds)
+          : { data: [] as { medication_id: string; scheduled_at: string }[] };
 
-        // Find missed medications
         const missed: {
           id: string;
           name: string;
@@ -115,7 +123,6 @@ export default function DashboardOverview() {
             scheduledDate.setHours(hours, minutes, 0, 0);
 
             if (now > scheduledDate) {
-              // Check if logged as taken for today
               const hasLogged = (logs || []).some(
                 (log) =>
                   log.medication_id === med.id &&
@@ -143,12 +150,41 @@ export default function DashboardOverview() {
       } catch (e) {
         console.error("Failed to load dashboard sync logs:", e);
       }
+    },
+    []
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadSession = async () => {
+      try {
+        const {
+          data: { session: s },
+        } = await supabase.auth.getSession();
+        if (!s || cancelled) return;
+        setSession(s);
+        await refreshDashboardData(s.user.id, s.user);
+      } catch (e) {
+        console.error("Failed to load dashboard session:", e);
+      }
     };
 
-    fetchSessionAndMeds();
-    const interval = setInterval(fetchSessionAndMeds, 10000); // Check every 10s for updates
+    loadSession();
+    return () => {
+      cancelled = true;
+    };
+  }, [refreshDashboardData]);
+
+  useEffect(() => {
+    if (!session?.user?.id) return;
+
+    const interval = setInterval(() => {
+      refreshDashboardData(session.user.id, session.user);
+    }, 30000);
+
     return () => clearInterval(interval);
-  }, []);
+  }, [session?.user?.id, refreshDashboardData]);
 
   const handleTakeMissedMed = async (med: {
     id: string;
@@ -556,7 +592,7 @@ export default function DashboardOverview() {
 
           <header className="relative z-10">
             <h2 className="text-2xl font-bold tracking-tight leading-snug">
-              Welcome back, Dr. Jenkins
+              Welcome back, {displayName}
               <br />
               <span className="text-base font-medium opacity-85">
                 Your personalized health summary

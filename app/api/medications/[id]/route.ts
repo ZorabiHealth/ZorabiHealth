@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, supabaseAdmin } from "@/lib/supabase";
 import { verifyAuth } from "@/lib/auth-utils";
+import { getAccessibleMedicationOwnerIds } from "@/lib/medication-access";
 
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -15,6 +16,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const { product_id } = body;
 
     const client = supabaseAdmin || supabase;
+
+    const accessibleOwnerIds = await getAccessibleMedicationOwnerIds(userId);
+    const { data: medication, error: medicationError } = await client
+      .from("medications")
+      .select("id, user_id")
+      .eq("id", id)
+      .maybeSingle();
+
+    if (medicationError) {
+      console.error("[medications] PATCH lookup error:", medicationError);
+      return NextResponse.json({ error: "Failed to load medication" }, { status: 500 });
+    }
+
+    if (!medication || !accessibleOwnerIds.includes(medication.user_id)) {
+      return NextResponse.json({ error: "Medication not found" }, { status: 404 });
+    }
 
     const { data, error } = await client
       .from("medications")

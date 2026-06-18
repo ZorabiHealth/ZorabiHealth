@@ -161,8 +161,8 @@ export default function BookAppointment() {
       const { data: patientProfile } = await supabase
         .from("patient_profiles")
         .select("id")
-        .eq("user_id", userId)
-        .single();
+        .eq("id", userId)
+        .maybeSingle();
 
       if (!patientProfile) {
         const { showToast } = await import("@/components/ui/toast");

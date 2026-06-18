@@ -15,7 +15,7 @@ export interface InAppNotification {
   read: boolean;
 }
 
-export function useNotifications() {
+export function useNotifications(enabled = true) {
   const [permission, setPermission] = useState<NotificationPermission | "unsupported">(() => {
     if (typeof window === "undefined") return "default";
     if (!("Notification" in window)) return "unsupported";
@@ -28,7 +28,7 @@ export function useNotifications() {
   const [initialized] = useState(() => typeof window !== "undefined" && "Notification" in window);
 
   const registerDevice = useCallback(async () => {
-    if (typeof window === "undefined" || registeredRef.current) return;
+    if (!enabled || typeof window === "undefined" || registeredRef.current) return;
     if (!("serviceWorker" in navigator) || !("PushManager" in window)) return;
 
     try {
@@ -88,10 +88,14 @@ export function useNotifications() {
     } catch (err) {
       console.warn("[Push] Registration failed:", err);
     }
-  }, []);
+  }, [enabled]);
 
   // Supabase Realtime subscription for in-app notification delivery
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
+
     let cancelled = false;
     let channel: { unsubscribe: () => void } | null = null;
 
@@ -132,7 +136,7 @@ export function useNotifications() {
       cancelled = true;
       channel?.unsubscribe();
     };
-  }, []);
+  }, [enabled]);
 
   const requestPermission = useCallback(async () => {
     if (typeof window === "undefined" || !("Notification" in window)) {
@@ -143,15 +147,15 @@ export function useNotifications() {
     const result = await Notification.requestPermission();
     setPermission(result);
 
-    if (result === "granted") {
+    if (result === "granted" && enabled) {
       await registerDevice();
     }
 
     return result;
-  }, [registerDevice]);
+  }, [registerDevice, enabled]);
 
   const unregisterDevice = useCallback(async () => {
-    if (!subscription) return;
+    if (!enabled || !subscription) return;
 
     try {
       const session = await supabase.auth.getSession();
@@ -172,7 +176,7 @@ export function useNotifications() {
     } catch (err) {
       console.warn("[Push] Unregistration failed:", err);
     }
-  }, [subscription]);
+  }, [subscription, enabled]);
 
   const dismissNotification = useCallback((id: string) => {
     setInAppNotifications((prev) => prev.filter((n) => n.id !== id));
