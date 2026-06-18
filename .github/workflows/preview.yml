@@ -1,0 +1,36 @@
+name: Preview
+
+on:
+  pull_request:
+    branches: [main, develop]
+    paths-ignore:
+      - "**.md"
+
+concurrency:
+  group: preview-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint-test:
+    uses: ./.github/workflows/ci.yml
+    secrets: inherit
+
+  vercel-preview:
+    name: Vercel Preview
+    needs: [lint-test]
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: zorabihealth
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          vercel-args: "--token ${{ secrets.VERCEL_TOKEN }}"
+          github-comment: true
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          working-directory: ./zorabihealth
