@@ -68,6 +68,107 @@ function detectIntent(text: string): string {
   return "general";
 }
 
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function extractMedicationMatch(
+  text: string,
+  medications: {
+    id: string;
+    name: string;
+    generic_name?: string | null;
+    dosage: string;
+    current_stock?: number | null;
+    refill_at?: number | null;
+    scheduled_times?: string[] | null;
+  }[]
+) {
+  const normalized = text.trim().toLowerCase();
+
+  const exactMatch = medications.find((med) => {
+    const nameMatch = new RegExp(`\\b${escapeRegExp(med.name)}\\b`, "i").test(text);
+    const genericMatch = med.generic_name
+      ? new RegExp(`\\b${escapeRegExp(med.generic_name)}\\b`, "i").test(text)
+      : false;
+    return nameMatch || genericMatch;
+  });
+  if (exactMatch) return exactMatch;
+
+  const partialMatch = medications.find((med) => {
+    const name = med.name.toLowerCase();
+    const generic = med.generic_name?.toLowerCase();
+    return normalized.includes(name) || (generic ? normalized.includes(generic) : false);
+  });
+
+  return partialMatch ?? null;
+}
+
+function extractReminderTime(text: string): string | null {
+  const hhmm = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
+  if (hhmm) {
+    return `${hhmm[1].padStart(2, "0")}:${hhmm[2]}`;
+  }
+
+  const amPm = text.match(/\b(1[0-2]|0?[1-9])(?:\s*)(am|pm)\b/i);
+  if (!amPm) return null;
+
+  let hours = Number(amPm[1]);
+  const period = amPm[2].toLowerCase();
+  if (period === "pm" && hours !== 12) hours += 12;
+  if (period === "am" && hours === 12) hours = 0;
+  return `${String(hours).padStart(2, "0")}:00`;
+}
+
+function extractReminderLabel(text: string): string {
+  const match =
+    text.match(/(?:remind me to|set (?:a )?reminder to|reminder to|alert me to)\s+(.+)/i) ||
+    text.match(/(?:remind me|set (?:a )?reminder|set alarm|alert me)\s+(.+)/i);
+  if (!match?.[1]) return "Reminder";
+  return (
+    match[1]
+      .replace(/[.?!]+$/g, "")
+      .trim()
+      .slice(0, 80) || "Reminder"
+  );
+}
+
+function parseRepeatDays(text: string): string[] {
+  const lower = text.toLowerCase();
+  if (/\b(every day|daily|each day)\b/.test(lower))
+    return ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  if (/\b(weekdays|weekday)\b/.test(lower)) return ["Mon", "Tue", "Wed", "Thu", "Fri"];
+  if (/\b(weekends|weekend)\b/.test(lower)) return ["Sat", "Sun"];
+
+  const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  return days.filter((day) => new RegExp(`\\b${day.toLowerCase()}(?:day)?\\b`, "i").test(text));
+}
+
+function summarizeVitals(
+  steps: number | null,
+  sleep: { duration: number; efficiency: number } | null,
+  symptom: { name: string; severity: string } | null,
+  medication: { name: string; dosage: string; time: string } | null
+) {
+  const parts: string[] = [];
+  if (typeof steps === "number") parts.push(`Today you have ${steps} steps.`);
+  if (sleep)
+    parts.push(
+      `Your latest sleep session was ${sleep.duration} hours with a score of ${sleep.efficiency}%.`
+    );
+  if (symptom)
+    parts.push(
+      `The most recent symptom logged was ${symptom.name} at ${symptom.severity} severity.`
+    );
+  if (medication)
+    parts.push(
+      `The last medication log was ${medication.name} (${medication.dosage}) at ${medication.time}.`
+    );
+  return parts.length > 0
+    ? `Here’s the latest health summary I found: ${parts.join(" ")}`
+    : "I couldn’t find any recent vitals or health logs yet. You can add one from the dashboard, and I’ll use that going forward.";
+}
+
 async function handleWorkoutIntent(intent: string, userId: string): Promise<string> {
   try {
     switch (intent) {
@@ -112,29 +213,29 @@ async function handleWorkoutIntent(intent: string, userId: string): Promise<stri
 function generateLocalResponse(intent: string, text: string): string {
   switch (intent) {
     case "greeting":
-      return "Hello! I'm your Clinical AI assistant. How can I help you today? You can tell me about symptoms, medications you've taken, or ask about your vitals.";
+      return "Hi — I can help log meds, symptoms, reminders, or check recent vitals. What would you like to do?";
     case "log_medication":
-      return "Got it! I've logged that you've taken your medication. Your medication log has been updated in the database. Is there anything else you'd like to record?";
+      return "Got it — I can log that medication for you. If you tell me the medicine name, I’ll save the right one.";
     case "log_symptom":
-      return "I've noted your symptom. I recommend logging this in your Symptom Tracker for your doctor's review. If symptoms are severe, please seek immediate medical attention.";
+      return "I’ve noted the symptom. If you want, I can save it in the Symptom Tracker with a severity level too.";
     case "query_vitals":
-      return "Based on your last reading, your heart rate was 72 bpm and SpO2 was 97%. Your vitals are within the normal range. Would you like to update a new reading?";
+      return "I can pull your latest vitals or recent health logs. Ask me to check your current summary.";
     case "set_reminder":
-      return "I'll help you set that reminder. Push notifications can be configured from the sidebar Bell icon to alert you on your device.";
+      return "I can set that reminder. Tell me the time and I’ll save it for you.";
     case "refill_request":
-      return "I'll flag that medication for refill. Head to the Pharmacy section to request an automated refill — I'll find the nearest vendor and send you a tracking ID.";
+      return "I can help flag a refill. If you mention the medicine name, I’ll check whether it’s running low.";
     case "start_workout":
-      return "Ready to exercise! Open the Workout dashboard and tap 'Start Session' to begin. I'll be here to cheer you on!";
+      return "Ready when you are — open the Workout dashboard and start a session.";
     case "log_meal":
-      return "I've logged a quick meal entry. For accurate macros, use the Nutrition Log on the Workout dashboard.";
+      return "I can log that meal for you. If you want more detail, just tell me the meal type too.";
     case "check_streak":
-      return "You're doing great! Check your streak progress on the Workout dashboard — every day counts!";
+      return "I can check your streak progress whenever you want.";
     case "suggest_workout":
-      return "Try mixing HIIT and strength training this week. Start with a 20-min session on the Workout dashboard!";
+      return "A light walk, mobility work, or short strength session would be a good conservative choice today.";
     case "help":
-      return "I can help you: log symptoms, record medications, check vitals, set reminders, and manage your workouts. Try saying 'start workout' or 'check my streak'!";
+      return "I can help with symptoms, medications, reminders, vitals, meals, and workouts. Just tell me what you want to do.";
     default:
-      return `I heard: "${text}". As your clinical health assistant, I can help with medication logging, symptom tracking, vitals, and workout management. What would you like to do?`;
+      return `I heard: "${text}". I can help log it, but if you want me to store something specific, say the medicine name, symptom, or reminder time.`;
   }
 }
 
@@ -230,34 +331,33 @@ export default function VoiceAgentPage() {
     });
   }, []);
 
+  const getAccessToken = useCallback(async (): Promise<string | null> => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (session?.access_token) return session.access_token;
+
+    const {
+      data: { session: refreshedSession },
+    } = await supabase.auth.refreshSession();
+    return refreshedSession?.access_token ?? null;
+  }, []);
+
   const handleClinicalVoiceIntent = async (intent: string, text: string): Promise<string> => {
     try {
       switch (intent) {
         case "log_medication": {
           const { data: meds, error } = await supabase
             .from("medications")
-            .select("*")
+            .select("id, name, generic_name, dosage, current_stock, refill_at, scheduled_times")
             .eq("user_id", userId)
             .eq("is_active", true);
 
           if (error) throw error;
 
-          let matchedMed = null;
-          if (meds && meds.length > 0) {
-            for (const med of meds) {
-              const medRegex = new RegExp(`\\b${med.name}\\b`, "i");
-              if (medRegex.test(text)) {
-                matchedMed = med;
-                break;
-              }
-            }
-            if (!matchedMed) {
-              matchedMed = meds[0];
-            }
-          }
-
+          const matchedMed = extractMedicationMatch(text, meds || []);
           if (!matchedMed) {
-            return "You don't have any active medications set up in the database. Please add them in the medications tracker.";
+            return "I couldn’t tell which medication you meant. Please say the medicine name, and I’ll log it.";
           }
 
           const { error: logErr } = await supabase.from("medication_logs").insert({
@@ -277,7 +377,7 @@ export default function VoiceAgentPage() {
             .update({ current_stock: newStock })
             .eq("id", matchedMed.id);
 
-          return `I've successfully logged that you took your ${matchedMed.name} (${matchedMed.dosage}). Your medication log has been updated.`;
+          return `Done — I logged ${matchedMed.name} (${matchedMed.dosage}) as taken.`;
         }
 
         case "log_symptom": {
@@ -298,9 +398,9 @@ export default function VoiceAgentPage() {
           }
 
           let severity = "Moderate";
-          if (/\b(severe|bad|high|intense)\b/i.test(text)) {
+          if (/\\b(severe|bad|high|intense)\\b/i.test(text)) {
             severity = "Severe";
-          } else if (/\b(mild|light|low)\b/i.test(text)) {
+          } else if (/\\b(mild|light|low)\\b/i.test(text)) {
             severity = "Mild";
           }
 
@@ -314,15 +414,15 @@ export default function VoiceAgentPage() {
           if (logErr) throw logErr;
 
           if (severity === "Severe") {
-            return `I have logged your symptom as severe ${symptomName}. I've alerted your designated physician, Dr. Sarah Jenkins. Please seek immediate medical assistance if you feel chest pain or severe distress.`;
+            return `I logged that as a severe ${symptomName}. If you’re feeling worse or unsafe, please contact a clinician right away.`;
           }
 
-          return `I've recorded your symptom of ${symptomName} as ${severity}. It has been saved to your outpatient log history.`;
+          return `I’ve recorded ${symptomName} as ${severity}.`;
         }
 
         case "query_vitals": {
           const todayStr = new Date().toISOString().split("T")[0];
-          const [stepsRes, sleepRes, symptomRes] = await Promise.all([
+          const [stepsRes, sleepRes, symptomRes, medRes] = await Promise.all([
             supabase
               .from("daily_steps")
               .select("steps")
@@ -341,47 +441,65 @@ export default function VoiceAgentPage() {
               .eq("user_id", userId)
               .order("created_at", { ascending: false })
               .limit(1),
+            supabase
+              .from("medication_logs")
+              .select("medication_name,dose,scheduled_at")
+              .eq("user_id", userId)
+              .order("scheduled_at", { ascending: false })
+              .limit(1),
           ]);
 
-          let reply = "Here are your latest health vitals from the database: ";
+          const latestSleep =
+            sleepRes.data && sleepRes.data.length > 0
+              ? { duration: sleepRes.data[0].duration, efficiency: sleepRes.data[0].efficiency }
+              : null;
+          const latestSymptom =
+            symptomRes.data && symptomRes.data.length > 0
+              ? { name: symptomRes.data[0].name, severity: symptomRes.data[0].severity }
+              : null;
+          const latestMedication =
+            medRes.data && medRes.data.length > 0
+              ? {
+                  name: medRes.data[0].medication_name,
+                  dosage: medRes.data[0].dose,
+                  time: new Date(medRes.data[0].scheduled_at).toLocaleTimeString([], {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  }),
+                }
+              : null;
 
-          if (stepsRes.data) {
-            reply += `Today you have walked ${stepsRes.data.steps} steps. `;
-          } else {
-            reply += "No steps recorded today. ";
-          }
-
-          if (sleepRes.data && sleepRes.data.length > 0) {
-            reply += `Your last sleep session was ${sleepRes.data[0].duration} hours, with a sleep score of ${sleepRes.data[0].efficiency}%. `;
-          }
-
-          if (symptomRes.data && symptomRes.data.length > 0) {
-            reply += `Your most recently logged symptom was ${symptomRes.data[0].name} marked as ${symptomRes.data[0].severity}. `;
-          }
-
-          return reply;
+          return summarizeVitals(
+            stepsRes.data?.steps ?? null,
+            latestSleep,
+            latestSymptom,
+            latestMedication
+          );
         }
 
         case "set_reminder": {
-          const timeMatch = text.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/);
-          let time = "08:00";
-          if (timeMatch) {
-            time = `${timeMatch[1].padStart(2, "0")}:${timeMatch[2]}`;
+          const time = extractReminderTime(text);
+          if (!time) {
+            return "I can set that reminder, but I need a time. Try saying something like 8:00 am or 18:30.";
           }
+          const repeat = parseRepeatDays(text);
+          const label = extractReminderLabel(text);
 
           const { error: alarmErr } = await supabase.from("wearable_alarms").insert({
             user_id: userId,
             time,
-            label: "Voice Reminder",
+            label,
             enabled: true,
-            repeat: ["Mon", "Tue", "Wed", "Thu", "Fri"],
-            smart_wake: true,
+            repeat,
+            smart_wake: false,
             sound: "Chime Chord",
           });
 
           if (alarmErr) throw alarmErr;
 
-          return `I've set a new voice reminder for ${time} in your alarm schedule.`;
+          return repeat.length > 0
+            ? `I set a reminder for ${time} and made it repeat on ${repeat.join(", ")}.`
+            : `I set a reminder for ${time}.`;
         }
 
         case "refill_request": {
@@ -393,12 +511,16 @@ export default function VoiceAgentPage() {
 
           if (refillErr) throw refillErr;
 
-          const lowStockMeds = (activeMeds || []).filter((m) => m.current_stock <= m.refill_at);
+          const lowStockMeds = (activeMeds || []).filter(
+            (m) => Number(m.current_stock) <= Number(m.refill_at)
+          );
           if (lowStockMeds.length === 0) {
-            return "Good news — all your medications are adequately stocked. Head to the Pharmacy section if you'd like to place an order preemptively.";
+            return "Your current medicines don’t look low right now. If you want, I can still help you place a refill later.";
           }
 
-          return `I found ${lowStockMeds.length} medication(s) that need refills: ${lowStockMeds.map((m) => `${m.name} (${m.current_stock} left)`).join(", ")}. Please go to the Pharmacy dashboard to place refill orders.`;
+          return `I found ${lowStockMeds.length} medication(s) that may need refills: ${lowStockMeds
+            .map((m) => `${m.name} (${m.current_stock} left)`)
+            .join(", ")}.`;
         }
 
         default:
@@ -406,10 +528,9 @@ export default function VoiceAgentPage() {
       }
     } catch (err: unknown) {
       console.error("[Voice Intent Log Error]", err);
-      return `I encountered an error logging that: ${err instanceof Error ? err.message : "database connection failed"}.`;
+      return `I ran into a problem saving that. ${err instanceof Error ? err.message : "Please try again."}`;
     }
   };
-
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -537,7 +658,17 @@ export default function VoiceAgentPage() {
     setErrorMsg("");
     setStatus("connecting");
     try {
-      const tokenRes = await fetch("/api/deepgram/token");
+      const accessToken = await getAccessToken();
+      if (!accessToken) throw new Error("Please sign in again to start voice transcription.");
+
+      const tokenRes = await fetch("/api/deepgram/token", {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (!tokenRes.ok) {
+        const errorBody = await tokenRes.json().catch(() => ({}));
+        throw new Error(errorBody.error || "Could not fetch Deepgram token");
+      }
+
       const { key } = await tokenRes.json();
       if (!key) throw new Error("Could not fetch Deepgram token");
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
@@ -554,7 +685,7 @@ export default function VoiceAgentPage() {
       audioContextRef.current = audioCtx;
       analyserRef.current = analyser;
       animationRef.current = requestAnimationFrame(animateWaveform);
-      const ws = new WebSocket(`${DEEPGRAM_WS_URL}?${STT_PARAMS}`, ["token", key]);
+      const ws = new WebSocket(`${DEEPGRAM_WS_URL}?${STT_PARAMS}`, ["bearer", key]);
       wsRef.current = ws;
       ws.onopen = () => {
         setStatus("listening");
