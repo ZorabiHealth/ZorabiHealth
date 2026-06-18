@@ -38,7 +38,7 @@ export default function DoctorAnalytics() {
   const { userId, loading: authLoading } = useUserRole();
   const router = useRouter();
 
-  const [, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalPatients, setTotalPatients] = useState(0);
   const [totalPrescriptions, setTotalPrescriptions] = useState(0);
@@ -146,6 +146,17 @@ export default function DoctorAnalytics() {
       fetchAnalytics();
     }
   }, [userId, fetchAnalytics]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="animate-spin h-10 w-10 border-4 border-brand-600 border-t-transparent rounded-full mx-auto mb-4" />
+          <p className="text-slate-500 font-medium">Loading analytics...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (

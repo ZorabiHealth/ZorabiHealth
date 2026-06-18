@@ -56,15 +56,7 @@ export function Features() {
 
             <CardContent>
               <div className="relative mb-6 sm:mb-0">
-                <video
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  className="absolute -inset-6 w-[calc(100%+3rem)] h-[calc(100%+3rem)] object-cover rounded-2xl opacity-40"
-                >
-                  <source src="/video/secondbox.mp4" type="video/mp4" />
-                </video>
+                <div className="absolute -inset-6 w-[calc(100%+3rem)] h-[calc(100%+3rem)] rounded-2xl opacity-20 bg-gradient-to-br from-brand-500/30 via-purple-500/20 to-transparent" />
                 <div className="aspect-[76/59] border border-slate-100 relative z-10">
                   <DualModeImage
                     darkSrc="/images/features/origin-cal-dark.png"

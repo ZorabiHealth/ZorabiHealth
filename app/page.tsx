@@ -244,7 +244,7 @@ export default function Home() {
               loop
               playsInline
               preload="none"
-              poster="/logo/image/logo.png"
+              poster="/logo/image/poster.png"
               className="w-24 h-24 rounded-2xl object-cover shadow-lg border border-brand-100"
             >
               <source src="/logo/video/logo_animation.mp4" type="video/mp4" />
@@ -332,30 +332,24 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 relative">
-                  <video
-                    autoPlay
-                    muted
-                    loop
-                    playsInline
-                    preload="none"
+                  <Image
+                    alt="Research guidance"
+                    src="/logo/image/logo.png"
+                    width={80}
+                    height={80}
                     className="w-full h-full object-cover"
-                  >
-                    <source src="/logo/video/logo_animation.mp4" type="video/mp4" />
-                  </video>
+                  />
                 </div>
               </div>
               {/* Logo Animation Badge */}
               <div className="absolute bottom-24 left-6 bg-white/90 backdrop-blur-md rounded-2xl shadow-lg p-4 flex items-center gap-4 border border-white/50">
-                <video
-                  autoPlay
-                  muted
-                  loop
-                  playsInline
-                  preload="none"
+                <Image
+                  alt="ZorabiHealth"
+                  src="/logo/image/logo.png"
+                  width={64}
+                  height={64}
                   className="w-16 h-16 rounded-xl object-cover"
-                >
-                  <source src="/logo/video/logo_animation.mp4" type="video/mp4" />
-                </video>
+                />
                 <div>
                   <p className="text-sm font-bold text-slate-800">ZorabiHealth</p>
                   <p className="text-xs text-slate-500">AI-Powered Care</p>
