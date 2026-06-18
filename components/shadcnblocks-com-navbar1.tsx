@@ -225,7 +225,10 @@ const Navbar1 = ({
       }`}
     >
       <div className="w-full px-6 lg:px-10">
-        <nav className="hidden justify-between lg:flex h-16 items-center">
+        <nav
+          aria-label="Main navigation"
+          className="hidden justify-between lg:flex h-16 items-center"
+        >
           <div className="flex items-center gap-8">
             <Link href={logo.url} className="flex items-center gap-2 shrink-0">
               <Image
@@ -280,8 +283,8 @@ const Navbar1 = ({
           </Link>
           <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
             <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-slate-700">
-                <Menu className="size-5" />
+              <Button variant="ghost" size="icon" className="text-slate-700" aria-label="Open menu">
+                <Menu className="size-5" aria-hidden="true" />
               </Button>
             </SheetTrigger>
             <SheetContent className="overflow-y-auto border-l-0 bg-white/95 backdrop-blur-xl">

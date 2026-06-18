@@ -232,7 +232,10 @@ export default function Home() {
       {/* END: TopNavigation */}
 
       {/* BEGIN: HeroSection */}
-      <section className="grid grid-cols-12 gap-8 px-10 pt-24 pb-20 items-center min-h-[calc(100vh-8rem)] relative bg-white overflow-hidden">
+      <section
+        aria-label="Hero"
+        className="grid grid-cols-12 gap-8 px-10 pt-24 pb-20 items-center min-h-[calc(100vh-8rem)] relative bg-white overflow-hidden"
+      >
         {/* Left Column: Copy */}
         <div className="col-span-5 animate-on-scroll-left" data-purpose="hero-copy">
           <div className="flex flex-col gap-4 mb-6">
@@ -241,6 +244,8 @@ export default function Home() {
               muted
               loop
               playsInline
+              preload="none"
+              poster="/logo/image/logo.png"
               className="w-24 h-24 rounded-2xl object-cover shadow-lg border border-brand-100"
             >
               <source src="/logo/video/logo_animation.mp4" type="video/mp4" />
@@ -328,7 +333,14 @@ export default function Home() {
                   </p>
                 </div>
                 <div className="w-20 h-20 rounded-xl overflow-hidden flex-shrink-0 relative">
-                  <video autoPlay muted loop playsInline className="w-full h-full object-cover">
+                  <video
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    preload="none"
+                    className="w-full h-full object-cover"
+                  >
                     <source src="/logo/video/logo_animation.mp4" type="video/mp4" />
                   </video>
                 </div>
@@ -340,6 +352,7 @@ export default function Home() {
                   muted
                   loop
                   playsInline
+                  preload="none"
                   className="w-16 h-16 rounded-xl object-cover"
                 >
                   <source src="/logo/video/logo_animation.mp4" type="video/mp4" />
@@ -372,7 +385,10 @@ export default function Home() {
           </div>
         </div>
         {/* Scroll to explore indicator */}
-        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center text-slate-500 animate-bounce">
+        <div
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 flex flex-col items-center text-slate-500 animate-bounce"
+          aria-hidden="true"
+        >
           <span className="text-[10px] uppercase tracking-widest font-semibold mb-1">
             Scroll to explore
           </span>
@@ -382,6 +398,7 @@ export default function Home() {
             stroke="currentColor"
             viewBox="0 0 24 24"
             xmlns="http://www.w3.org/2000/svg"
+            aria-hidden="true"
           >
             <path
               d="M19 14l-7 7m0 0l-7-7m7 7V3"
@@ -395,7 +412,10 @@ export default function Home() {
       {/* END: HeroSection */}
 
       {/* BEGIN: Dashboard Scroll Experience */}
-      <section className="px-10 py-16 bg-slate-50 border-t border-slate-100">
+      <section
+        aria-label="Dashboard Scroll Experience"
+        className="px-10 py-16 bg-slate-50 border-t border-slate-100"
+      >
         <div className="w-full max-w-7xl mx-auto flex gap-6">
           {/* Data Integration Card */}
           <div
@@ -438,7 +458,11 @@ export default function Home() {
             </div>
             <div className="absolute bottom-6 right-6 w-20 h-20 bg-white/90 rounded-full flex items-center justify-center">
               {/* Spinning progress animation */}
-              <svg className="w-16 h-16 text-brand-500 animate-spin-slow" viewBox="0 0 36 36">
+              <svg
+                className="w-16 h-16 text-brand-500 animate-spin-slow"
+                viewBox="0 0 36 36"
+                aria-hidden="true"
+              >
                 <path
                   className="fill-none text-brand-100"
                   d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
@@ -461,13 +485,17 @@ export default function Home() {
       {/* END: Dashboard Scroll Experience */}
 
       {/* BEGIN: Integrated Health Dashboard */}
-      <section className="px-10 py-16 bg-slate-50 animate-on-scroll">
+      <section
+        aria-label="Integrated Health Dashboard"
+        className="px-10 py-16 bg-slate-50 animate-on-scroll"
+      >
         <div
           className="w-full max-w-7xl mx-auto bg-[#f0f5ff] rounded-[40px] shadow-lg border border-slate-100 overflow-hidden flex p-4 gap-4 h-[760px]"
           data-purpose="dashboard-layout"
         >
           {/* BEGIN: Left Sidebar */}
           <aside
+            aria-label="Dashboard navigation"
             className="w-16 flex flex-col items-center py-6 gap-8 bg-white/40 backdrop-blur-xl rounded-[32px] border border-white/30 shrink-0"
             data-purpose="sidebar"
           >
@@ -481,6 +509,7 @@ export default function Home() {
                 strokeLinejoin="round"
                 strokeWidth="2"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
                 <path d="M12 8v8" />
@@ -488,7 +517,10 @@ export default function Home() {
               </svg>
             </div>
             {/* Navigation Icons */}
-            <nav className="flex flex-col gap-5 items-center flex-grow text-slate-400">
+            <nav
+              aria-label="Sidebar menu"
+              className="flex flex-col gap-5 items-center flex-grow text-slate-400"
+            >
               <button
                 onClick={() => setActiveTab("overview")}
                 className={`p-2 rounded-xl transition-all cursor-pointer ${
@@ -569,6 +601,7 @@ export default function Home() {
                 stroke="currentColor"
                 strokeWidth="2"
                 viewBox="0 0 24 24"
+                aria-hidden="true"
               >
                 <path d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
                 <path d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
