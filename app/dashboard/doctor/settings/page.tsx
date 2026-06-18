@@ -5,14 +5,12 @@ import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Settings,
   Save,
   Loader2,
   User,
-  Stethoscope,
-  BriefcaseMedical,
-  Globe,
   FileText,
   Camera,
   PenLine,
@@ -250,13 +248,13 @@ export default function DoctorSettings() {
     return () => {
       if (avatarPreview?.startsWith("blob:")) URL.revokeObjectURL(avatarPreview);
     };
-  }, [avatarFile]);
+  }, [avatarFile, avatarPreview]);
 
   useEffect(() => {
     return () => {
       if (sigPreview?.startsWith("blob:")) URL.revokeObjectURL(sigPreview);
     };
-  }, [sigFile]);
+  }, [sigFile, sigPreview]);
 
   const handleSaveProfile = async () => {
     if (!doctorProfile) return;
@@ -418,7 +416,13 @@ export default function DoctorSettings() {
             <div className="relative group">
               <div className="w-20 h-20 rounded-full overflow-hidden border-2 border-gray-200 bg-gray-100">
                 {avatarPreview ? (
-                  <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                  <Image
+                    src={avatarPreview}
+                    alt="Avatar"
+                    width={80}
+                    height={80}
+                    className="w-full h-full object-cover"
+                  />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-400">
                     <User className="w-8 h-8" />
@@ -457,9 +461,11 @@ export default function DoctorSettings() {
             <div className="text-center">
               <div className="w-28 border-b-2 border-gray-300 mb-1">
                 {sigPreview ? (
-                  <img
+                  <Image
                     src={sigPreview}
                     alt="Signature"
+                    width={160}
+                    height={48}
                     className="h-12 mx-auto object-contain border-b-2 border-gray-300"
                   />
                 ) : (

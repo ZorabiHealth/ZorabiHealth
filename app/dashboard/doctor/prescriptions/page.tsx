@@ -14,7 +14,6 @@ import {
   Printer,
   Edit2,
   FileDown,
-  Loader2,
 } from "lucide-react";
 
 interface Prescription {
@@ -65,7 +64,7 @@ function PrescriptionsPageContent() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [patientNames, setPatientNames] = useState<Map<string, string>>(new Map());
+  const [, setPatientNames] = useState<Map<string, string>>(new Map());
 
   useEffect(() => {
     if (role === null) return;

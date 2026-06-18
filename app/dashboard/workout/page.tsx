@@ -122,12 +122,6 @@ const BodyAreaIcon = ({
   return <Activity size={size} className={className} />;
 };
 
-const difficultyColor: Record<string, string> = {
-  Beginner: "bg-emerald-100 text-emerald-700",
-  Intermediate: "bg-amber-100 text-amber-700",
-  Advanced: "bg-red-100 text-red-700",
-};
-
 async function apiFetch(url: string, options?: RequestInit) {
   const {
     data: { session },
@@ -574,12 +568,6 @@ export default function WorkoutDashboardPage() {
     "digestive_issues",
     "anxiety",
   ];
-
-  const filteredWorkouts = workouts.filter((w) => {
-    const catMatch = activeCategory === "All" || w.category === activeCategory;
-    const bodyMatch = activeBodyArea === "All" || w.body_area === activeBodyArea;
-    return catMatch && bodyMatch;
-  });
 
   const totalCalories = nutrition.reduce((sum, n) => sum + n.calories, 0);
   const totalProtein = nutrition.reduce((sum, n) => sum + n.protein_g, 0);

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import {
   ShoppingCart,
@@ -15,7 +16,6 @@ import {
   Star,
   Package,
   Truck,
-  HeartPulse,
   Plus,
   Minus,
   Loader2,
@@ -144,9 +144,11 @@ export default function ProductDetailPage() {
       <div className="grid gap-8 lg:grid-cols-2">
         {/* Image */}
         <div className="relative flex aspect-square items-center justify-center overflow-hidden rounded-3xl bg-gradient-to-b from-emerald-50/80 to-white p-8 shadow-sm lg:sticky lg:top-24">
-          <img
+          <Image
             src={product.image}
             alt={product.name}
+            width={380}
+            height={380}
             className="h-[380px] w-[380px] object-contain transition-all duration-500 hover:scale-110"
           />
           {discount > 0 && (
@@ -356,7 +358,6 @@ export default function ProductDetailPage() {
           </div>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
             {related.map((rp) => {
-              const rQty = cart[rp.id] || 0;
               return (
                 <Link
                   key={rp.id}
@@ -364,9 +365,11 @@ export default function ProductDetailPage() {
                   className="group rounded-2xl border border-slate-100 bg-white p-4 shadow-sm transition-all hover:shadow-md"
                 >
                   <div className="mb-3 flex aspect-square items-center justify-center rounded-xl bg-emerald-50/50 p-4">
-                    <img
+                    <Image
                       src={rp.image}
                       alt={rp.name}
+                      width={120}
+                      height={120}
                       className="h-[120px] w-[120px] object-contain transition-transform group-hover:scale-110"
                     />
                   </div>

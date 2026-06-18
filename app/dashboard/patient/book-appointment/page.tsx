@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   Search,
   MapPin,
@@ -297,9 +298,11 @@ export default function BookAppointment() {
                     <div className="relative shrink-0">
                       <div className="w-14 h-14 rounded-full overflow-hidden bg-gradient-to-br from-[#0c4381] to-[#006686] flex items-center justify-center text-white text-lg font-bold">
                         {doctorAvatars[doc.id] ? (
-                          <img
+                          <Image
                             src={doctorAvatars[doc.id]}
                             alt=""
+                            width={56}
+                            height={56}
                             className="w-full h-full object-cover"
                           />
                         ) : (
@@ -411,9 +414,11 @@ export default function BookAppointment() {
                 <div className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
                   <div className="w-10 h-10 rounded-full overflow-hidden bg-gradient-to-br from-[#0c4381] to-[#006686] flex items-center justify-center text-white text-xs font-bold shrink-0">
                     {doctorAvatars[selectedDoctor.id] ? (
-                      <img
+                      <Image
                         src={doctorAvatars[selectedDoctor.id]}
                         alt=""
+                        width={40}
+                        height={40}
                         className="w-full h-full object-cover"
                       />
                     ) : (

@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter, useSearchParams } from "next/navigation";
+import Image from "next/image";
 import {
   FileText,
   Clock,
@@ -135,7 +136,7 @@ export default function DoctorDashboard() {
   // Medications search states
   const [drugSearchQuery, setDrugSearchQuery] = useState("");
   const [catalogSuggestions, setCatalogSuggestions] = useState<CatalogDrug[]>([]);
-  const [isSearchingDrugs, setIsSearchingDrugs] = useState(false);
+  const [, setIsSearchingDrugs] = useState(false);
 
   // Dosing form state
   const [selectedDrug, setSelectedDrug] = useState<CatalogDrug | null>(null);
@@ -284,7 +285,6 @@ export default function DoctorDashboard() {
           .order("full_name", { ascending: true });
 
         const list: Patient[] = (ppData || []).map((p) => {
-          const initial = (p.full_name || "?").charAt(0).toUpperCase();
           return {
             id: p.id,
             name: p.full_name,
@@ -307,7 +307,7 @@ export default function DoctorDashboard() {
     };
 
     initDoctor();
-  }, [role, userId]);
+  }, [role, userId, router, searchParams]);
 
   // Derived image URLs from doctor profile (used in preview, print, and PDF)
   const doctorAvatarUrl = doctorProfile?.avatar_url
@@ -1306,10 +1306,12 @@ export default function DoctorDashboard() {
                   onClick={() => setPatientDropdownOpen(!patientDropdownOpen)}
                   className="flex items-center gap-3 bg-white/70 backdrop-blur border border-[#0c4381]/10 rounded-full px-5 py-2.5 cursor-pointer hover:bg-white/95 transition-all shadow-sm"
                 >
-                  <img
+                  <Image
                     className="w-8 h-8 rounded-full object-cover border border-[#0c4381]/15"
                     src={activePatient.avatar}
                     alt={activePatient.name}
+                    width={32}
+                    height={32}
                   />
                   <div className="flex flex-col text-left">
                     <span className="text-sm font-bold text-slate-800 leading-tight">
@@ -1346,10 +1348,12 @@ export default function DoctorDashboard() {
                           }}
                           className={`flex items-center gap-3 p-2.5 rounded-xl cursor-pointer transition-colors ${activePatient.id === p.id ? "bg-[#0c4381]/10 text-[#0c4381]" : "hover:bg-slate-50"}`}
                         >
-                          <img
+                          <Image
                             className="w-7 h-7 rounded-full object-cover"
                             src={p.avatar}
                             alt={p.name}
+                            width={28}
+                            height={28}
                           />
                           <div className="min-w-0">
                             <p className="text-xs font-bold text-slate-800 truncate">{p.name}</p>
@@ -2330,9 +2334,11 @@ export default function DoctorDashboard() {
               <div className="flex justify-between items-start border-b-2 border-slate-100 pb-4">
                 <div className="flex items-center gap-3">
                   {doctorAvatarUrl ? (
-                    <img
+                    <Image
                       src={doctorAvatarUrl}
                       alt="Doctor"
+                      width={48}
+                      height={48}
                       className="w-12 h-12 rounded-full object-cover border-2 border-slate-200"
                     />
                   ) : (
@@ -2448,9 +2454,11 @@ export default function DoctorDashboard() {
                 </div>
                 <div className="text-center w-44 space-y-1">
                   {doctorSigUrl ? (
-                    <img
+                    <Image
                       src={doctorSigUrl}
                       alt="Signature"
+                      width={160}
+                      height={48}
                       className="h-12 mx-auto object-contain"
                     />
                   ) : (
@@ -2684,9 +2692,11 @@ export default function DoctorDashboard() {
                 </label>
                 <div className="mt-1 flex items-center gap-4">
                   {editPhotoPreview && (
-                    <img
+                    <Image
                       src={editPhotoPreview}
                       alt="Preview"
+                      width={64}
+                      height={64}
                       className="w-16 h-16 rounded-full object-cover border-2 border-slate-200"
                     />
                   )}
@@ -2714,9 +2724,11 @@ export default function DoctorDashboard() {
                 </label>
                 <div className="mt-1 flex items-center gap-4">
                   {editSignaturePreview && (
-                    <img
+                    <Image
                       src={editSignaturePreview}
                       alt="Signature"
+                      width={160}
+                      height={48}
                       className="h-12 object-contain border border-slate-200 rounded-lg p-2 bg-white"
                     />
                   )}

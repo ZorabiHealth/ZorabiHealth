@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   MessageSquare,
   Send,
@@ -96,7 +97,7 @@ export default function DoctorMessages() {
       }
     : null;
 
-  const getConversations = async () => {
+  const getConversations = useCallback(async () => {
     const { data, error } = await supabase
       .from("conversations")
       .select("*")
@@ -116,7 +117,7 @@ export default function DoctorMessages() {
       patient_name: nameMap.get(conv.patient_id) || `Patient ${conv.patient_id.slice(0, 6)}`,
       patient_avatar: AVATARS[hashId(conv.patient_id) % AVATARS.length],
     }));
-  };
+  }, [userId]);
 
   const fetchConversations = async () => {
     setLoading(true);
@@ -155,7 +156,7 @@ export default function DoctorMessages() {
     return () => {
       channelRef.current?.unsubscribe();
     };
-  }, [role, userId, router]);
+  }, [role, userId, router, getConversations]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -543,9 +544,11 @@ export default function DoctorMessages() {
               >
                 <div className="flex items-center gap-3">
                   <div className="relative shrink-0">
-                    <img
+                    <Image
                       src={conv.patient_avatar || AVATARS[0]}
-                      alt={conv.patient_name}
+                      alt={conv.patient_name ?? ""}
+                      width={36}
+                      height={36}
                       className="w-9 h-9 rounded-full object-cover border border-white/60"
                     />
                     <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-white bg-emerald-500" />
@@ -583,9 +586,11 @@ export default function DoctorMessages() {
             {/* Chat Header */}
             <div className="glass-panel-sm rounded-none border-b border-white/30 px-5 py-3 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-3">
-                <img
+                <Image
                   src={activePatientData?.avatar || AVATARS[0]}
-                  alt={activeConv.patient_name}
+                  alt={activeConv.patient_name ?? ""}
+                  width={36}
+                  height={36}
                   className="w-9 h-9 rounded-full object-cover border border-white/60"
                 />
                 <div>
@@ -739,9 +744,11 @@ export default function DoctorMessages() {
           <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
             {/* Patient profile summary */}
             <div className="flex flex-col items-center text-center glass-panel-sm rounded-2xl p-5">
-              <img
+              <Image
                 src={activePatientData.avatar}
                 alt={activePatientData.name}
+                width={64}
+                height={64}
                 className="w-16 h-16 rounded-full object-cover border-2 border-white shadow-md mb-3"
               />
               <h4 className="text-sm font-bold text-slate-800">{activePatientData.name}</h4>

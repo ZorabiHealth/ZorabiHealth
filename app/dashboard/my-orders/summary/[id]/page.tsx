@@ -7,8 +7,6 @@ import { supabase } from "@/lib/supabase";
 import {
   ArrowLeft,
   CheckCircle2,
-  Clock,
-  Package,
   Truck,
   Pill,
   MapPin,

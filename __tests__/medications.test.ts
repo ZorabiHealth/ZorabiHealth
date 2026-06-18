@@ -55,7 +55,7 @@ describe("MedicationCRUD", () => {
       isLogging = false;
       return true;
     };
-    const results = Promise.all([handleLogTaken(), handleLogTaken()]);
+    Promise.all([handleLogTaken(), handleLogTaken()]);
     // Only one should succeed
   });
 

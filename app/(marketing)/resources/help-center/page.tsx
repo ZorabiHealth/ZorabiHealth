@@ -1,6 +1,6 @@
 import React from "react";
 import { DocsSidebar } from "@/components/marketing/docs-sidebar";
-import { Search, MessageCircle, BookOpen, ChevronRight } from "lucide-react";
+import { Search, MessageCircle, ChevronRight } from "lucide-react";
 
 const sections = [
   {

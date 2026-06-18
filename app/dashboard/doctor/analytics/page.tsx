@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
@@ -12,7 +12,6 @@ import {
   TrendingUp,
   Clock,
   ArrowUpRight,
-  Loader2,
   BarChart3,
   AlertCircle,
 } from "lucide-react";
@@ -39,7 +38,7 @@ export default function DoctorAnalytics() {
   const { userId, loading: authLoading } = useUserRole();
   const router = useRouter();
 
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [totalPatients, setTotalPatients] = useState(0);
   const [totalPrescriptions, setTotalPrescriptions] = useState(0);
@@ -58,13 +57,7 @@ export default function DoctorAnalytics() {
     }
   }, [authLoading, userId, router]);
 
-  useEffect(() => {
-    if (userId) {
-      fetchAnalytics();
-    }
-  }, [userId]);
-
-  async function fetchAnalytics() {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
 
@@ -145,7 +138,14 @@ export default function DoctorAnalytics() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [userId]);
+
+  useEffect(() => {
+    if (userId) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchAnalytics();
+    }
+  }, [userId, fetchAnalytics]);
 
   if (error) {
     return (

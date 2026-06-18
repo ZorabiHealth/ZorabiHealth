@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
@@ -110,7 +110,7 @@ export default function DoctorSchedule() {
     });
   }, [currentDate]);
 
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async () => {
     setLoading(true);
     try {
       const { data: profile } = await supabase
@@ -184,7 +184,18 @@ export default function DoctorSchedule() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [
+    userId,
+    currentDate,
+    viewMode,
+    weekDays,
+    setLoading,
+    setDoctorProfileId,
+    setScheduleDoctorSpec,
+    setScheduleDoctorName,
+    setAppointments,
+    setStats,
+  ]);
 
   useEffect(() => {
     if (role === null || loading) return;
@@ -194,7 +205,7 @@ export default function DoctorSchedule() {
     }
     // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAppointments();
-  }, [role, userId, router, currentDate, viewMode, loading]);
+  }, [role, userId, router, currentDate, viewMode, loading, loadAppointments]);
 
   const searchPatients = async (q: string) => {
     setPatientSearch(q);
