@@ -154,10 +154,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
-  const { permission, requestPermission, initialized, inAppNotifications, dismissNotification } =
-    useNotifications();
-  const [notifGranted, setNotifGranted] = useState(false);
   const { role, loading: roleLoading } = useUserRole();
+  const isPatient = role === "patient";
+  const { permission, requestPermission, initialized, inAppNotifications, dismissNotification } =
+    useNotifications(isPatient);
+  const [notifGranted, setNotifGranted] = useState(false);
 
   useEffect(() => {
     if (!roleLoading && role === null && !checkingAuth) {
@@ -224,6 +225,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   };
 
   const currentNavItems = getNavItemsForRole();
+  const visibleNotifications = isPatient ? inAppNotifications : [];
 
   const handleLogout = async () => {
     const isPlaceholder = !process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -305,8 +307,6 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         >
           {children}
         </main>
-        <MedicationAlarmAlerter />
-        <NotificationToast notifications={inAppNotifications} onDismiss={dismissNotification} />
         <ToastContainer />
         <NetworkBanner />
       </div>
@@ -356,28 +356,30 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
         {/* Bottom: Pair + Bell + Logout + Avatar */}
         <div className="flex flex-col items-center gap-3 px-2 py-4 border-t border-white/30">
-          <PairButton />
-          <button
-            onClick={async () => {
-              if (!notifGranted) {
-                const result = await requestPermission();
-                if (result === "granted") setNotifGranted(true);
-              }
-            }}
-            className="flex items-center gap-3 w-full px-2.5 py-2.5 rounded-xl text-slate-500 hover:bg-white/70 hover:text-slate-800 transition-all duration-200"
-            title={!expanded ? "Notifications" : undefined}
-          >
-            {notifGranted ? (
-              <BellRing className="w-5 h-5 shrink-0 text-blue-500" />
-            ) : (
-              <Bell className="w-5 h-5 shrink-0" />
-            )}
-            {expanded && (
-              <span className="text-sm font-medium">
-                {notifGranted ? "Notifications On" : "Enable Notifications"}
-              </span>
-            )}
-          </button>
+          {isPatient && <PairButton />}
+          {isPatient && (
+            <button
+              onClick={async () => {
+                if (!notifGranted) {
+                  const result = await requestPermission();
+                  if (result === "granted") setNotifGranted(true);
+                }
+              }}
+              className="flex items-center gap-3 w-full px-2.5 py-2.5 rounded-xl text-slate-500 hover:bg-white/70 hover:text-slate-800 transition-all duration-200"
+              title={!expanded ? "Notifications" : undefined}
+            >
+              {notifGranted ? (
+                <BellRing className="w-5 h-5 shrink-0 text-blue-500" />
+              ) : (
+                <Bell className="w-5 h-5 shrink-0" />
+              )}
+              {expanded && (
+                <span className="text-sm font-medium">
+                  {notifGranted ? "Notifications On" : "Enable Notifications"}
+                </span>
+              )}
+            </button>
+          )}
 
           <button
             onClick={handleLogout}
@@ -415,8 +417,10 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <main id="dashboard-main" className="flex-1 min-w-0 h-full overflow-y-auto overflow-x-hidden">
         {children}
       </main>
-      <MedicationAlarmAlerter />
-      <NotificationToast notifications={inAppNotifications} onDismiss={dismissNotification} />
+      {isPatient && <MedicationAlarmAlerter />}
+      {isPatient && (
+        <NotificationToast notifications={visibleNotifications} onDismiss={dismissNotification} />
+      )}
       <ToastContainer />
       <NetworkBanner />
     </div>
