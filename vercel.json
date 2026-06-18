@@ -2,11 +2,5 @@
   "framework": "nextjs",
   "buildCommand": "npm run build",
   "outputDirectory": ".next",
-  "installCommand": "npm install",
-  "crons": [
-    {
-      "path": "/api/notifications/dispatch",
-      "schedule": "*/5 * * * *"
-    }
-  ]
+  "installCommand": "npm install"
 }
