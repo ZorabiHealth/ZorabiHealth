@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
 import {
   ShoppingCart,
@@ -10,16 +11,12 @@ import {
   Trash2,
   Plus,
   Minus,
-  Package,
   MapPin,
   Phone,
   User,
   CreditCard,
   Check,
   Shield,
-  Truck,
-  Clock,
-  AlertTriangle,
   Loader2,
 } from "lucide-react";
 import { cleanAndValidatePhone } from "@/lib/validation";
@@ -262,9 +259,11 @@ export default function CheckoutPage() {
                   className="flex gap-4 rounded-2xl border border-slate-100 bg-white p-4 shadow-sm"
                 >
                   <div className="flex h-20 w-20 shrink-0 items-center justify-center rounded-xl bg-emerald-50/50 p-3">
-                    <img
+                    <Image
                       src={item.product.image}
                       alt={item.product.name}
+                      width={80}
+                      height={80}
                       className="h-[80px] w-[80px] object-contain"
                     />
                   </div>

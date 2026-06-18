@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import Image from "next/image";
 import {
   Plus,
   Pencil,
@@ -10,7 +11,6 @@ import {
   X,
   Check,
   AlertCircle,
-  Pill,
   Package,
   Save,
   Loader2,
@@ -104,7 +104,7 @@ export default function PharmacyProductsPage() {
     process.env.NEXT_PUBLIC_API_URL ||
     (typeof window !== "undefined" ? window.location.origin : "");
 
-  const fetchProducts = async () => {
+  const fetchProducts = useCallback(async () => {
     try {
       const session = (await supabase.auth.getSession()).data.session;
       if (!session) return;
@@ -117,14 +117,14 @@ export default function PharmacyProductsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [apiUrl]);
 
   useEffect(() => {
     const load = async () => {
       await fetchProducts();
     };
     load();
-  }, []);
+  }, [fetchProducts]);
 
   useEffect(() => {
     if (blobUrlRef.current && form.image_url !== blobUrlRef.current) {
@@ -360,9 +360,11 @@ export default function PharmacyProductsPage() {
                   </div>
                 ) : previewUrl && previewUrl !== "/images/placeholder.svg" ? (
                   <div className="relative w-full max-w-[200px]">
-                    <img
+                    <Image
                       src={previewUrl}
                       alt="Preview"
+                      width={160}
+                      height={160}
                       className="mx-auto h-40 w-40 rounded-xl object-contain"
                     />
                     <button
@@ -829,9 +831,11 @@ export default function PharmacyProductsPage() {
               className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white transition-all hover:shadow-lg hover:shadow-emerald-100/40"
             >
               <div className="relative flex h-44 items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50/30 p-6">
-                <img
+                <Image
                   src={p.image_url || "/images/placeholder.svg"}
                   alt={p.name}
+                  width={128}
+                  height={128}
                   className="h-32 w-32 object-contain transition-transform duration-300 group-hover:scale-110"
                 />
                 {p.is_pinned && (
@@ -909,9 +913,11 @@ export default function PharmacyProductsPage() {
                   <td className="px-5 py-4">
                     <div className="flex items-center gap-3">
                       <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-xl bg-emerald-50">
-                        <img
+                        <Image
                           src={p.image_url || "/images/placeholder.svg"}
                           alt={p.name}
+                          width={40}
+                          height={40}
                           className="h-10 w-10 object-contain"
                         />
                       </div>

@@ -13,7 +13,6 @@ import { PairButton } from "@/components/pair-button";
 import { ToastContainer } from "@/components/ui/toast";
 import { NetworkBanner } from "@/components/ui/network-banner";
 import { DoctorSidebar } from "@/components/doctor-sidebar";
-import { cn } from "@/lib/utils";
 import {
   HeartPulse,
   LayoutDashboard,
@@ -30,17 +29,11 @@ import {
   Sparkles,
   ShoppingBag,
   Moon,
-  FileText,
   Package,
   BookOpen,
   ClipboardList,
-  CircleHelp,
-  LayoutGrid,
   Calendar,
   MessageSquare,
-  Users,
-  BarChart3,
-  ClipboardCheck,
 } from "lucide-react";
 
 interface NavItem {

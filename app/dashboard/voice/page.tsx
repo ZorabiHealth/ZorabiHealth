@@ -15,7 +15,6 @@ import {
   Send,
   Stethoscope,
   BrainCircuit,
-  Waves,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -319,7 +318,7 @@ export default function VoiceAgentPage() {
   const [syncStatus, setSyncStatus] = useState<"connected" | "offline" | "syncing">("connected");
   const [isLoading, setIsLoading] = useState(true);
   const [mousePos, setMousePos] = useState({ x: 0.5, y: 0.5 });
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery] = useState("");
   const [sessionTimer, setSessionTimer] = useState(0);
   const [userId, setUserId] = useState<string>("");
 

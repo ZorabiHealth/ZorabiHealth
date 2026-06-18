@@ -2,12 +2,12 @@
 
 import React, { useState, useMemo, useEffect } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Pill,
   Search,
   ShoppingCart,
   Star,
-  ChevronRight,
   TrendingUp,
   Shield,
   Truck,
@@ -22,7 +22,6 @@ import {
   FlaskConical,
   Stethoscope,
   Activity,
-  Brain,
   Loader2,
 } from "lucide-react";
 import { CATEGORIES, type PharmProduct, loadCart, saveCart } from "@/lib/pharmacy-store-data";
@@ -213,9 +212,11 @@ function ProductCard({
         href={`/zobraipharm/product/${product.id}`}
         className="relative flex aspect-square items-center justify-center bg-gradient-to-b from-emerald-50/50 to-white p-6"
       >
-        <img
+        <Image
           src={product.image}
           alt={product.name}
+          width={200}
+          height={200}
           className="h-[200px] w-[200px] object-contain transition-transform duration-500 group-hover:scale-110"
         />
         {product.isPinned && (

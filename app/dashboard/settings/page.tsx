@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
   UserCheck,

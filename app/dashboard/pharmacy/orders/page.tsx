@@ -1,10 +1,9 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import {
   ClipboardList,
   Search,
@@ -16,17 +15,13 @@ import {
   Loader2,
   Truck,
   Clock,
-  ExternalLink,
   ShoppingBag,
   Pill,
   FileText,
   MapPin,
   Phone,
   Mail,
-  ChevronDown,
-  ChevronUp,
   Ban,
-  Send,
   Eye,
 } from "lucide-react";
 
@@ -66,15 +61,6 @@ interface UnifiedOrder {
 
 type StatusFilter = "all" | "new" | "active" | "history";
 const ACTIVE_STATUSES = ["PENDING", "CONFIRMED", "PREPARING", "DISPATCHED"];
-const STATUS_ORDER: Record<string, number> = {
-  PENDING: 0,
-  CONFIRMED: 1,
-  PREPARING: 2,
-  DISPATCHED: 3,
-  DELIVERED: 4,
-  CANCELLED: 5,
-};
-
 const STATUS_COLORS: Record<string, string> = {
   PENDING: "bg-amber-100 text-amber-800 border-amber-200",
   CONFIRMED: "bg-blue-100 text-blue-800 border-blue-200",
@@ -261,7 +247,7 @@ export default function PharmacyOrdersPage() {
     }
   };
 
-  const fetchOrders = async () => {
+  const fetchOrders = useCallback(async () => {
     setLoading(true);
     setFetchError("");
     try {
@@ -298,7 +284,7 @@ export default function PharmacyOrdersPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     if (role === null) return;
@@ -334,7 +320,7 @@ export default function PharmacyOrdersPage() {
       }
     };
     load();
-  }, [role, userId, router]);
+  }, [role, userId, router, fetchOrders]);
 
   const updateOrderStatus = async (order: UnifiedOrder, newStatus: string) => {
     setUpdatingId(order.sourceId);

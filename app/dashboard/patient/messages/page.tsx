@@ -1,20 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter, useSearchParams } from "next/navigation";
-import {
-  MessageSquare,
-  Send,
-  Search,
-  FileText,
-  CheckCheck,
-  Loader2,
-  X,
-  Stethoscope,
-  Pill,
-} from "lucide-react";
+import { MessageSquare, Send, Search, FileText, CheckCheck, Loader2, Pill } from "lucide-react";
 import { RealtimeChannel } from "@supabase/supabase-js";
 import Link from "next/link";
 
@@ -58,7 +48,7 @@ export default function PatientMessages() {
   const channelRef = useRef<RealtimeChannel | null>(null);
   const subscribingRef = useRef(false);
 
-  const getConversations = async () => {
+  const getConversations = useCallback(async () => {
     const { data, error } = await supabase
       .from("conversations")
       .select("*")
@@ -86,38 +76,41 @@ export default function PatientMessages() {
         doctor_specialization: info?.spec || "",
       };
     });
-  };
+  }, [userId]);
 
-  const ensureConversation = async (docId: string, docUserId: string) => {
-    const { data: existing } = await supabase
-      .from("conversations")
-      .select("*")
-      .eq("doctor_id", docUserId)
-      .eq("patient_id", userId)
-      .maybeSingle();
-
-    if (existing) return existing;
-
-    const { data: newConv, error: insertErr } = await supabase
-      .from("conversations")
-      .insert({
-        doctor_id: docUserId,
-        patient_id: userId,
-      })
-      .select()
-      .maybeSingle();
-
-    if (insertErr) {
-      const { data: retryConv } = await supabase
+  const ensureConversation = useCallback(
+    async (docId: string, docUserId: string) => {
+      const { data: existing } = await supabase
         .from("conversations")
         .select("*")
         .eq("doctor_id", docUserId)
         .eq("patient_id", userId)
-        .single();
-      return retryConv;
-    }
-    return newConv;
-  };
+        .maybeSingle();
+
+      if (existing) return existing;
+
+      const { data: newConv, error: insertErr } = await supabase
+        .from("conversations")
+        .insert({
+          doctor_id: docUserId,
+          patient_id: userId,
+        })
+        .select()
+        .maybeSingle();
+
+      if (insertErr) {
+        const { data: retryConv } = await supabase
+          .from("conversations")
+          .select("*")
+          .eq("doctor_id", docUserId)
+          .eq("patient_id", userId)
+          .single();
+        return retryConv;
+      }
+      return newConv;
+    },
+    [userId]
+  );
 
   useEffect(() => {
     if (role === null) return;
@@ -156,7 +149,7 @@ export default function PatientMessages() {
     return () => {
       channelRef.current?.unsubscribe();
     };
-  }, [role, userId, router, doctorParam, doctorUserParam]);
+  }, [role, userId, router, doctorParam, doctorUserParam, ensureConversation, getConversations]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });

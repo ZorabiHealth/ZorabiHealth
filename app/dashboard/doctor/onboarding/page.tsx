@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import {
@@ -563,9 +564,11 @@ export default function DoctorOnboarding() {
                 <div className="flex items-center gap-4">
                   <div className="w-16 h-16 rounded-full bg-slate-200 overflow-hidden flex items-center justify-center">
                     {avatarPreview ? (
-                      <img
+                      <Image
                         src={avatarPreview}
                         alt="Preview"
+                        width={64}
+                        height={64}
                         className="w-full h-full object-cover"
                       />
                     ) : (

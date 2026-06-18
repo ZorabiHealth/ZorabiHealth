@@ -69,9 +69,7 @@ export default function DashboardOverview() {
       currentStock: number;
     }[]
   >([]);
-  const [loginTime, setLoginTime] = useState<string | null>(() =>
-    localStorage.getItem("zh_login_time")
-  );
+  const [loginTime] = useState<string | null>(() => localStorage.getItem("zh_login_time"));
 
   const refreshDashboardData = useCallback(
     async (userId: string, sessionUser?: Session["user"]) => {
@@ -189,7 +187,7 @@ export default function DashboardOverview() {
     }, 30000);
 
     return () => clearInterval(interval);
-  }, [session?.user?.id, refreshDashboardData]);
+  }, [session?.user?.id, session?.user, refreshDashboardData]);
 
   const handleTakeMissedMed = async (med: {
     id: string;

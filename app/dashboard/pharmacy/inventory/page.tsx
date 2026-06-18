@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import {
   Package,
   Plus,
@@ -12,7 +13,6 @@ import {
   AlertTriangle,
   X,
   Save,
-  TrendingDown,
   Upload,
   Download,
   RefreshCw,
@@ -21,10 +21,8 @@ import {
   ChevronRight,
   GripHorizontal,
   Eye,
-  Pill,
   AlertCircle,
   Check,
-  Loader2,
   Trash2,
 } from "lucide-react";
 
@@ -262,7 +260,7 @@ export default function PharmacyInventoryPage() {
     }
   };
 
-  const fetchPharmacyAndInventory = async () => {
+  const fetchPharmacyAndInventory = useCallback(async () => {
     setLoading(true);
     setFetchError("");
     try {
@@ -351,7 +349,7 @@ export default function PharmacyInventoryPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     if (role === null) return;
@@ -360,7 +358,7 @@ export default function PharmacyInventoryPage() {
       return;
     }
     fetchPharmacyAndInventory();
-  }, [role, userId, router]);
+  }, [role, userId, router, fetchPharmacyAndInventory]);
 
   const searchDrugs = async (q: string) => {
     setDrugSearch(q);
@@ -417,7 +415,6 @@ export default function PharmacyInventoryPage() {
     if (!selectedDrugs.length || !pharmacyId || stockQty <= 0) return;
     setSaving(true);
     let added = 0;
-    let errors = 0;
     try {
       for (const drug of selectedDrugs) {
         try {
@@ -439,7 +436,6 @@ export default function PharmacyInventoryPage() {
                 .select("id")
                 .single();
               if (createErr || !newDrug) {
-                errors++;
                 continue;
               }
               drugId = newDrug.id;
@@ -452,13 +448,10 @@ export default function PharmacyInventoryPage() {
               { onConflict: "pharmacy_id, drug_id" }
             );
           if (error) {
-            errors++;
             continue;
           }
           added++;
-        } catch {
-          errors++;
-        }
+        } catch {}
       }
       // Sync store_products.in_stock for all added drugs
       if (added > 0 && stockQty > 0) {
@@ -574,7 +567,7 @@ export default function PharmacyInventoryPage() {
       if (Date.now() - lastFetchTime > STALE_THRESHOLD_MS) fetchPharmacyAndInventory();
     }, 30000);
     return () => clearInterval(interval);
-  }, [pharmacyId, loading, lastFetchTime]);
+  }, [pharmacyId, loading, lastFetchTime, fetchPharmacyAndInventory]);
 
   const filteredInventory = useMemo(() => {
     const q = searchTerm.toLowerCase();
@@ -1120,9 +1113,11 @@ export default function PharmacyInventoryPage() {
                 >
                   {item.storeProduct?.image_url &&
                   item.storeProduct.image_url !== "/images/placeholder.svg" ? (
-                    <img
+                    <Image
                       src={item.storeProduct.image_url}
                       alt={item.drug_name}
+                      width={112}
+                      height={112}
                       className="h-28 w-28 object-contain transition-transform duration-300 group-hover:scale-110"
                     />
                   ) : (
@@ -1303,9 +1298,11 @@ export default function PharmacyInventoryPage() {
                         <div className="flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl bg-emerald-50">
                           {item.storeProduct?.image_url &&
                           item.storeProduct.image_url !== "/images/placeholder.svg" ? (
-                            <img
+                            <Image
                               src={item.storeProduct.image_url}
                               alt=""
+                              width={32}
+                              height={32}
                               className="h-8 w-8 object-contain"
                             />
                           ) : (

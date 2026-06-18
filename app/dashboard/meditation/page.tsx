@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -85,7 +85,7 @@ export default function MeditationPage() {
 
   // Web Audio Synth states
   const [ambientSound, setAmbientSound] = useState<"None" | "Theta" | "Solfeggio" | "Zen">("None");
-  const [ambientVolume, setAmbientVolume] = useState(0.35);
+  const [ambientVolume] = useState(0.35);
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const mainGainRef = useRef<GainNode | null>(null);

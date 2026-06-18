@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAuth, getAdminClient } from "@/lib/auth-utils";
+import { verifyAuth } from "@/lib/auth-utils";
 import { supabase } from "@/lib/supabase";
 
 function sanitize(str: string): string {
@@ -34,8 +34,6 @@ export async function POST(req: NextRequest) {
       { status: 400 }
     );
   }
-
-  const admin = getAdminClient();
 
   // Check for duplicate review by this user for the same order+product
   if (orderId || prescriptionOrderId) {

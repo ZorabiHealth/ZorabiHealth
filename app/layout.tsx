@@ -7,7 +7,8 @@ import { cn } from "@/lib/utils";
 const hankenGrotesk = Hanken_Grotesk({
   variable: "--font-hanken-grotesk",
   subsets: ["latin"],
-  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
 export const metadata: Metadata = {
@@ -24,6 +25,9 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn("h-full", "antialiased", hankenGrotesk.variable, "font-sans")}>
       <head>
+        <link rel="preconnect" href="https://cdn.pendo.io" />
+        <link rel="dns-prefetch" href="https://cdn.pendo.io" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <Script id="pendo-install" strategy="beforeInteractive">{`
 (function(apiKey){
     (function(p,e,n,d,o){var v,w,x,y,z;o=p[d]=p[d]||{};o._q=o._q||[];

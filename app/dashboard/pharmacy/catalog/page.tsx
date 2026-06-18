@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
 import { useRouter } from "next/navigation";
+import Image from "next/image";
 import {
   BookOpen,
   Search,
@@ -13,7 +14,6 @@ import {
   Loader2,
   AlertCircle,
   Pill,
-  FlaskConical,
   Building2,
   Package,
   Trash2,
@@ -78,7 +78,7 @@ export default function DrugCatalogPage() {
     null
   );
 
-  const getCatalogData = async () => {
+  const getCatalogData = useCallback(async () => {
     let query = supabase.from("drug_catalog").select("*").order("name");
     if (selectedCategory !== "All") query = query.eq("category", selectedCategory);
     if (searchTerm) query = query.ilike("name", `%${searchTerm}%`);
@@ -128,7 +128,7 @@ export default function DrugCatalogPage() {
           : null,
       };
     });
-  };
+  }, [selectedCategory, searchTerm]);
 
   const fetchCatalog = async () => {
     setLoading(true);
@@ -166,7 +166,7 @@ export default function DrugCatalogPage() {
       }
     };
     load();
-  }, [role, router, selectedCategory, searchTerm]);
+  }, [role, router, selectedCategory, searchTerm, getCatalogData]);
 
   useEffect(() => {
     const load = async () => {
@@ -184,7 +184,7 @@ export default function DrugCatalogPage() {
       }
     };
     load();
-  }, [selectedCategory, searchTerm]);
+  }, [selectedCategory, searchTerm, getCatalogData]);
 
   const addToInventory = async (drug: Drug) => {
     setAddingId(drug.id);
@@ -420,9 +420,11 @@ export default function DrugCatalogPage() {
               <div className="relative flex h-36 items-center justify-center bg-gradient-to-br from-slate-50 to-emerald-50/30 p-4">
                 {drug.storeProduct?.image_url &&
                 drug.storeProduct.image_url !== "/images/placeholder.svg" ? (
-                  <img
+                  <Image
                     src={drug.storeProduct.image_url}
                     alt={drug.name}
+                    width={96}
+                    height={96}
                     className="h-24 w-24 object-contain transition-transform duration-300 group-hover:scale-110"
                   />
                 ) : (

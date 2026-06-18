@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { useUserRole } from "@/hooks/useUserRole";
@@ -36,7 +36,7 @@ export default function PharmacyRegisterPage() {
   const [checkingExisting, setCheckingExisting] = useState(true);
   const [alreadyRegistered, setAlreadyRegistered] = useState(false);
 
-  const checkExistingProfile = async () => {
+  const checkExistingProfile = useCallback(async () => {
     try {
       const { data } = await supabase
         .from("pharmacy_profiles")
@@ -51,7 +51,7 @@ export default function PharmacyRegisterPage() {
     } finally {
       setCheckingExisting(false);
     }
-  };
+  }, [userId]);
 
   useEffect(() => {
     if (roleLoading) return;
@@ -63,23 +63,7 @@ export default function PharmacyRegisterPage() {
       await checkExistingProfile();
     };
     check();
-  }, [userId, roleLoading]);
-
-  const geocodePincode = async (code: string) => {
-    if (code.length !== 6) return;
-    try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?postalcode=${code}&country=India&format=json&limit=1`
-      );
-      const json = await res.json();
-      if (json?.[0]) {
-        setLat(Number(json[0].lat));
-        setLng(Number(json[0].lon));
-      }
-    } catch {
-      // geocode failed silently, user can still submit
-    }
-  };
+  }, [userId, roleLoading, checkExistingProfile, router]);
 
   useEffect(() => {
     if (pincode.length !== 6) return;

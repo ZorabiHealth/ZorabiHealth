@@ -32,7 +32,10 @@ function Footerdemo() {
   }, [isDarkMode]);
 
   return (
-    <footer className="relative border-t bg-white text-slate-800 transition-colors duration-300 dark:bg-gray-900 dark:text-gray-100">
+    <footer
+      aria-label="Site footer"
+      className="relative border-t bg-white text-slate-800 transition-colors duration-300 dark:bg-gray-900 dark:text-gray-100"
+    >
       <div className="container mx-auto px-4 py-12 md:px-6 lg:px-8 max-w-7xl">
         <div className="grid gap-8 sm:gap-12 grid-cols-2 md:grid-cols-2 lg:grid-cols-5">
           {/* Brand & Newsletter */}
@@ -50,7 +53,7 @@ function Footerdemo() {
               Your personal AI-powered health companion. Track medications, monitor vitals, and stay
               on top of your wellness journey.
             </p>
-            <div className="flex items-center gap-2 mb-6 text-xs text-slate-400 dark:text-slate-500">
+            <div className="flex items-center gap-2 mb-6 text-xs text-slate-500 dark:text-slate-400">
               <Shield className="h-3.5 w-3.5 text-emerald-500" />
               HIPAA-aligned &bull; SSL encrypted &bull; SOC 2
             </div>
@@ -79,7 +82,7 @@ function Footerdemo() {
             <h3 className="mb-4 text-sm font-semibold text-brand-900 dark:text-brand-400 uppercase tracking-wider">
               Platform
             </h3>
-            <nav className="space-y-2.5 text-sm">
+            <nav aria-label="Platform" className="space-y-2.5 text-sm">
               <Link
                 href="/dashboard"
                 className="block transition-colors hover:text-brand-600 text-slate-600 dark:text-slate-400"
@@ -112,7 +115,7 @@ function Footerdemo() {
             <h3 className="mb-4 text-sm font-semibold text-brand-900 dark:text-brand-400 uppercase tracking-wider">
               Resources
             </h3>
-            <nav className="space-y-2.5 text-sm">
+            <nav aria-label="Resources" className="space-y-2.5 text-sm">
               <Link
                 href="/dashboard"
                 className="block transition-colors hover:text-brand-600 text-slate-600 dark:text-slate-400"
