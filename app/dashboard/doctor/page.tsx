@@ -31,6 +31,7 @@ import {
   ClipboardList,
   FileDown,
   Loader2,
+  LogOut,
 } from "lucide-react";
 
 const safeUUID = (): string => {
@@ -1436,6 +1437,16 @@ export default function DoctorDashboard() {
               title="Edit Profile"
             >
               <Settings className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => {
+                supabase.auth.signOut();
+                router.push("/");
+              }}
+              className="p-2 bg-white/60 hover:bg-red-100 rounded-full border border-white/40 shadow-sm text-slate-500 hover:text-red-600 transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </header>
