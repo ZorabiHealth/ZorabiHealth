@@ -12,6 +12,7 @@ import {
   HeartPulse,
   LayoutDashboard,
   Menu,
+  Smartphone,
   Microscope,
   Pill,
   Shield,
@@ -263,6 +264,17 @@ const Navbar1 = ({
             >
               <Link href={auth.signup.url}>{auth.signup.text}</Link>
             </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="border-slate-200 text-slate-600 hover:text-brand-600 hover:border-brand-200"
+            >
+              <Link href="/download">
+                <Smartphone className="w-4 h-4" />
+                Download App
+              </Link>
+            </Button>
           </div>
         </nav>
 
@@ -337,6 +349,12 @@ const Navbar1 = ({
                   >
                     <Link href={auth.signup.url} onClick={() => setMobileOpen(false)}>
                       {auth.signup.text}
+                    </Link>
+                  </Button>
+                  <Button variant="outline" asChild className="w-full border-slate-200">
+                    <Link href="/download" onClick={() => setMobileOpen(false)}>
+                      <Smartphone className="w-4 h-4" />
+                      Download App
                     </Link>
                   </Button>
                 </div>
