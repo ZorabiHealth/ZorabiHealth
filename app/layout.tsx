@@ -28,7 +28,15 @@ export default function RootLayout({
         <link rel="preconnect" href="https://cdn.pendo.io" />
         <link rel="dns-prefetch" href="https://cdn.pendo.io" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <Script id="pendo-install" strategy="beforeInteractive">{`
+      </head>
+      <body className="min-h-full flex flex-col">
+        {children}
+        {/* Pendo analytics — dangerouslySetInnerHTML required for inline Script in App Router */}
+        <Script
+          id="pendo-install"
+          strategy="afterInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
 (function(apiKey){
     (function(p,e,n,d,o){var v,w,x,y,z;o=p[d]=p[d]||{};o._q=o._q||[];
     v=['initialize','identify','updateOptions','pageLoad','track','trackAgent'];for(w=0,x=v.length;w<x;++w)(function(m){
@@ -37,9 +45,10 @@ export default function RootLayout({
     z=e.getElementsByTagName(n)[0];z.parentNode.insertBefore(y,z);})(window,document,'script','pendo');
 })('84d28da6-a5f1-4ea6-9157-3cfa76b7837d');
 pendo.initialize({ visitor: { id: '' } });
-        `}</Script>
-      </head>
-      <body className="min-h-full flex flex-col">{children}</body>
+            `,
+          }}
+        />
+      </body>
     </html>
   );
 }
