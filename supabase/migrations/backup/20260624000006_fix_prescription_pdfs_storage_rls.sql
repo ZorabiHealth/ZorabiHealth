@@ -1,6 +1,6 @@
 -- ============================================================
 -- Fix missing INSERT policy for prescription_pdfs storage bucket
---
+-- 
 -- The earlier migration 20260623000002_fix_patient_profiles_and_rls.sql
 -- recreated the SELECT policy but dropped and never re-added
 -- the INSERT policy, causing "new row violates row-level security

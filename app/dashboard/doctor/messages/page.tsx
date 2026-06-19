@@ -76,7 +76,7 @@ export default function DoctorMessages() {
   const [fetchError, setFetchError] = useState<string | null>(null);
   const [showPrescriptionModal, setShowPrescriptionModal] = useState(false);
   const [patientPrescriptions, setPatientPrescriptions] = useState<
-    { id: string; diagnosis: string; status: string; created_at: string }[]
+    { id: string; diagnosis: string; status: string; created_at: string; hasPdf?: boolean }[]
   >([]);
   const [loadingPrescriptions, setLoadingPrescriptions] = useState(false);
   const [sendingPrescription, setSendingPrescription] = useState(false);
@@ -291,7 +291,18 @@ export default function DoctorMessages() {
         .eq("patient_id", activeConv.patient_id)
         .order("created_at", { ascending: false })
         .limit(20);
-      setPatientPrescriptions(data ?? []);
+
+      if (data && data.length > 0) {
+        const rxIds = data.map((r) => r.id);
+        const { data: docData } = await supabase
+          .from("prescription_documents")
+          .select("prescription_id")
+          .in("prescription_id", rxIds);
+        const hasPdfSet = new Set(docData?.map((d) => d.prescription_id) ?? []);
+        setPatientPrescriptions(data.map((r) => ({ ...r, hasPdf: hasPdfSet.has(r.id) })));
+      } else {
+        setPatientPrescriptions([]);
+      }
     } catch (err) {
       console.error("Failed to load prescriptions:", err);
     } finally {
@@ -309,7 +320,52 @@ export default function DoctorMessages() {
     const fileName = `prescription-${rxId.slice(0, 8)}-${timestamp}.pdf`;
     setSendingPrescription(true);
     try {
-      // Fetch full prescription data
+      // Check if PDF already exists in storage
+      const { data: existingDoc } = await supabase
+        .from("prescription_documents")
+        .select("storage_path")
+        .eq("prescription_id", rxId)
+        .maybeSingle();
+
+      if (existingDoc?.storage_path) {
+        const { data: signedData } = await supabase.storage
+          .from("prescription_pdfs")
+          .createSignedUrl(existingDoc.storage_path, 86400);
+        if (signedData?.signedUrl) {
+          const content = `📋 Prescription: ${diagnosis}`;
+          const { error: msgErr } = await supabase.from("messages").insert({
+            conversation_id: activeConv.id,
+            sender_id: userId,
+            content,
+            attachment_url: signedData.signedUrl,
+            attachment_type: "prescription",
+          });
+          if (!msgErr) {
+            await supabase
+              .from("conversations")
+              .update({ last_message: content, last_message_at: new Date().toISOString() })
+              .eq("id", activeConv.id);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: timestampId,
+                conversation_id: activeConv.id,
+                sender_id: userId,
+                content,
+                attachment_url: signedData.signedUrl,
+                attachment_type: "prescription",
+                created_at: new Date().toISOString(),
+                read_at: null,
+              },
+            ]);
+            setShowPrescriptionModal(false);
+          }
+          setSendingPrescription(false);
+          return;
+        }
+      }
+
+      // Fetch full prescription data for PDF generation
       const [rxRes, itemsRes, doctorRes, patientRes] = await Promise.all([
         supabase.from("prescriptions").select("*").eq("id", rxId).single(),
         supabase.from("prescription_items").select("*").eq("prescription_id", rxId),
@@ -886,9 +942,16 @@ export default function DoctorMessages() {
                   {patientPrescriptions.map((rx) => (
                     <div key={rx.id} className="flex items-center justify-between py-3">
                       <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-slate-800 truncate">
-                          {rx.diagnosis}
-                        </p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium text-slate-800 truncate">
+                            {rx.diagnosis}
+                          </p>
+                          {rx.hasPdf && (
+                            <span className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 shrink-0">
+                              PDF
+                            </span>
+                          )}
+                        </div>
                         <div className="flex items-center gap-2 mt-0.5">
                           <span className="text-[10px] text-slate-400">
                             {new Date(rx.created_at).toLocaleDateString("en-IN", {
