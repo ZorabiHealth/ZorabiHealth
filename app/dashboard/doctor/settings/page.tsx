@@ -421,6 +421,7 @@ export default function DoctorSettings() {
                     alt="Avatar"
                     width={80}
                     height={80}
+                    unoptimized
                     className="w-full h-full object-cover"
                   />
                 ) : (
@@ -466,6 +467,7 @@ export default function DoctorSettings() {
                     alt="Signature"
                     width={160}
                     height={48}
+                    unoptimized
                     className="h-12 mx-auto object-contain border-b-2 border-gray-300"
                   />
                 ) : (

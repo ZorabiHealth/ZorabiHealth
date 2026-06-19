@@ -466,27 +466,28 @@ export default function DoctorMessages() {
       const pdfBlob = doc.output("blob");
       const filePath = `prescriptions/${activeConv.patient_id}/${fileName}`;
 
-      const { error: uploadErr } = await supabase.storage
-        .from("prescription_pdfs")
-        .upload(filePath, pdfBlob, { contentType: "application/pdf", upsert: true });
-
       let pdfUrl = "";
-      if (!uploadErr) {
-        const { data: signedData } = await supabase.storage
-          .from("prescription_pdfs")
-          .createSignedUrl(filePath, 86400);
-        pdfUrl = signedData?.signedUrl || "";
+      try {
+        const pdfFormData = new FormData();
+        pdfFormData.append("file", new File([pdfBlob], fileName, { type: "application/pdf" }));
+        pdfFormData.append("filePath", filePath);
+        pdfFormData.append("fileName", fileName);
+        pdfFormData.append("prescriptionId", rxId);
 
-        // Record prescription document
-        await supabase
-          .from("prescription_documents")
-          .insert({
-            prescription_id: rxId,
-            storage_path: filePath,
-            file_name: fileName,
-            file_size: pdfBlob.size,
-          })
-          .throwOnError();
+        const res = await fetch("/api/upload-pdf", {
+          method: "POST",
+          body: pdfFormData,
+        });
+
+        const data = await res.json();
+
+        if (res.ok) {
+          pdfUrl = data.signedUrl || "";
+        } else {
+          console.error("PDF upload via API failed:", data.error);
+        }
+      } catch (err) {
+        console.error("PDF upload via API failed:", err);
       }
 
       // Guard against conversation switch during async PDF generation/upload

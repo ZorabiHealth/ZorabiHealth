@@ -1134,29 +1134,29 @@ export default function DoctorDashboard() {
     const fileName = `prescription-${Date.now()}.pdf`;
     const filePath = `prescriptions/${activePatient?.id || "unknown"}/${fileName}`;
 
-    const { error: uploadErr } = await supabase.storage
-      .from("prescription_pdfs")
-      .upload(filePath, pdfBlob, { contentType: "application/pdf", upsert: true });
-
     let signedUrl: string | null = null;
 
-    if (uploadErr) {
-      console.error("PDF upload to prescription_pdfs bucket failed:", uploadErr);
-    } else {
-      const signed = await supabase.storage
-        .from("prescription_pdfs")
-        .createSignedUrl(filePath, 3600);
-      signedUrl = signed.data?.signedUrl || null;
+    try {
+      const formData = new FormData();
+      formData.append("file", new File([pdfBlob], fileName, { type: "application/pdf" }));
+      formData.append("filePath", filePath);
+      formData.append("fileName", fileName);
+      formData.append("prescriptionId", rxId);
 
-      const { error: docErr } = await supabase.from("prescription_documents").insert({
-        prescription_id: rxId,
-        storage_path: filePath,
-        file_name: fileName,
-        file_size: pdfBlob.size,
+      const res = await fetch("/api/upload-pdf", {
+        method: "POST",
+        body: formData,
       });
-      if (docErr) {
-        console.error("prescription_documents insert failed:", docErr);
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error("PDF upload via API failed:", data.error);
+      } else {
+        signedUrl = data.signedUrl;
       }
+    } catch (err) {
+      console.error("PDF upload via API failed:", err);
     }
 
     if (openAfter) {
@@ -1417,6 +1417,7 @@ export default function DoctorDashboard() {
                   alt={doctorName}
                   width={28}
                   height={28}
+                  unoptimized
                   className="w-7 h-7 rounded-full object-cover border border-white/60"
                 />
               ) : (
@@ -2138,6 +2139,7 @@ export default function DoctorDashboard() {
                           alt={doctorName}
                           width={40}
                           height={40}
+                          unoptimized
                           className="w-10 h-10 rounded-full object-cover border-2 border-slate-200"
                         />
                       ) : (
@@ -2153,6 +2155,7 @@ export default function DoctorDashboard() {
                             alt="Signature"
                             width={100}
                             height={28}
+                            unoptimized
                             className="h-6 object-contain mt-0.5"
                           />
                         )}
@@ -2429,6 +2432,7 @@ export default function DoctorDashboard() {
                       alt="Doctor"
                       width={48}
                       height={48}
+                      unoptimized
                       className="w-12 h-12 rounded-full object-cover border-2 border-slate-200"
                     />
                   ) : (
@@ -2549,6 +2553,7 @@ export default function DoctorDashboard() {
                       alt="Signature"
                       width={160}
                       height={48}
+                      unoptimized
                       className="h-12 mx-auto object-contain"
                     />
                   ) : (
