@@ -1155,6 +1155,39 @@ create policy "Doctor and patient read prescription PDFs"
     )
   );
 
+-- 7b. Add INSERT policy for doctors uploading prescription PDFs
+drop policy if exists "Doctors upload prescription PDFs" on storage.objects;
+create policy "Doctors upload prescription PDFs"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'prescription_pdfs'
+    and exists (
+      select 1 from doctor_profiles
+      where user_id = auth.uid()
+    )
+  );
+
+-- 7c. Add UPDATE/DELETE policy so doctors can manage their uploads
+drop policy if exists "Doctors manage prescription PDFs" on storage.objects;
+create policy "Doctors manage prescription PDFs"
+  on storage.objects for all
+  using (
+    bucket_id = 'prescription_pdfs'
+    and exists (
+      select 1 from prescription_documents pd
+      join prescriptions px on px.id = pd.prescription_id
+      where pd.storage_path = name
+      and exists (select 1 from doctor_profiles where id = px.doctor_id and user_id = auth.uid())
+    )
+  )
+  with check (
+    bucket_id = 'prescription_pdfs'
+    and exists (
+      select 1 from doctor_profiles
+      where user_id = auth.uid()
+    )
+  );
+
 -- 8. Fix conversations RLS: doctor_id → auth.users(id) is correct here
 -- (conversations.doctor_id references auth.users(id), not doctor_profiles(id))
 -- But patient_id now references patient_profiles, update accordingly
@@ -1337,6 +1370,36 @@ create policy "Doctor and patient read prescription PDFs"
     )
   );
 
+drop policy if exists "Doctors upload prescription PDFs" on storage.objects;
+create policy "Doctors upload prescription PDFs"
+  on storage.objects for insert
+  with check (
+    bucket_id = 'prescription_pdfs'
+    and exists (
+      select 1 from doctor_profiles
+      where user_id = auth.uid()
+    )
+  );
+
+drop policy if exists "Doctors manage prescription PDFs" on storage.objects;
+create policy "Doctors manage prescription PDFs"
+  on storage.objects for all
+  using (
+    bucket_id = 'prescription_pdfs'
+    and exists (
+      select 1 from prescription_documents pd
+      join prescriptions px on px.id = pd.prescription_id
+      where pd.storage_path = name
+      and exists (select 1 from doctor_profiles where id = px.doctor_id and user_id = auth.uid())
+    )
+  )
+  with check (
+    bucket_id = 'prescription_pdfs'
+    and exists (
+      select 1 from doctor_profiles
+      where user_id = auth.uid()
+    )
+  );
 
 
 -- ===== 20260623000004_fix_refill_medication_fk.sql =====
