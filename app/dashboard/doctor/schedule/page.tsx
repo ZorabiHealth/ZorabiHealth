@@ -198,14 +198,16 @@ export default function DoctorSchedule() {
   ]);
 
   useEffect(() => {
-    if (role === null || loading) return;
+    if (role === null) return;
     if (role !== "doctor") {
       router.push("/dashboard");
       return;
     }
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    loadAppointments();
-  }, [role, userId, router, currentDate, viewMode, loading, loadAppointments]);
+    const run = async () => {
+      await loadAppointments();
+    };
+    run();
+  }, [role, userId, router, currentDate, viewMode, loadAppointments]);
 
   const searchPatients = async (q: string) => {
     setPatientSearch(q);

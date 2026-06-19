@@ -31,6 +31,7 @@ import {
   ClipboardList,
   FileDown,
   Loader2,
+  LogOut,
 } from "lucide-react";
 
 const safeUUID = (): string => {
@@ -99,6 +100,7 @@ interface PastVisit {
   doctor: string;
   notes: string;
   items: PastVisitItem[];
+  hasPdf: boolean;
 }
 
 export default function DoctorDashboard() {
@@ -369,6 +371,13 @@ export default function DoctorDashboard() {
         if (error) throw error;
 
         if (data && data.length > 0) {
+          const rxIds = data.map((rx: Record<string, unknown>) => String(rx.id));
+          const { data: docData } = await supabase
+            .from("prescription_documents")
+            .select("prescription_id")
+            .in("prescription_id", rxIds);
+          const hasPdfSet = new Set(docData?.map((d) => d.prescription_id) ?? []);
+
           setPastVisits(
             data.map((rx: Record<string, unknown>) => ({
               id: String(rx.id ?? ""),
@@ -381,6 +390,7 @@ export default function DoctorDashboard() {
               doctor: "Dr. Sarah Smith",
               notes: String(rx.notes || ""),
               items: (rx.prescription_items || []) as PastVisitItem[],
+              hasPdf: hasPdfSet.has(String(rx.id)),
             }))
           );
         } else {
@@ -897,11 +907,16 @@ export default function DoctorDashboard() {
           console.warn("Failed to mark prescription as completed (non-blocking):", statusErr);
         }
 
-        // Generate & upload PDF to bucket (non-blocking)
+        // Generate & upload PDF to bucket
         try {
           await generateAndUploadPdf(rx.id, false);
+          console.log("PDF uploaded successfully for prescription:", rx.id);
         } catch (pdfErr) {
-          console.error("PDF generation/upload failed (non-blocking):", pdfErr);
+          console.error("PDF generation/upload failed:", pdfErr);
+          setToast({
+            message: "Prescription saved but PDF upload failed. Please use Save PDF in preview.",
+            type: "error",
+          });
         }
       }
 
@@ -1120,24 +1135,29 @@ export default function DoctorDashboard() {
     const fileName = `prescription-${Date.now()}.pdf`;
     const filePath = `prescriptions/${activePatient?.id || "unknown"}/${fileName}`;
 
-    const { error: uploadErr } = await supabase.storage
-      .from("prescription_pdfs")
-      .upload(filePath, pdfBlob, { contentType: "application/pdf", upsert: false });
-
     let signedUrl: string | null = null;
 
-    if (!uploadErr) {
-      const signed = await supabase.storage
-        .from("prescription_pdfs")
-        .createSignedUrl(filePath, 3600);
-      signedUrl = signed.data?.signedUrl || null;
+    try {
+      const formData = new FormData();
+      formData.append("file", new File([pdfBlob], fileName, { type: "application/pdf" }));
+      formData.append("filePath", filePath);
+      formData.append("fileName", fileName);
+      formData.append("prescriptionId", rxId);
 
-      await supabase.from("prescription_documents").insert({
-        prescription_id: rxId,
-        storage_path: filePath,
-        file_name: fileName,
-        file_size: pdfBlob.size,
+      const res = await fetch("/api/upload-pdf", {
+        method: "POST",
+        body: formData,
       });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        console.error("PDF upload via API failed:", data.error);
+      } else {
+        signedUrl = data.signedUrl;
+      }
+    } catch (err) {
+      console.error("PDF upload via API failed:", err);
     }
 
     if (openAfter) {
@@ -1390,10 +1410,26 @@ export default function DoctorDashboard() {
             )}
           </div>
 
-          <div className="flex items-center gap-2 self-end md:self-auto">
-            <div className="text-xs font-semibold text-slate-500 mr-2">
-              {doctorName} | {doctorProfile?.qualification || "MD"} | License:{" "}
-              {String(doctorProfile?.license_number ?? "")}
+          <div className="flex items-center gap-3 self-end md:self-auto">
+            <div className="flex items-center gap-2 bg-white/60 border border-white/40 rounded-full pl-1 pr-3 py-1 shadow-sm">
+              {doctorAvatarUrl ? (
+                <Image
+                  src={doctorAvatarUrl}
+                  alt={doctorName}
+                  width={28}
+                  height={28}
+                  unoptimized
+                  className="w-7 h-7 rounded-full object-cover border border-white/60"
+                />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-gradient-to-br from-[#0c4381] to-[#006686] flex items-center justify-center text-white text-[10px] font-bold">
+                  {doctorName.charAt(4) || "D"}
+                </div>
+              )}
+              <span className="text-xs font-semibold text-slate-600">
+                {doctorName} | {doctorProfile?.qualification || "MD"} | License:{" "}
+                {String(doctorProfile?.license_number ?? "")}
+              </span>
             </div>
             <button
               onClick={openProfileEdit}
@@ -1401,6 +1437,16 @@ export default function DoctorDashboard() {
               title="Edit Profile"
             >
               <Settings className="w-4 h-4" />
+            </button>
+            <button
+              onClick={() => {
+                supabase.auth.signOut();
+                router.push("/");
+              }}
+              className="p-2 bg-white/60 hover:bg-red-100 rounded-full border border-white/40 shadow-sm text-slate-500 hover:text-red-600 transition-colors"
+              title="Sign Out"
+            >
+              <LogOut className="w-4 h-4" />
             </button>
           </div>
         </header>
@@ -1980,9 +2026,38 @@ export default function DoctorDashboard() {
                     <div
                       key={visit.id}
                       onClick={() => setSelectedPastVisit(visit)}
-                      className="border-l-4 border-[#006686] hover:bg-[#0c4381]/5 transition-colors pl-3 py-1 cursor-pointer"
+                      className="border-l-4 border-[#006686] hover:bg-[#0c4381]/5 transition-colors pl-3 py-1 cursor-pointer group"
                     >
-                      <span className="text-[10px] font-bold text-[#006686]">{visit.date}</span>
+                      <div className="flex items-center justify-between">
+                        <span className="text-[10px] font-bold text-[#006686]">{visit.date}</span>
+                        {visit.hasPdf && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              supabase
+                                .from("prescription_documents")
+                                .select("storage_path")
+                                .eq("prescription_id", visit.id)
+                                .single()
+                                .then(({ data: docData }) => {
+                                  if (docData?.storage_path) {
+                                    supabase.storage
+                                      .from("prescription_pdfs")
+                                      .createSignedUrl(docData.storage_path, 3600)
+                                      .then(({ data: signed }) => {
+                                        if (signed?.signedUrl)
+                                          window.open(signed.signedUrl, "_blank");
+                                      });
+                                  }
+                                });
+                            }}
+                            className="text-[8px] font-bold px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 hover:bg-emerald-200 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="Download PDF"
+                          >
+                            PDF
+                          </button>
+                        )}
+                      </div>
                       <p className="text-xs font-bold text-slate-800 leading-tight mt-0.5">
                         {visit.diagnosis}
                       </p>
@@ -2068,6 +2143,35 @@ export default function DoctorDashboard() {
               <div className="p-4 space-y-3">
                 {!profileEditMode ? (
                   <>
+                    <div className="flex items-center gap-3 mb-3 pb-3 border-b border-slate-100">
+                      {doctorAvatarUrl ? (
+                        <Image
+                          src={doctorAvatarUrl}
+                          alt={doctorName}
+                          width={40}
+                          height={40}
+                          unoptimized
+                          className="w-10 h-10 rounded-full object-cover border-2 border-slate-200"
+                        />
+                      ) : (
+                        <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#0c4381] to-[#006686] flex items-center justify-center text-white font-bold text-sm">
+                          {doctorName.charAt(4) || "D"}
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-xs font-bold text-slate-800 truncate">{doctorName}</p>
+                        {doctorSigUrl && (
+                          <Image
+                            src={doctorSigUrl}
+                            alt="Signature"
+                            width={100}
+                            height={28}
+                            unoptimized
+                            className="h-6 object-contain mt-0.5"
+                          />
+                        )}
+                      </div>
+                    </div>
                     <div>
                       <span className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">
                         Specialization
@@ -2339,6 +2443,7 @@ export default function DoctorDashboard() {
                       alt="Doctor"
                       width={48}
                       height={48}
+                      unoptimized
                       className="w-12 h-12 rounded-full object-cover border-2 border-slate-200"
                     />
                   ) : (
@@ -2459,6 +2564,7 @@ export default function DoctorDashboard() {
                       alt="Signature"
                       width={160}
                       height={48}
+                      unoptimized
                       className="h-12 mx-auto object-contain"
                     />
                   ) : (
@@ -2644,7 +2750,31 @@ export default function DoctorDashboard() {
               </div>
             </div>
 
-            <footer className="bg-slate-50 px-6 py-4 flex justify-end border-t border-slate-100 shrink-0">
+            <footer className="bg-slate-50 px-6 py-4 flex justify-end gap-2 border-t border-slate-100 shrink-0">
+              {selectedPastVisit.hasPdf && (
+                <button
+                  onClick={async () => {
+                    try {
+                      const { data: docData } = await supabase
+                        .from("prescription_documents")
+                        .select("storage_path")
+                        .eq("prescription_id", selectedPastVisit.id)
+                        .single();
+                      if (docData?.storage_path) {
+                        const { data: signed } = await supabase.storage
+                          .from("prescription_pdfs")
+                          .createSignedUrl(docData.storage_path, 3600);
+                        if (signed?.signedUrl) window.open(signed.signedUrl, "_blank");
+                      }
+                    } catch (err) {
+                      console.error("Failed to open PDF:", err);
+                    }
+                  }}
+                  className="bg-emerald-600 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-emerald-700 transition-colors flex items-center gap-1.5"
+                >
+                  <FileDown className="w-3.5 h-3.5" /> Download PDF
+                </button>
+              )}
               <button
                 onClick={() => setSelectedPastVisit(null)}
                 className="bg-slate-950 text-white px-5 py-2 rounded-xl text-xs font-bold hover:bg-slate-800 transition-colors"

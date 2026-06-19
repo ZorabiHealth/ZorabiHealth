@@ -390,58 +390,21 @@ const SignInCard = ({ defaultMode = "signin", redirectTo = "/dashboard" }: SignI
       >
         {/* Left side - Branded Canvas & Overlay */}
         <div className="hidden md:block w-1/2 relative overflow-hidden border-r border-slate-50 bg-gradient-to-br from-brand-50 to-brand-100/50">
-          <div className="absolute inset-0">
-            <DotHeart />
-
-            {/* Logo and text overlay */}
-            <div className="absolute inset-0 flex flex-col items-center justify-between p-12 z-10">
-              <div
-                className="flex items-center gap-2 cursor-pointer self-start"
-                onClick={() => router.push("/")}
-              >
-                <Image
-                  src="/logo/image/logo.png"
-                  alt="ZorabiHealth"
-                  width={140}
-                  height={40}
-                  className="object-contain"
-                  style={{ width: "auto", height: "auto" }}
-                  loading="eager"
-                  unoptimized
-                />
-              </div>
-
-              <div className="flex flex-col items-center text-center">
-                <motion.div
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.5 }}
-                  className="h-14 w-14 rounded-2xl bg-white flex items-center justify-center shadow-md mb-6 border border-slate-100"
-                >
-                  <ShieldCheck className="text-brand-500 h-7 w-7" />
-                </motion.div>
-                <motion.h2
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6 }}
-                  className="text-2xl font-black mb-3 text-slate-800 tracking-tight"
-                >
-                  Predictive Clinical GenAI
-                </motion.h2>
-                <motion.p
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7 }}
-                  className="text-sm text-slate-600 max-w-xs leading-relaxed font-medium"
-                >
-                  Access your clinical dashboard to view analytics, track outpatient indicator logs,
-                  and log health metrics.
-                </motion.p>
-              </div>
-
-              <div className="text-xs text-slate-400 font-semibold self-center">
-                Secure 256-bit SSL Encryption
-              </div>
+          <div className="absolute inset-0 flex flex-col items-center justify-center p-12">
+            <div
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => router.push("/")}
+            >
+              <Image
+                src="/logo/image/logo.png"
+                alt="ZorabiHealth"
+                width={180}
+                height={52}
+                className="object-contain"
+                style={{ width: "auto", height: "auto" }}
+                loading="eager"
+                unoptimized
+              />
             </div>
           </div>
         </div>

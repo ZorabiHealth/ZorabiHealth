@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import {
   Activity,
+  ArrowUp,
   ArrowRight,
   BookOpen,
   Brain,
@@ -166,6 +167,7 @@ const demoData = {
     },
     { title: "Pricing", url: "/pricing" },
     { title: "PharmStore", url: "/zobraipharm" },
+    { title: "For Doctors", url: "/login" },
   ],
   mobileExtraLinks: [
     { name: "Clinical Safety", url: "/resources/clinical-verification" },
@@ -180,6 +182,7 @@ const demoData = {
 };
 
 export default function Home() {
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
 
   // Interactive mock states
@@ -219,8 +222,13 @@ export default function Home() {
     );
     elements.forEach((el) => observer.observe(el));
 
+    const onScroll = () => setShowScrollTop(window.scrollY > 600);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    onScroll();
+
     return () => {
       elements.forEach((el) => observer.unobserve(el));
+      window.removeEventListener("scroll", onScroll);
     };
   }, []);
 
@@ -2739,6 +2747,18 @@ export default function Home() {
       {/* BEGIN: Footer Section */}
       <Footer />
       {/* END: Footer Section */}
+
+      <button
+        onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}
+        className={`fixed bottom-8 right-8 z-50 p-3 rounded-full bg-white/80 backdrop-blur-xl border border-white/30 shadow-lg text-slate-600 hover:text-[#0c4381] hover:bg-white transition-all duration-300 ${
+          showScrollTop
+            ? "opacity-100 translate-y-0"
+            : "opacity-0 translate-y-4 pointer-events-none"
+        }`}
+        aria-label="Scroll to top"
+      >
+        <ArrowUp className="w-5 h-5" />
+      </button>
     </main>
   );
 }

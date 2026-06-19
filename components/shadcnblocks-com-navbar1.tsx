@@ -12,6 +12,7 @@ import {
   HeartPulse,
   LayoutDashboard,
   Menu,
+  Smartphone,
   Microscope,
   Pill,
   Shield,
@@ -219,7 +220,7 @@ const Navbar1 = ({
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 ${
         scrolled
-          ? "bg-white/90 backdrop-blur-xl border-b border-slate-100 shadow-sm"
+          ? "bg-white/10 backdrop-blur-2xl border-b border-white/20 shadow-lg"
           : "bg-transparent"
       }`}
     >
@@ -262,6 +263,17 @@ const Navbar1 = ({
               className="bg-gradient-to-r from-brand-500 to-brand-600 hover:from-brand-600 hover:to-brand-700 text-white shadow-lg shadow-brand-200 hover:shadow-brand-300 transition-all"
             >
               <Link href={auth.signup.url}>{auth.signup.text}</Link>
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              asChild
+              className="border-slate-200 text-slate-600 hover:text-brand-600 hover:border-brand-200"
+            >
+              <Link href="/download">
+                <Smartphone className="w-4 h-4" />
+                Download App
+              </Link>
             </Button>
           </div>
         </nav>
@@ -337,6 +349,12 @@ const Navbar1 = ({
                   >
                     <Link href={auth.signup.url} onClick={() => setMobileOpen(false)}>
                       {auth.signup.text}
+                    </Link>
+                  </Button>
+                  <Button variant="outline" asChild className="w-full border-slate-200">
+                    <Link href="/download" onClick={() => setMobileOpen(false)}>
+                      <Smartphone className="w-4 h-4" />
+                      Download App
                     </Link>
                   </Button>
                 </div>
