@@ -126,6 +126,7 @@ export interface VoiceMessage {
   intent?: string;
   actionTaken?: string;
   audio_url?: string;
+  session_id?: string | null;
 }
 
 // ─── localStorage Keys ───────────────────────────────────────
@@ -266,6 +267,7 @@ export function voiceMessageToDb(msg: {
   text: string;
   intent?: string;
   actionTaken?: string;
+  sessionId?: string | null;
 }) {
   return {
     id: msg.id,
@@ -274,6 +276,7 @@ export function voiceMessageToDb(msg: {
     text: msg.text,
     intent: msg.intent || null,
     action_taken: msg.actionTaken || null,
+    session_id: msg.sessionId || null,
   };
 }
 
