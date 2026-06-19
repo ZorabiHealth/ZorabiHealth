@@ -10,11 +10,11 @@ import {
   Loader2,
   AlertCircle,
   Keyboard,
-  X,
   Download,
   Send,
   Stethoscope,
   BrainCircuit,
+  Trash2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,21 @@ import { type VoiceMessage, STORAGE_KEYS, loadFromStorage, saveToStorage } from 
 import { supabase, queueSyncItem, drainSyncQueue } from "@/lib/supabase";
 
 type AgentStatus = "idle" | "connecting" | "listening" | "processing" | "speaking" | "error";
+
+interface VoiceExtractedData {
+  medicationName?: string | null;
+  symptomName?: string | null;
+  severity?: "Mild" | "Moderate" | "Severe" | null;
+  time?: string | null;
+  label?: string | null;
+  repeatDays?: string[] | null;
+}
+
+interface VoiceResponse {
+  intent: string;
+  extractedData: VoiceExtractedData | null;
+  response: string;
+}
 
 const DEEPGRAM_WS_URL = "wss://api.deepgram.com/v1/listen";
 const STT_PARAMS = new URLSearchParams({
@@ -60,9 +75,60 @@ function generateUUID(): string {
   });
 }
 
-function detectIntent(text: string): string {
+function detectIntent(
+  text: string,
+  history: VoiceMessage[] = [],
+  activeMeds: { name: string; generic_name?: string | null }[] = []
+): string {
+  // 1. Check if user is replying to a symptom follow-up
+  const lastMsg = history[history.length - 1];
+  const isSymptomFollowupRep =
+    lastMsg &&
+    (lastMsg.intent === "symptom_followup" ||
+      /\b(mild|moderate|severe|how bad|severity)\b/i.test(lastMsg.text));
+
+  const hasSeverityWord =
+    /\b(severe|bad|high|intense|killing me|unbearable|mild|light|low|moderate|medium|mid|so so|okay|little)\b/i.test(
+      text
+    );
+
+  if (isSymptomFollowupRep && hasSeverityWord) {
+    return "log_symptom";
+  }
+
+  // 2. Check if user is replying to a medication follow-up
+  const isMedFollowupRep =
+    lastMsg &&
+    (lastMsg.intent === "medication_followup" ||
+      /\b(which medication|which pill|which medicine)\b/i.test(lastMsg.text));
+
+  if (isMedFollowupRep) {
+    return "log_medication";
+  }
+
+  // 3. Regular intent matching
   for (const [intent, pattern] of Object.entries(INTENTS)) {
-    if (pattern.test(text)) return intent;
+    if (pattern.test(text)) {
+      if (intent === "log_symptom" && !hasSeverityWord) {
+        return "symptom_followup";
+      }
+      if (intent === "log_medication") {
+        // If they said they took their medication, but did not specify which one,
+        // and we have multiple active medications, return medication_followup
+        const mentionsSpecificMed = activeMeds.some((med) => {
+          const nameReg = new RegExp(`\\b${escapeRegExp(med.name)}\\b`, "i");
+          const genReg = med.generic_name
+            ? new RegExp(`\\b${escapeRegExp(med.generic_name)}\\b`, "i")
+            : null;
+          return nameReg.test(text) || (genReg ? genReg.test(text) : false);
+        });
+
+        if (!mentionsSpecificMed && activeMeds.length > 1) {
+          return "medication_followup";
+        }
+      }
+      return intent;
+    }
   }
   return "general";
 }
@@ -217,6 +283,10 @@ function generateLocalResponse(intent: string, text: string): string {
       return "Got it — I can log that medication for you. If you tell me the medicine name, I’ll save the right one.";
     case "log_symptom":
       return "I’ve noted the symptom. If you want, I can save it in the Symptom Tracker with a severity level too.";
+    case "symptom_followup":
+      return "I'm sorry to hear that. Could you please tell me if your symptom is mild, moderate, or severe so I can log it for you?";
+    case "medication_followup":
+      return "Which medication did you take? Let me know so I can log the correct one.";
     case "query_vitals":
       return "I can pull your latest vitals or recent health logs. Ask me to check your current summary.";
     case "set_reminder":
@@ -236,22 +306,6 @@ function generateLocalResponse(intent: string, text: string): string {
     default:
       return `I heard: "${text}". I can help log it, but if you want me to store something specific, say the medicine name, symptom, or reminder time.`;
   }
-}
-
-function speakText(text: string, onEnd?: () => void) {
-  if (typeof window === "undefined" || !window.speechSynthesis) return;
-  window.speechSynthesis.cancel();
-  const u = new SpeechSynthesisUtterance(text);
-  u.rate = 1.0;
-  u.pitch = 1.0;
-  u.volume = 1.0;
-  const voices = window.speechSynthesis.getVoices();
-  const preferred = voices.find(
-    (v) => v.name.includes("Google") || v.name.includes("Natural") || v.name.includes("Samantha")
-  );
-  if (preferred) u.voice = preferred;
-  if (onEnd) u.onend = onEnd;
-  window.speechSynthesis.speak(u);
 }
 
 function AudioPlayerButton({ audioUrl }: { audioUrl: string }) {
@@ -308,6 +362,7 @@ const suggestions = [
 export default function VoiceAgentPage() {
   const [status, setStatus] = useState<AgentStatus>("idle");
   const [messages, setMessages] = useState<VoiceMessage[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string>("");
   const [interimText, setInterimText] = useState("");
   const [errorMsg, setErrorMsg] = useState("");
   const [isMuted, setIsMuted] = useState(false);
@@ -321,6 +376,33 @@ export default function VoiceAgentPage() {
   const [searchQuery] = useState("");
   const [sessionTimer, setSessionTimer] = useState(0);
   const [userId, setUserId] = useState<string>("");
+  const [autoSubmit, setAutoSubmit] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      const saved = window.localStorage.getItem("voice_auto_submit");
+      return saved ? saved === "true" : false;
+    }
+    return false;
+  });
+
+  const activeMessages = useMemo(() => {
+    return messages.filter((m) => (m.session_id || "default") === (activeSessionId || "default"));
+  }, [messages, activeSessionId]);
+
+  const isActive = useMemo(
+    () => ["listening", "processing", "speaking"].includes(status),
+    [status]
+  );
+
+  const autoSubmitRef = useRef(autoSubmit);
+  useEffect(() => {
+    autoSubmitRef.current = autoSubmit;
+  }, [autoSubmit]);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      window.localStorage.setItem("voice_auto_submit", String(autoSubmit));
+    }
+  }, [autoSubmit]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -342,194 +424,296 @@ export default function VoiceAgentPage() {
     return refreshedSession?.access_token ?? null;
   }, []);
 
-  const handleClinicalVoiceIntent = async (intent: string, text: string): Promise<string> => {
-    try {
-      switch (intent) {
-        case "log_medication": {
-          const { data: meds, error } = await supabase
-            .from("medications")
-            .select("id, name, generic_name, dosage, current_stock, refill_at, scheduled_times")
-            .eq("user_id", userId)
-            .eq("is_active", true);
-
-          if (error) throw error;
-
-          const matchedMed = extractMedicationMatch(text, meds || []);
-          if (!matchedMed) {
-            return "I couldn’t tell which medication you meant. Please say the medicine name, and I’ll log it.";
-          }
-
-          const { error: logErr } = await supabase.from("medication_logs").insert({
-            medication_id: matchedMed.id,
-            medication_name: matchedMed.name,
-            status: "taken",
-            taken_at: new Date().toISOString(),
-            scheduled_at: new Date().toISOString(),
-            dose: matchedMed.dosage,
-          });
-
-          if (logErr) throw logErr;
-
-          const newStock = Math.max(0, (matchedMed.current_stock || 0) - 1);
-          await supabase
-            .from("medications")
-            .update({ current_stock: newStock })
-            .eq("id", matchedMed.id);
-
-          return `Done — I logged ${matchedMed.name} (${matchedMed.dosage}) as taken.`;
+  const speakText = useCallback(
+    async (text: string, onEnd?: () => void) => {
+      if (!text) return;
+      try {
+        // Cancel any ongoing audio playing
+        if (activeAudioRef.current) {
+          activeAudioRef.current.pause();
+          activeAudioRef.current.src = "";
+          activeAudioRef.current = null;
         }
 
-        case "log_symptom": {
-          const symptoms = [
-            "Palpitations",
-            "Chest Tightness",
-            "Fatigue",
-            "Shortness of Breath",
-            "Dizziness",
-            "Headache",
-          ];
-          let symptomName = "General Symptom";
-          for (const s of symptoms) {
-            if (new RegExp(`\\b${s}\\b`, "i").test(text)) {
-              symptomName = s;
-              break;
-            }
-          }
-
-          let severity = "Moderate";
-          if (/\\b(severe|bad|high|intense)\\b/i.test(text)) {
-            severity = "Severe";
-          } else if (/\\b(mild|light|low)\\b/i.test(text)) {
-            severity = "Mild";
-          }
-
-          const { error: logErr } = await supabase.from("symptom_logs").insert({
-            user_id: userId,
-            name: symptomName,
-            severity,
-            notes: text,
-          });
-
-          if (logErr) throw logErr;
-
-          if (severity === "Severe") {
-            return `I logged that as a severe ${symptomName}. If you’re feeling worse or unsafe, please contact a clinician right away.`;
-          }
-
-          return `I’ve recorded ${symptomName} as ${severity}.`;
+        const accessToken = await getAccessToken();
+        if (!accessToken) {
+          throw new Error("User not authenticated");
         }
 
-        case "query_vitals": {
-          const todayStr = new Date().toISOString().split("T")[0];
-          const [stepsRes, sleepRes, symptomRes, medRes] = await Promise.all([
-            supabase
-              .from("daily_steps")
-              .select("steps")
-              .eq("user_id", userId)
-              .eq("date", todayStr)
-              .maybeSingle(),
-            supabase
-              .from("sleep_sessions")
-              .select("duration,efficiency")
-              .eq("user_id", userId)
-              .order("date", { ascending: false })
-              .limit(1),
-            supabase
-              .from("symptom_logs")
-              .select("name,severity")
-              .eq("user_id", userId)
-              .order("created_at", { ascending: false })
-              .limit(1),
-            supabase
-              .from("medication_logs")
-              .select("medication_name,dose,scheduled_at")
-              .eq("user_id", userId)
-              .order("scheduled_at", { ascending: false })
-              .limit(1),
-          ]);
+        const res = await fetch("/api/deepgram/speak", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${accessToken}`,
+          },
+          body: JSON.stringify({ text }),
+        });
 
-          const latestSleep =
-            sleepRes.data && sleepRes.data.length > 0
-              ? { duration: sleepRes.data[0].duration, efficiency: sleepRes.data[0].efficiency }
-              : null;
-          const latestSymptom =
-            symptomRes.data && symptomRes.data.length > 0
-              ? { name: symptomRes.data[0].name, severity: symptomRes.data[0].severity }
-              : null;
-          const latestMedication =
-            medRes.data && medRes.data.length > 0
-              ? {
-                  name: medRes.data[0].medication_name,
-                  dosage: medRes.data[0].dose,
-                  time: new Date(medRes.data[0].scheduled_at).toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  }),
-                }
-              : null;
-
-          return summarizeVitals(
-            stepsRes.data?.steps ?? null,
-            latestSleep,
-            latestSymptom,
-            latestMedication
-          );
+        if (!res.ok) {
+          throw new Error("Failed to synthesize speech via Deepgram");
         }
 
-        case "set_reminder": {
-          const time = extractReminderTime(text);
-          if (!time) {
-            return "I can set that reminder, but I need a time. Try saying something like 8:00 am or 18:30.";
-          }
-          const repeat = parseRepeatDays(text);
-          const label = extractReminderLabel(text);
+        const audioBlob = await res.blob();
+        const audioUrl = URL.createObjectURL(audioBlob);
+        const audio = new Audio(audioUrl);
+        activeAudioRef.current = audio;
 
-          const { error: alarmErr } = await supabase.from("wearable_alarms").insert({
-            user_id: userId,
-            time,
-            label,
-            enabled: true,
-            repeat,
-            smart_wake: false,
-            sound: "Chime Chord",
-          });
+        audio.onended = () => {
+          URL.revokeObjectURL(audioUrl);
+          activeAudioRef.current = null;
+          if (onEnd) onEnd();
+        };
 
-          if (alarmErr) throw alarmErr;
+        audio.onerror = () => {
+          URL.revokeObjectURL(audioUrl);
+          activeAudioRef.current = null;
+          if (onEnd) onEnd();
+        };
 
-          return repeat.length > 0
-            ? `I set a reminder for ${time} and made it repeat on ${repeat.join(", ")}.`
-            : `I set a reminder for ${time}.`;
-        }
-
-        case "refill_request": {
-          const { data: activeMeds, error: refillErr } = await supabase
-            .from("medications")
-            .select("name, current_stock, refill_at")
-            .eq("user_id", userId)
-            .eq("is_active", true);
-
-          if (refillErr) throw refillErr;
-
-          const lowStockMeds = (activeMeds || []).filter(
-            (m) => Number(m.current_stock) <= Number(m.refill_at)
-          );
-          if (lowStockMeds.length === 0) {
-            return "Your current medicines don’t look low right now. If you want, I can still help you place a refill later.";
-          }
-
-          return `I found ${lowStockMeds.length} medication(s) that may need refills: ${lowStockMeds
-            .map((m) => `${m.name} (${m.current_stock} left)`)
-            .join(", ")}.`;
-        }
-
-        default:
-          return "";
+        await audio.play();
+      } catch (e) {
+        console.error("Deepgram TTS play failed:", e);
+        if (onEnd) onEnd();
       }
-    } catch (err: unknown) {
-      console.error("[Voice Intent Log Error]", err);
-      return `I ran into a problem saving that. ${err instanceof Error ? err.message : "Please try again."}`;
-    }
-  };
+    },
+    [getAccessToken]
+  );
+
+  const handleClinicalVoiceIntent = useCallback(
+    async (intent: string, text: string, extractedData?: VoiceExtractedData): Promise<string> => {
+      try {
+        switch (intent) {
+          case "log_medication": {
+            const { data: meds, error } = await supabase
+              .from("medications")
+              .select("id, name, generic_name, dosage, current_stock, refill_at, scheduled_times")
+              .eq("user_id", userId)
+              .eq("is_active", true);
+
+            if (error) throw error;
+
+            const queryName = extractedData?.medicationName || text;
+            let matchedMed = extractMedicationMatch(queryName, meds || []);
+            if (!matchedMed) {
+              // Scan history to see if the user mentioned a valid medication earlier
+              for (let i = activeMessages.length - 1; i >= 0; i--) {
+                const msg = activeMessages[i];
+                if (msg.sender === "user") {
+                  matchedMed = extractMedicationMatch(msg.text, meds || []);
+                  if (matchedMed) break;
+                }
+              }
+            }
+
+            if (!matchedMed) {
+              return `I couldn’t find an active medication matching "${queryName}". Please say the medicine name, and I’ll log it.`;
+            }
+
+            const { error: logErr } = await supabase.from("medication_logs").insert({
+              medication_id: matchedMed.id,
+              medication_name: matchedMed.name,
+              status: "taken",
+              taken_at: new Date().toISOString(),
+              scheduled_at: new Date().toISOString(),
+              dose: matchedMed.dosage,
+            });
+
+            if (logErr) throw logErr;
+
+            const newStock = Math.max(0, (matchedMed.current_stock || 0) - 1);
+            await supabase
+              .from("medications")
+              .update({ current_stock: newStock })
+              .eq("id", matchedMed.id);
+
+            return `Done — I logged ${matchedMed.name} (${matchedMed.dosage}) as taken.`;
+          }
+
+          case "log_symptom": {
+            let symptomName = extractedData?.symptomName;
+            if (!symptomName) {
+              const symptoms = [
+                "Palpitations",
+                "Chest Tightness",
+                "Fatigue",
+                "Shortness of Breath",
+                "Dizziness",
+                "Headache",
+              ];
+              symptomName = "General Symptom";
+              for (const s of symptoms) {
+                if (new RegExp(`\\b${s}\\b`, "i").test(text)) {
+                  symptomName = s;
+                  break;
+                }
+              }
+            }
+
+            if (!symptomName || symptomName === "General Symptom") {
+              // Scan history to find the last mentioned symptom
+              const symptoms = [
+                "Palpitations",
+                "Chest Tightness",
+                "Fatigue",
+                "Shortness of Breath",
+                "Dizziness",
+                "Headache",
+              ];
+              for (let i = activeMessages.length - 1; i >= 0; i--) {
+                const msgText = activeMessages[i].text;
+                for (const s of symptoms) {
+                  if (new RegExp(`\\b${s}\\b`, "i").test(msgText)) {
+                    symptomName = s;
+                    break;
+                  }
+                }
+                if (symptomName && symptomName !== "General Symptom") break;
+              }
+            }
+
+            let severity = extractedData?.severity;
+            if (!severity) {
+              severity = "Moderate";
+              if (
+                /\b(severe|bad|high|intense|killing me|unbearable|terrible|worst|dying)\b/i.test(
+                  text
+                )
+              ) {
+                severity = "Severe";
+              } else if (/\b(mild|light|low|minor|tiny|little|barely)\b/i.test(text)) {
+                severity = "Mild";
+              }
+            }
+
+            const { error: logErr } = await supabase.from("symptom_logs").insert({
+              user_id: userId,
+              name: symptomName,
+              severity,
+              notes: text,
+            });
+
+            if (logErr) throw logErr;
+
+            if (severity === "Severe") {
+              return `I logged that as a severe ${symptomName}. If you’re feeling worse or unsafe, please contact a clinician right away.`;
+            }
+
+            return `I’ve recorded ${symptomName} as ${severity}.`;
+          }
+
+          case "query_vitals": {
+            const todayStr = new Date().toISOString().split("T")[0];
+            const [stepsRes, sleepRes, symptomRes, medRes] = await Promise.all([
+              supabase
+                .from("daily_steps")
+                .select("steps")
+                .eq("user_id", userId)
+                .eq("date", todayStr)
+                .maybeSingle(),
+              supabase
+                .from("sleep_sessions")
+                .select("duration,efficiency")
+                .eq("user_id", userId)
+                .order("date", { ascending: false })
+                .limit(1),
+              supabase
+                .from("symptom_logs")
+                .select("name,severity")
+                .eq("user_id", userId)
+                .order("created_at", { ascending: false })
+                .limit(1),
+              supabase
+                .from("medication_logs")
+                .select("medication_name,dose,scheduled_at")
+                .eq("user_id", userId)
+                .order("scheduled_at", { ascending: false })
+                .limit(1),
+            ]);
+
+            const latestSleep =
+              sleepRes.data && sleepRes.data.length > 0
+                ? { duration: sleepRes.data[0].duration, efficiency: sleepRes.data[0].efficiency }
+                : null;
+            const latestSymptom =
+              symptomRes.data && symptomRes.data.length > 0
+                ? { name: symptomRes.data[0].name, severity: symptomRes.data[0].severity }
+                : null;
+            const latestMedication =
+              medRes.data && medRes.data.length > 0
+                ? {
+                    name: medRes.data[0].medication_name,
+                    dosage: medRes.data[0].dose,
+                    time: new Date(medRes.data[0].scheduled_at).toLocaleTimeString([], {
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    }),
+                  }
+                : null;
+
+            return summarizeVitals(
+              stepsRes.data?.steps ?? null,
+              latestSleep,
+              latestSymptom,
+              latestMedication
+            );
+          }
+
+          case "set_reminder": {
+            const time = extractedData?.time || extractReminderTime(text);
+            if (!time) {
+              return "I can set that reminder, but I need a time. Try saying something like 8:00 am or 18:30.";
+            }
+            const repeat = extractedData?.repeatDays || parseRepeatDays(text);
+            const label = extractedData?.label || extractReminderLabel(text);
+
+            const { error: alarmErr } = await supabase.from("wearable_alarms").insert({
+              user_id: userId,
+              time,
+              label,
+              enabled: true,
+              repeat,
+              smart_wake: false,
+              sound: "Chime Chord",
+            });
+
+            if (alarmErr) throw alarmErr;
+
+            return repeat.length > 0
+              ? `I set a reminder for ${time} and made it repeat on ${repeat.join(", ")}.`
+              : `I set a reminder for ${time}.`;
+          }
+
+          case "refill_request": {
+            const { data: activeMeds, error: refillErr } = await supabase
+              .from("medications")
+              .select("name, current_stock, refill_at")
+              .eq("user_id", userId)
+              .eq("is_active", true);
+
+            if (refillErr) throw refillErr;
+
+            const lowStockMeds = (activeMeds || []).filter(
+              (m) => Number(m.current_stock) <= Number(m.refill_at)
+            );
+            if (lowStockMeds.length === 0) {
+              return "Your current medicines don’t look low right now. If you want, I can still help you place a refill later.";
+            }
+
+            return `I found ${lowStockMeds.length} medication(s) that may need refills: ${lowStockMeds
+              .map((m) => `${m.name} (${m.current_stock} left)`)
+              .join(", ")}.`;
+          }
+
+          default:
+            return "";
+        }
+      } catch (err: unknown) {
+        console.error("[Voice Intent Log Error]", err);
+        return `I ran into a problem saving that. ${err instanceof Error ? err.message : "Please try again."}`;
+      }
+    },
+    [userId, activeMessages]
+  );
   const wsRef = useRef<WebSocket | null>(null);
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -538,11 +722,9 @@ export default function VoiceAgentPage() {
   const animationRef = useRef<number | null>(null);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
   const audioBlobsRef = useRef<Blob[]>([]);
-
-  const isActive = useMemo(
-    () => ["listening", "processing", "speaking"].includes(status),
-    [status]
-  );
+  const accumulatedTranscriptRef = useRef<string>("");
+  const submitTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const activeAudioRef = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
     const handleMouse = (e: MouseEvent) => {
@@ -557,7 +739,14 @@ export default function VoiceAgentPage() {
     const isOnline = typeof window !== "undefined" && navigator.onLine;
     if (!isOnline) {
       setSyncStatus("offline");
-      setMessages(loadFromStorage<VoiceMessage[]>(STORAGE_KEYS.VOICE_SESSIONS, []));
+      const cached = loadFromStorage<VoiceMessage[]>(STORAGE_KEYS.VOICE_SESSIONS, []);
+      setMessages(cached);
+      if (cached.length > 0) {
+        const lastMsg = cached[cached.length - 1];
+        setActiveSessionId(lastMsg.session_id || "default");
+      } else {
+        setActiveSessionId(generateUUID());
+      }
       setIsLoading(false);
       return;
     }
@@ -568,7 +757,7 @@ export default function VoiceAgentPage() {
         .from("voice_messages")
         .select("*")
         .order("created_at", { ascending: true })
-        .limit(20);
+        .limit(100);
       if (error) throw error;
       const mappedMsgs: VoiceMessage[] = (dbMsgs || []).map((db) => ({
         id: db.id,
@@ -578,14 +767,30 @@ export default function VoiceAgentPage() {
         intent: db.intent || undefined,
         actionTaken: db.action_taken || undefined,
         audio_url: db.audio_url || undefined,
+        session_id: db.session_id || null,
       }));
       setMessages(mappedMsgs);
       saveToStorage(STORAGE_KEYS.VOICE_SESSIONS, mappedMsgs);
+
+      if (mappedMsgs.length > 0) {
+        const lastMsg = mappedMsgs[mappedMsgs.length - 1];
+        setActiveSessionId(lastMsg.session_id || "default");
+      } else {
+        setActiveSessionId(generateUUID());
+      }
+
       setSyncStatus("connected");
     } catch (err) {
       console.error("[Voice] Failed to load messages. Fallback to cache:", err);
       setSyncStatus("offline");
-      setMessages(loadFromStorage<VoiceMessage[]>(STORAGE_KEYS.VOICE_SESSIONS, []));
+      const cached = loadFromStorage<VoiceMessage[]>(STORAGE_KEYS.VOICE_SESSIONS, []);
+      setMessages(cached);
+      if (cached.length > 0) {
+        const lastMsg = cached[cached.length - 1];
+        setActiveSessionId(lastMsg.session_id || "default");
+      } else {
+        setActiveSessionId(generateUUID());
+      }
     } finally {
       setIsLoading(false);
     }
@@ -623,38 +828,46 @@ export default function VoiceAgentPage() {
     animationRef.current = requestAnimationFrame(animate);
   }, []);
 
-  const addMessage = async (msg: Omit<VoiceMessage, "id" | "timestamp">) => {
-    const messageId = generateUUID();
-    const now = new Date().toISOString();
-    const full: VoiceMessage = { ...msg, id: messageId, timestamp: now };
-    const updated = [...messages.slice(-19), full];
-    setMessages(updated);
-    saveToStorage(STORAGE_KEYS.VOICE_SESSIONS, updated);
-    const dbPayload = {
-      id: full.id,
-      user_id: userId,
-      sender: full.sender,
-      text: full.text,
-      intent: full.intent || null,
-      action_taken: full.actionTaken || null,
-    };
-    if (navigator.onLine) {
-      try {
-        const { error } = await supabase.from("voice_messages").insert(dbPayload);
-        if (error) throw error;
-      } catch {
+  const addMessage = useCallback(
+    async (msg: Omit<VoiceMessage, "id" | "timestamp">) => {
+      const messageId = generateUUID();
+      const now = new Date().toISOString();
+      const full: VoiceMessage = {
+        ...msg,
+        id: messageId,
+        timestamp: now,
+        session_id: activeSessionId,
+      };
+      const updated = [...messages, full];
+      setMessages(updated);
+      saveToStorage(STORAGE_KEYS.VOICE_SESSIONS, updated);
+      const dbPayload = {
+        id: full.id,
+        user_id: userId,
+        sender: full.sender,
+        text: full.text,
+        intent: full.intent || null,
+        action_taken: full.actionTaken || null,
+        session_id: activeSessionId || null,
+      };
+      if (navigator.onLine) {
+        try {
+          const { error } = await supabase.from("voice_messages").insert(dbPayload);
+          if (error) throw error;
+        } catch {
+          queueSyncItem({ table: "voice_messages", action: "insert", payload: dbPayload });
+          setSyncStatus("offline");
+        }
+      } else {
         queueSyncItem({ table: "voice_messages", action: "insert", payload: dbPayload });
         setSyncStatus("offline");
       }
-    } else {
-      queueSyncItem({ table: "voice_messages", action: "insert", payload: dbPayload });
-      setSyncStatus("offline");
-    }
-    return messageId;
-  };
+      return messageId;
+    },
+    [activeSessionId, userId, messages]
+  );
 
   const startListening = async () => {
-    setErrorMsg("");
     setStatus("connecting");
     try {
       const accessToken = await getAccessToken();
@@ -706,70 +919,81 @@ export default function VoiceAgentPage() {
           const transcript = data.channel?.alternatives?.[0]?.transcript ?? "";
           const isFinal = data.is_final;
           if (!transcript) return;
+
           if (!isFinal) {
-            setInterimText(transcript);
+            setInterimText(
+              accumulatedTranscriptRef.current
+                ? accumulatedTranscriptRef.current + " " + transcript
+                : transcript
+            );
           } else {
-            setInterimText("");
-            if (transcript.trim().length < 2) return;
-            setStatus("processing");
-            addMessage({ sender: "user", text: transcript })
-              .then(async (msgId) => {
-                if (navigator.onLine) {
-                  const blobs = audioBlobsRef.current;
-                  audioBlobsRef.current = [];
-                  if (blobs.length > 0) {
-                    const blob = new Blob(blobs, { type: "audio/webm" });
-                    const fileName = `${msgId}.webm`;
-                    const { error } = await supabase.storage
-                      .from("voicesessions")
-                      .upload(fileName, blob, { contentType: "audio/webm" });
-                    if (!error) {
-                      const { data: urlData } = supabase.storage
-                        .from("voicesessions")
-                        .getPublicUrl(fileName);
-                      await supabase
-                        .from("voice_messages")
-                        .update({ audio_url: urlData.publicUrl })
-                        .eq("id", msgId);
+            // Append the finalized chunk to our accumulated transcript buffer
+            accumulatedTranscriptRef.current = accumulatedTranscriptRef.current
+              ? accumulatedTranscriptRef.current + " " + transcript
+              : transcript;
+            setInterimText(accumulatedTranscriptRef.current);
+
+            // Clear any pending submission timers since the user is still actively speaking
+            if (submitTimeoutRef.current) {
+              clearTimeout(submitTimeoutRef.current);
+            }
+
+            // Set a silence debounce timer (3.5 seconds) to wait for the user to finish speaking, if autoSubmit is enabled
+            if (autoSubmitRef.current) {
+              submitTimeoutRef.current = setTimeout(() => {
+                const textToProcess = accumulatedTranscriptRef.current.trim();
+                if (textToProcess.length >= 2) {
+                  setStatus("processing");
+                  setInterimText("");
+
+                  // Reset accumulated buffer before triggering processing
+                  accumulatedTranscriptRef.current = "";
+
+                  addMessage({ sender: "user", text: textToProcess })
+                    .then(async (msgId) => {
+                      if (navigator.onLine) {
+                        const blobs = audioBlobsRef.current;
+                        audioBlobsRef.current = [];
+                        if (blobs.length > 0) {
+                          const blob = new Blob(blobs, { type: "audio/webm" });
+                          const fileName = `${msgId}.webm`;
+                          const { error } = await supabase.storage
+                            .from("voicesessions")
+                            .upload(fileName, blob, { contentType: "audio/webm" });
+                          if (!error) {
+                            const { data: urlData } = supabase.storage
+                              .from("voicesessions")
+                              .getPublicUrl(fileName);
+                            await supabase
+                              .from("voice_messages")
+                              .update({ audio_url: urlData.publicUrl })
+                              .eq("id", msgId);
+                          }
+                        }
+                      }
+                    })
+                    .catch(() => {});
+
+                  processVoiceInput(textToProcess, (response, intent) => {
+                    if (!response) {
+                      setStatus("listening");
+                      return;
                     }
-                  }
+                    addMessage({
+                      sender: "assistant",
+                      text: response,
+                      intent,
+                      actionTaken: intent,
+                    }).catch(() => {});
+                    setStatus("speaking");
+                    if (!isMuted) speakText(response, () => setStatus("listening"));
+                    else setStatus("listening");
+                  });
+                } else {
+                  accumulatedTranscriptRef.current = "";
+                  setInterimText("");
                 }
-              })
-              .catch(() => {});
-            const intent = detectIntent(transcript);
-            const workoutIntents = ["start_workout", "log_meal", "check_streak", "suggest_workout"];
-            const clinicalIntents = [
-              "log_medication",
-              "log_symptom",
-              "query_vitals",
-              "set_reminder",
-              "refill_request",
-            ];
-            const handleResp = (response: string) => {
-              if (!response) {
-                setStatus("listening");
-                return;
-              }
-              addMessage({
-                sender: "assistant",
-                text: response,
-                intent,
-                actionTaken: intent,
-              }).catch(() => {});
-              setStatus("speaking");
-              if (!isMuted) speakText(response, () => setStatus("listening"));
-              else setStatus("listening");
-            };
-            if (workoutIntents.includes(intent)) {
-              handleWorkoutIntent(intent, userId)
-                .then(handleResp)
-                .catch(() => setStatus("listening"));
-            } else if (clinicalIntents.includes(intent)) {
-              handleClinicalVoiceIntent(intent, transcript)
-                .then(handleResp)
-                .catch(() => setStatus("listening"));
-            } else {
-              setTimeout(() => handleResp(generateLocalResponse(intent, transcript)), 500);
+              }, 3500);
             }
           }
         } catch {
@@ -793,17 +1017,46 @@ export default function VoiceAgentPage() {
   };
 
   const stopListening = useCallback(() => {
-    if (animationRef.current) cancelAnimationFrame(animationRef.current);
-    if (mediaRecorderRef.current?.state !== "inactive") mediaRecorderRef.current?.stop();
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    if (wsRef.current?.readyState === WebSocket.OPEN) wsRef.current.close();
+    if (animationRef.current) {
+      try {
+        cancelAnimationFrame(animationRef.current);
+      } catch (e) {
+        console.warn("Failed to cancel animation frame", e);
+      }
+    }
+    if (mediaRecorderRef.current) {
+      try {
+        if (mediaRecorderRef.current.state !== "inactive") {
+          mediaRecorderRef.current.stop();
+        }
+      } catch (e) {
+        console.warn("Failed to stop media recorder", e);
+      }
+    }
+    if (streamRef.current) {
+      try {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        console.warn("Failed to stop stream tracks", e);
+      }
+    }
+    if (wsRef.current) {
+      try {
+        if (wsRef.current.readyState === WebSocket.OPEN) {
+          wsRef.current.close();
+        }
+      } catch (e) {
+        console.warn("Failed to close WebSocket", e);
+      }
+    }
     try {
       if (audioContextRef.current && audioContextRef.current.state !== "closed") {
         audioContextRef.current.close().catch(() => {});
       }
-    } catch {
-      console.warn("[catch] Non-critical operation failed at page.tsx");
+    } catch (e) {
+      console.warn("Failed to close audio context", e);
     }
+
     audioContextRef.current = null;
     wsRef.current = null;
     mediaRecorderRef.current = null;
@@ -812,19 +1065,156 @@ export default function VoiceAgentPage() {
     setWaveformData(Array(30).fill(0));
     setInterimText("");
     setStatus("idle");
-    window.speechSynthesis?.cancel();
+    try {
+      window.speechSynthesis?.cancel();
+    } catch (e) {
+      console.warn("Failed to cancel speech synthesis", e);
+    }
+    if (submitTimeoutRef.current) {
+      clearTimeout(submitTimeoutRef.current);
+      submitTimeoutRef.current = null;
+    }
+    accumulatedTranscriptRef.current = "";
   }, []);
 
-  const didCleanup = useRef(false);
-  useEffect(
-    () => () => {
-      if (!didCleanup.current) {
-        didCleanup.current = true;
-        stopListening();
+  const processVoiceInput = useCallback(
+    async (text: string, onResponse: (response: string, intent: string) => void) => {
+      let activeMeds: { name: string; generic_name?: string | null; dosage: string }[] = [];
+      let voiceData: VoiceResponse | null = null;
+
+      if (navigator.onLine) {
+        try {
+          const { data } = await supabase
+            .from("medications")
+            .select("name, generic_name, dosage")
+            .eq("user_id", userId)
+            .eq("is_active", true);
+          activeMeds = data || [];
+
+          const voiceRes = await fetch("/api/gemini/voice", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              message: text,
+              activeMedications: activeMeds,
+              history: activeMessages.slice(-6).map((m) => ({ sender: m.sender, text: m.text })),
+            }),
+          });
+          if (voiceRes.ok) {
+            voiceData = await voiceRes.json();
+          }
+        } catch (e) {
+          console.error("Gemini voice API call failed, falling back to local processing", e);
+        }
+      }
+
+      const intent = voiceData?.intent || detectIntent(text, activeMessages, activeMeds);
+      const extractedData = voiceData?.extractedData || undefined;
+      const responseText = voiceData?.response || generateLocalResponse(intent, text);
+
+      const workoutIntents = ["start_workout", "log_meal", "check_streak", "suggest_workout"];
+      const clinicalIntents = [
+        "log_medication",
+        "log_symptom",
+        "query_vitals",
+        "set_reminder",
+        "refill_request",
+      ];
+
+      if (workoutIntents.includes(intent)) {
+        handleWorkoutIntent(intent, userId)
+          .then((resp) => onResponse(resp || responseText, intent))
+          .catch(() => onResponse(responseText, intent));
+      } else if (clinicalIntents.includes(intent)) {
+        handleClinicalVoiceIntent(intent, text, extractedData)
+          .then((resp) => onResponse(resp || responseText, intent))
+          .catch(() => onResponse(responseText, intent));
+      } else {
+        onResponse(responseText, intent);
       }
     },
-    [stopListening]
+    [userId, activeMessages, handleClinicalVoiceIntent]
   );
+
+  const finishAndSubmit = useCallback(async () => {
+    if (submitTimeoutRef.current) {
+      clearTimeout(submitTimeoutRef.current);
+      submitTimeoutRef.current = null;
+    }
+
+    const textToProcess = accumulatedTranscriptRef.current.trim();
+
+    // Stop recording first
+    stopListening();
+
+    if (textToProcess.length >= 2) {
+      setStatus("processing");
+      setInterimText("");
+
+      addMessage({ sender: "user", text: textToProcess })
+        .then(async (msgId) => {
+          if (navigator.onLine) {
+            const blobs = audioBlobsRef.current;
+            audioBlobsRef.current = [];
+            if (blobs.length > 0) {
+              const blob = new Blob(blobs, { type: "audio/webm" });
+              const fileName = `${msgId}.webm`;
+              const { error } = await supabase.storage
+                .from("voicesessions")
+                .upload(fileName, blob, { contentType: "audio/webm" });
+              if (!error) {
+                const { data: urlData } = supabase.storage
+                  .from("voicesessions")
+                  .getPublicUrl(fileName);
+                await supabase
+                  .from("voice_messages")
+                  .update({ audio_url: urlData.publicUrl })
+                  .eq("id", msgId);
+              }
+            }
+          }
+        })
+        .catch(() => {});
+
+      processVoiceInput(textToProcess, (response, intent) => {
+        if (!response) {
+          setStatus("listening");
+          return;
+        }
+        addMessage({
+          sender: "assistant",
+          text: response,
+          intent,
+          actionTaken: intent,
+        }).catch(() => {});
+        setStatus("speaking");
+        if (!isMuted) speakText(response, () => setStatus("listening"));
+        else setStatus("listening");
+      });
+    } else {
+      setInterimText("");
+    }
+  }, [stopListening, addMessage, isMuted, processVoiceInput, speakText]);
+
+  // Stop listening when tab becomes hidden (user switches tabs or minimizes browser)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+        stopListening();
+      }
+    };
+    document.addEventListener("visibilitychange", handleVisibilityChange);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+    };
+  }, [stopListening]);
+
+  // Clean up on component unmount
+  useEffect(() => {
+    return () => {
+      stopListening();
+    };
+  }, [stopListening]);
 
   useEffect(() => {
     if (!isActive) return;
@@ -839,33 +1229,69 @@ export default function VoiceAgentPage() {
     const text = textInput.trim();
     setTextInput("");
     setStatus("processing");
-    const intent = detectIntent(text);
-    const workoutIntents = ["start_workout", "log_meal", "check_streak", "suggest_workout"];
-    const clinicalIntents = [
-      "log_medication",
-      "log_symptom",
-      "query_vitals",
-      "set_reminder",
-      "refill_request",
-    ];
-
-    let response = "";
-    if (workoutIntents.includes(intent)) {
-      response = await handleWorkoutIntent(intent, userId);
-    } else if (clinicalIntents.includes(intent)) {
-      response = await handleClinicalVoiceIntent(intent, text);
-    } else {
-      response = generateLocalResponse(intent, text);
-    }
 
     await addMessage({ sender: "user", text }).catch(() => {});
-    await addMessage({ sender: "assistant", text: response, intent }).catch(() => {});
-    if (!isMuted) speakText(response, () => setStatus("idle"));
-    else setStatus("idle");
+
+    await processVoiceInput(text, (response, intent) => {
+      addMessage({ sender: "assistant", text: response, intent }).catch(() => {});
+      if (!isMuted && response) speakText(response, () => setStatus("idle"));
+      else setStatus("idle");
+    });
   };
 
+  const sessions = useMemo(() => {
+    const groups: Record<
+      string,
+      { id: string; name: string; lastTimestamp: string; messages: VoiceMessage[] }
+    > = {};
+
+    messages.forEach((msg) => {
+      const sId = msg.session_id || "default";
+      if (!groups[sId]) {
+        groups[sId] = {
+          id: sId,
+          name: "New Chat",
+          lastTimestamp: msg.timestamp,
+          messages: [],
+        };
+      }
+      groups[sId].messages.push(msg);
+      if (new Date(msg.timestamp) > new Date(groups[sId].lastTimestamp)) {
+        groups[sId].lastTimestamp = msg.timestamp;
+      }
+    });
+
+    Object.keys(groups).forEach((sId) => {
+      const userMsgs = groups[sId].messages.filter((m) => m.sender === "user");
+      if (userMsgs.length > 0) {
+        const firstText = userMsgs[0].text;
+        groups[sId].name = firstText.length > 28 ? firstText.substring(0, 28) + "..." : firstText;
+      } else {
+        groups[sId].name = "Empty Chat";
+      }
+    });
+
+    return Object.values(groups).sort(
+      (a, b) => new Date(b.lastTimestamp).getTime() - new Date(a.lastTimestamp).getTime()
+    );
+  }, [messages]);
+
+  const allSessions = useMemo(() => {
+    const list = [...sessions];
+    const activeExists = list.some((s) => s.id === activeSessionId);
+    if (!activeExists && activeSessionId) {
+      list.unshift({
+        id: activeSessionId,
+        name: "New Chat",
+        lastTimestamp: new Date().toISOString(),
+        messages: [],
+      });
+    }
+    return list;
+  }, [sessions, activeSessionId]);
+
   const exportSession = () => {
-    const content = messages
+    const content = activeMessages
       .map(
         (m) =>
           `[${new Date(m.timestamp).toLocaleTimeString()}] ${m.sender === "user" ? "You" : "Assistant"}: ${m.text}`
@@ -882,19 +1308,62 @@ export default function VoiceAgentPage() {
     setTimeout(() => URL.revokeObjectURL(url), 10000);
   };
 
-  const clearSession = async () => {
-    setMessages([]);
-    saveToStorage(STORAGE_KEYS.VOICE_SESSIONS, []);
+  const deleteSession = async (sessionIdToDelete: string) => {
+    const updated = messages.filter(
+      (m) => (m.session_id || "default") !== (sessionIdToDelete || "default")
+    );
+    setMessages(updated);
+    saveToStorage(STORAGE_KEYS.VOICE_SESSIONS, updated);
+
+    if (activeSessionId === sessionIdToDelete) {
+      const remaining = updated
+        .map((m) => m.session_id || "default")
+        .filter((val, idx, arr) => arr.indexOf(val) === idx);
+      if (remaining.length > 0) {
+        setActiveSessionId(remaining[0]);
+      } else {
+        setActiveSessionId(generateUUID());
+      }
+    }
+
     if (navigator.onLine) {
       try {
-        await supabase.from("voice_messages").delete().eq("user_id", userId);
-      } catch {
-        console.warn("[catch] Non-critical operation failed at page.tsx");
+        if (sessionIdToDelete === "default") {
+          const { error } = await supabase
+            .from("voice_messages")
+            .delete()
+            .eq("user_id", userId)
+            .or("session_id.is.null,session_id.eq.default");
+          if (error) throw error;
+        } else {
+          const { error } = await supabase
+            .from("voice_messages")
+            .delete()
+            .eq("user_id", userId)
+            .eq("session_id", sessionIdToDelete);
+          if (error) throw error;
+        }
+      } catch (err) {
+        console.error("Failed to delete session from Supabase:", err);
       }
     }
   };
 
-  const filteredMessages = messages.filter(
+  const clearAllHistory = async () => {
+    setMessages([]);
+    saveToStorage(STORAGE_KEYS.VOICE_SESSIONS, []);
+    setActiveSessionId(generateUUID());
+    if (navigator.onLine) {
+      try {
+        const { error } = await supabase.from("voice_messages").delete().eq("user_id", userId);
+        if (error) throw error;
+      } catch (err) {
+        console.error("Failed to clear all history from Supabase:", err);
+      }
+    }
+  };
+
+  const filteredMessages = activeMessages.filter(
     (msg) => searchQuery.trim() === "" || msg.text.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -903,7 +1372,7 @@ export default function VoiceAgentPage() {
 
   return (
     <motion.div
-      className="relative w-full h-full min-h-[calc(100vh-4rem)] flex flex-col overflow-hidden"
+      className="relative w-full h-full min-h-[calc(100vh-4rem)] flex overflow-hidden"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.6 }}
@@ -951,41 +1420,91 @@ export default function VoiceAgentPage() {
         style={{ filter: "blur(60px)" }}
       />
 
-      {/* ===== HEADER ===== */}
-      <motion.header
-        className="relative z-10 flex items-center justify-between px-4 py-3 border-b border-white/40 bg-white/30 backdrop-blur-xl shrink-0"
-        initial={{ y: -20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ duration: 0.5 }}
-      >
-        <div className="flex items-center gap-3">
-          <motion.div
-            className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-sm"
-            whileHover={{ rotate: 10, scale: 1.1 }}
-          >
-            <Stethoscope className="w-4 h-4 text-white" />
-          </motion.div>
-          <div>
-            <h1 className="text-sm font-bold text-slate-800">
-              <motion.span
-                animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
-                className="bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 bg-clip-text text-transparent"
-                style={{ backgroundSize: "200% 200%" }}
-              >
-                Clinical AI Voice
-              </motion.span>
-            </h1>
+      {/* ===== SIDEBAR ===== */}
+      <aside className="relative z-10 w-80 shrink-0 border-r border-white/20 bg-white/20 backdrop-blur-xl flex flex-col h-full overflow-hidden">
+        {/* Sidebar Header */}
+        <div className="p-4 border-b border-white/30 flex flex-col gap-3">
+          <div className="flex items-center gap-3">
             <motion.div
-              className="flex items-center gap-1.5"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.3 }}
+              className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-sm"
+              whileHover={{ rotate: 10, scale: 1.1 }}
             >
-              <motion.span
+              <Stethoscope className="w-4 h-4 text-white" />
+            </motion.div>
+            <div>
+              <h1 className="text-sm font-bold text-slate-800">
+                <span className="bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 bg-clip-text text-transparent">
+                  Clinical AI Voice
+                </span>
+              </h1>
+              <div className="text-[10px] text-slate-400 font-medium">Assistant History</div>
+            </div>
+          </div>
+
+          <Button
+            onClick={() => setActiveSessionId(generateUUID())}
+            className="w-full bg-white/60 hover:bg-white/80 border border-white/40 text-slate-700 rounded-xl py-2 flex items-center justify-center gap-2 text-xs font-semibold shadow-sm transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
+          >
+            <Sparkles className="w-3.5 h-3.5 text-blue-500" />
+            New Chat
+          </Button>
+        </div>
+
+        {/* Sidebar Session List */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-1">
+          {allSessions.map((session) => {
+            const isActive = session.id === activeSessionId;
+            return (
+              <div
+                key={session.id}
+                onClick={() => setActiveSessionId(session.id)}
+                className={`group relative flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all duration-200 ${
+                  isActive
+                    ? "bg-white/70 border border-white/60 shadow-sm text-slate-800 font-semibold"
+                    : "hover:bg-white/40 text-slate-600 hover:text-slate-800 border border-transparent"
+                }`}
+              >
+                <div className="flex items-center gap-2.5 overflow-hidden">
+                  <div
+                    className={`w-2 h-2 rounded-full shrink-0 ${
+                      isActive ? "bg-blue-500 animate-pulse" : "bg-slate-300"
+                    }`}
+                  />
+                  <div className="text-xs truncate max-w-[170px]">{session.name}</div>
+                </div>
+
+                {/* Delete button (hover reveal) */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    deleteSession(session.id);
+                  }}
+                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded-lg text-slate-400 hover:text-red-500 hover:bg-red-50/50 transition-all duration-200 shrink-0"
+                  title="Delete conversation"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Sidebar Footer */}
+        <div className="p-4 border-t border-white/30 bg-white/10 flex flex-col gap-2">
+          {messages.length > 0 && (
+            <Button
+              variant="ghost"
+              onClick={clearAllHistory}
+              className="w-full text-xs text-red-500 hover:text-red-600 hover:bg-red-50/50 border border-transparent hover:border-red-100/50 rounded-xl py-2 flex items-center justify-center gap-2 font-semibold transition-all duration-200"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+              Clear All History
+            </Button>
+          )}
+          <div className="flex items-center justify-between px-1">
+            <div className="flex items-center gap-1.5">
+              <span
                 className="w-1.5 h-1.5 rounded-full"
-                animate={{ scale: syncStatus === "connected" ? [1, 1.3, 1] : 1 }}
-                transition={{ duration: 2, repeat: Infinity }}
                 style={{
                   backgroundColor:
                     syncStatus === "connected"
@@ -997,461 +1516,549 @@ export default function VoiceAgentPage() {
               />
               <span className="text-[10px] text-slate-400 font-medium">
                 {syncStatus === "connected"
-                  ? "Nova-3 · Live"
+                  ? "Sync Connected"
                   : syncStatus === "syncing"
                     ? "Syncing..."
-                    : "Offline"}
+                    : "Offline Cached"}
               </span>
-            </motion.div>
+            </div>
+            <span className="text-[9px] text-slate-400 font-medium">v1.2</span>
           </div>
         </div>
-        <div className="flex items-center gap-1.5">
-          {[
-            {
-              icon: isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />,
-              onClick: () => setIsMuted(!isMuted),
-              active: isMuted,
-              activeClass: "bg-red-50 text-red-500",
-              defaultClass: "text-slate-500 hover:text-slate-700 hover:bg-white/60",
-              title: isMuted ? "Unmute" : "Mute",
-            },
-            {
-              icon: <Keyboard className="w-4 h-4" />,
-              onClick: () => setShowTextMode(!showTextMode),
-              active: false,
-              defaultClass: "text-slate-500 hover:text-slate-700 hover:bg-white/60",
-              title: "Toggle text input",
-            },
-            ...(messages.length > 0
-              ? [
-                  {
-                    icon: <Download className="w-4 h-4" />,
-                    onClick: exportSession,
-                    active: false,
-                    defaultClass: "text-slate-500 hover:text-slate-700 hover:bg-white/60",
-                    title: "Export session",
-                  },
-                  {
-                    icon: <X className="w-4 h-4" />,
-                    onClick: clearSession,
-                    active: false,
-                    defaultClass: "text-slate-500 hover:text-red-500 hover:bg-red-50/60",
-                    title: "Clear session",
-                  },
-                ]
-              : []),
-          ].map((btn, i) => (
-            <motion.button
-              key={i}
-              onClick={btn.onClick}
-              className={`p-2 rounded-xl transition-all ${btn.active ? btn.activeClass : btn.defaultClass}`}
-              title={btn.title}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              {btn.icon}
-            </motion.button>
-          ))}
-        </div>
-      </motion.header>
+      </aside>
 
-      {/* ===== CHAT MESSAGES ===== */}
-      <div className="relative z-10 flex-1 overflow-y-auto px-4 py-6">
-        <div className="max-w-3xl mx-auto">
-          {isLoading ? (
-            <div className="h-full flex items-center justify-center pt-20">
-              <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
-            </div>
-          ) : filteredMessages.length === 0 && !interimText ? (
+      {/* ===== MAIN CHAT PANEL ===== */}
+      <div className="relative z-10 flex-1 flex flex-col h-full overflow-hidden">
+        {/* ===== HEADER ===== */}
+        <motion.header
+          className="relative z-10 flex items-center justify-between px-4 py-3 border-b border-white/40 bg-white/30 backdrop-blur-xl shrink-0"
+          initial={{ y: -20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="flex items-center gap-3">
             <motion.div
-              className="flex flex-col items-center justify-center text-center gap-5 pt-16 md:pt-24"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.8, ease: "easeOut" }}
+              className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-cyan-400 flex items-center justify-center shadow-sm"
+              whileHover={{ rotate: 10, scale: 1.1 }}
             >
-              {/* Interactive animated orb */}
-              <motion.div
-                className="relative w-24 h-24 mb-2"
-                style={{ transform: `translateX(${orbX}px) translateY(${orbY}px)` }}
-                transition={{ type: "spring", stiffness: 100, damping: 30 }}
-              >
-                <motion.div
-                  className="absolute inset-0 rounded-full"
-                  animate={{ rotate: [0, 360] }}
-                  transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
-                  style={{
-                    background:
-                      "conic-gradient(from 0deg, #38bdf8, #22d3ee, #2dd4bf, #60a5fa, #3b82f6, #06b6d4, #14b8a6, #38bdf8)",
-                    borderRadius: "50%",
-                    mask: "radial-gradient(circle at 50% 50%, transparent 70%, black 71%, black 100%)",
-                    WebkitMask:
-                      "radial-gradient(circle at 50% 50%, transparent 70%, black 71%, black 100%)",
-                  }}
-                />
-                <motion.div
-                  className="absolute inset-0 rounded-full flex items-center justify-center"
-                  style={{
-                    background:
-                      "radial-gradient(circle at 35% 30%, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.1) 40%, transparent 60%)",
-                    boxShadow:
-                      "inset -2px -2px 8px rgba(0,0,0,0.04), inset 2px 2px 8px rgba(255,255,255,0.4), 0 8px 32px rgba(59,130,246,0.2)",
-                  }}
-                >
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
-                  >
-                    <BrainCircuit className="w-8 h-8 text-white/70" />
-                  </motion.div>
-                </motion.div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2, duration: 0.6 }}
-              >
-                <motion.h2
-                  className="text-lg font-bold text-slate-700"
+              <Stethoscope className="w-4 h-4 text-white" />
+            </motion.div>
+            <div>
+              <h1 className="text-sm font-bold text-slate-800">
+                <span className="text-slate-500 font-normal">Session: </span>
+                <motion.span
                   animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
-                  transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                  transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                  className="bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 bg-clip-text text-transparent"
                   style={{ backgroundSize: "200% 200%" }}
                 >
-                  <span
-                    className="bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 bg-clip-text text-transparent"
-                    style={{ backgroundSize: "200% 200%", backgroundPosition: "inherit" }}
-                  >
-                    How can I help you today?
-                  </span>
-                </motion.h2>
-                <p className="text-xs text-slate-400 mt-1 max-w-sm">
-                  Ask me about medications, symptoms, vitals, or refills — just tap the mic or type
-                  below
-                </p>
-              </motion.div>
-
-              {/* Animated idle waveform */}
+                  {allSessions.find((s) => s.id === activeSessionId)?.name || "New Chat"}
+                </motion.span>
+              </h1>
               <motion.div
-                className="flex items-end gap-[2px] h-8 w-48"
+                className="flex items-center gap-1.5"
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
-                transition={{ delay: 0.4 }}
+                transition={{ delay: 0.3 }}
               >
-                {waveformData.map((_, i) => (
+                <motion.span
+                  className="w-1.5 h-1.5 rounded-full"
+                  animate={{ scale: syncStatus === "connected" ? [1, 1.3, 1] : 1 }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                  style={{
+                    backgroundColor:
+                      syncStatus === "connected"
+                        ? "#3b82f6"
+                        : syncStatus === "syncing"
+                          ? "#06b6d4"
+                          : "#f59e0b",
+                  }}
+                />
+                <span className="text-[10px] text-slate-400 font-medium">
+                  {syncStatus === "connected"
+                    ? "Nova-3 · Live"
+                    : syncStatus === "syncing"
+                      ? "Syncing..."
+                      : "Offline"}
+                </span>
+              </motion.div>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5">
+            {[
+              {
+                icon: isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />,
+                onClick: () => setIsMuted(!isMuted),
+                active: isMuted,
+                activeClass: "bg-red-50 text-red-500",
+                defaultClass: "text-slate-500 hover:text-slate-700 hover:bg-white/60",
+                title: isMuted ? "Unmute" : "Mute",
+              },
+              {
+                icon: <Keyboard className="w-4 h-4" />,
+                onClick: () => setShowTextMode(!showTextMode),
+                active: false,
+                defaultClass: "text-slate-500 hover:text-slate-700 hover:bg-white/60",
+                title: "Toggle text input",
+              },
+              ...(activeMessages.length > 0
+                ? [
+                    {
+                      icon: <Download className="w-4 h-4" />,
+                      onClick: exportSession,
+                      active: false,
+                      defaultClass: "text-slate-500 hover:text-slate-700 hover:bg-white/60",
+                      title: "Export session",
+                    },
+                    {
+                      icon: <Trash2 className="w-4 h-4" />,
+                      onClick: () => deleteSession(activeSessionId),
+                      active: false,
+                      defaultClass: "text-slate-500 hover:text-red-500 hover:bg-red-50/60",
+                      title: "Delete this session",
+                    },
+                  ]
+                : []),
+            ].map((btn, i) => (
+              <motion.button
+                key={i}
+                onClick={btn.onClick}
+                className={`p-2 rounded-xl transition-all ${btn.active ? btn.activeClass : btn.defaultClass}`}
+                title={btn.title}
+                whileHover={{ scale: 1.1 }}
+                whileTap={{ scale: 0.9 }}
+              >
+                {btn.icon}
+              </motion.button>
+            ))}
+          </div>
+        </motion.header>
+
+        {/* ===== CHAT MESSAGES ===== */}
+        <div className="relative z-10 flex-1 overflow-y-auto px-4 py-6">
+          <div className="max-w-3xl mx-auto">
+            {isLoading ? (
+              <div className="h-full flex items-center justify-center pt-20">
+                <Loader2 className="w-6 h-6 text-blue-500 animate-spin" />
+              </div>
+            ) : filteredMessages.length === 0 && !interimText ? (
+              <motion.div
+                className="flex flex-col items-center justify-center text-center gap-5 pt-16 md:pt-24"
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, ease: "easeOut" }}
+              >
+                {/* Interactive animated orb */}
+                <motion.div
+                  className="relative w-24 h-24 mb-2"
+                  style={{ transform: `translateX(${orbX}px) translateY(${orbY}px)` }}
+                  transition={{ type: "spring", stiffness: 100, damping: 30 }}
+                >
                   <motion.div
-                    key={i}
-                    className="flex-1 rounded-full"
-                    animate={{ height: [8, Math.random() * 50 + 10, 8] }}
-                    transition={{
-                      duration: 1.5 + Math.random(),
-                      repeat: Infinity,
-                      delay: Math.random() * 0.5,
-                    }}
+                    className="absolute inset-0 rounded-full"
+                    animate={{ rotate: [0, 360] }}
+                    transition={{ duration: 20, repeat: Infinity, ease: "linear" }}
                     style={{
-                      background: `hsl(${210 - (i / 29) * 30}, 70%, 75%)`,
-                      opacity: 0.4,
+                      background:
+                        "conic-gradient(from 0deg, #38bdf8, #22d3ee, #2dd4bf, #60a5fa, #3b82f6, #06b6d4, #14b8a6, #38bdf8)",
+                      borderRadius: "50%",
+                      mask: "radial-gradient(circle at 50% 50%, transparent 70%, black 71%, black 100%)",
+                      WebkitMask:
+                        "radial-gradient(circle at 50% 50%, transparent 70%, black 71%, black 100%)",
                     }}
                   />
-                ))}
-              </motion.div>
-
-              {/* Suggestion chips */}
-              <motion.div
-                className="flex flex-wrap justify-center gap-2 mt-2 max-w-lg"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.5, staggerChildren: 0.1 }}
-              >
-                {suggestions.map(({ label, cmd }, i) => (
-                  <motion.button
-                    key={label}
-                    onClick={async () => {
-                      if (!isActive) {
-                        setStatus("processing");
-                        const intent = detectIntent(cmd);
-                        const workoutIntents = [
-                          "start_workout",
-                          "log_meal",
-                          "check_streak",
-                          "suggest_workout",
-                        ];
-                        const clinicalIntents = [
-                          "log_medication",
-                          "log_symptom",
-                          "query_vitals",
-                          "set_reminder",
-                          "refill_request",
-                        ];
-                        const resp = workoutIntents.includes(intent)
-                          ? await handleWorkoutIntent(intent, userId)
-                          : clinicalIntents.includes(intent)
-                            ? await handleClinicalVoiceIntent(intent, cmd)
-                            : generateLocalResponse(intent, cmd);
-                        await addMessage({ sender: "user", text: cmd }).catch(() => {});
-                        await addMessage({ sender: "assistant", text: resp, intent }).catch(
-                          () => {}
-                        );
-                        if (!isMuted && resp) speakText(resp);
-                        setStatus("idle");
-                      }
-                    }}
-                    className="flex items-center gap-1.5 bg-white/70 hover:bg-white/90 backdrop-blur-md px-3.5 py-2 rounded-full text-xs font-medium text-slate-600 shadow-sm border border-white/50 transition-all hover:border-blue-200"
-                    whileHover={{ scale: 1.05, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: 0.5 + i * 0.08 }}
-                  >
-                    {label}
-                  </motion.button>
-                ))}
-              </motion.div>
-
-              {/* Mic button */}
-              <motion.button
-                onClick={startListening}
-                className="mt-4 w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 text-white flex items-center justify-center shadow-lg shadow-blue-200/50"
-                whileHover={{ scale: 1.1, boxShadow: "0 20px 40px rgba(59,130,246,0.3)" }}
-                whileTap={{ scale: 0.9 }}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.7 }}
-              >
-                <Mic className="w-6 h-6" />
-              </motion.button>
-            </motion.div>
-          ) : (
-            <div className="space-y-4">
-              <AnimatePresence mode="popLayout">
-                {filteredMessages.map((msg, idx) => (
                   <motion.div
-                    key={msg.id}
-                    layout
-                    initial={{ opacity: 0, y: 12, scale: 0.97 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    transition={{ duration: 0.3, delay: Math.min(idx * 0.02, 0.3) }}
-                    className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+                    className="absolute inset-0 rounded-full flex items-center justify-center"
+                    style={{
+                      background:
+                        "radial-gradient(circle at 35% 30%, rgba(255,255,255,0.7) 0%, rgba(255,255,255,0.1) 40%, transparent 60%)",
+                      boxShadow:
+                        "inset -2px -2px 8px rgba(0,0,0,0.04), inset 2px 2px 8px rgba(255,255,255,0.4), 0 8px 32px rgba(59,130,246,0.2)",
+                    }}
                   >
-                    <div
-                      className={`flex gap-3 max-w-[85%] md:max-w-[75%] ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}
+                    <motion.div
+                      animate={{ scale: [1, 1.1, 1] }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "easeInOut" }}
                     >
-                      <motion.div
-                        className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold mt-0.5"
-                        initial={{ scale: 0 }}
-                        animate={{ scale: 1 }}
-                        transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                        style={{
-                          background:
-                            msg.sender === "user"
-                              ? "linear-gradient(135deg, #3b82f6, #06b6d4)"
-                              : "linear-gradient(135deg, #3b82f6, #14b8a6)",
-                        }}
-                      >
-                        {msg.sender === "user" ? "U" : "AI"}
-                      </motion.div>
-                      <motion.div
-                        className={`text-sm leading-relaxed px-4 py-2.5 ${
-                          msg.sender === "user"
-                            ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-2xl rounded-tr-sm"
-                            : "bg-white/80 backdrop-blur-sm text-slate-700 rounded-2xl rounded-tl-sm border border-white/60 shadow-sm"
-                        }`}
-                        whileHover={{ scale: 1.01 }}
-                      >
-                        {msg.text}
-                        {msg.intent && msg.sender === "assistant" && (
-                          <motion.div
-                            className="mt-1 text-[9px] opacity-50 font-semibold uppercase flex items-center gap-1"
-                            initial={{ opacity: 0 }}
-                            animate={{ opacity: 1 }}
-                            transition={{ delay: 0.3 }}
-                          >
-                            <Sparkles className="w-2.5 h-2.5" /> {msg.intent.replace(/_/g, " ")}
-                          </motion.div>
-                        )}
-                        {msg.audio_url && <AudioPlayerButton audioUrl={msg.audio_url} />}
-                      </motion.div>
-                    </div>
+                      <BrainCircuit className="w-8 h-8 text-white/70" />
+                    </motion.div>
                   </motion.div>
-                ))}
-              </AnimatePresence>
-
-              {interimText && (
-                <motion.div
-                  className="flex justify-end"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                >
-                  <div className="flex gap-3 max-w-[85%] md:max-w-[75%] flex-row-reverse">
-                    <div
-                      className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold text-white mt-0.5"
-                      style={{ background: "linear-gradient(135deg, #3b82f6, #06b6d4)" }}
-                    >
-                      U
-                    </div>
-                    <div className="text-sm leading-relaxed px-4 py-2.5 bg-blue-100/50 text-blue-700 rounded-2xl rounded-tr-sm italic">
-                      {interimText}...
-                    </div>
-                  </div>
                 </motion.div>
-              )}
 
-              {status === "processing" && (
                 <motion.div
-                  className="flex justify-start"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.2, duration: 0.6 }}
+                >
+                  <motion.h2
+                    className="text-lg font-bold text-slate-700"
+                    animate={{ backgroundPosition: ["0% 50%", "100% 50%", "0% 50%"] }}
+                    transition={{ duration: 4, repeat: Infinity, ease: "linear" }}
+                    style={{ backgroundSize: "200% 200%" }}
+                  >
+                    <span
+                      className="bg-gradient-to-r from-blue-600 via-cyan-500 to-blue-600 bg-clip-text text-transparent"
+                      style={{ backgroundSize: "200% 200%", backgroundPosition: "inherit" }}
+                    >
+                      How can I help you today?
+                    </span>
+                  </motion.h2>
+                  <p className="text-xs text-slate-400 mt-1 max-w-sm">
+                    Ask me about medications, symptoms, vitals, or refills — just tap the mic or
+                    type below
+                  </p>
+                </motion.div>
+
+                {/* Animated idle waveform */}
+                <motion.div
+                  className="flex items-end gap-[2px] h-8 w-48"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
+                  transition={{ delay: 0.4 }}
                 >
-                  <div className="flex gap-3 max-w-[85%] md:max-w-[75%]">
-                    <div
-                      className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold text-white mt-0.5"
-                      style={{ background: "linear-gradient(135deg, #3b82f6, #14b8a6)" }}
+                  {waveformData.map((_, i) => (
+                    <motion.div
+                      key={i}
+                      className="flex-1 rounded-full"
+                      animate={{ height: [8, Math.random() * 50 + 10, 8] }}
+                      transition={{
+                        duration: 1.5 + Math.random(),
+                        repeat: Infinity,
+                        delay: Math.random() * 0.5,
+                      }}
+                      style={{
+                        background: `hsl(${210 - (i / 29) * 30}, 70%, 75%)`,
+                        opacity: 0.4,
+                      }}
+                    />
+                  ))}
+                </motion.div>
+
+                {/* Suggestion chips */}
+                <motion.div
+                  className="flex flex-wrap justify-center gap-2 mt-2 max-w-lg"
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.5, staggerChildren: 0.1 }}
+                >
+                  {suggestions.map(({ label, cmd }, i) => (
+                    <motion.button
+                      key={label}
+                      onClick={async () => {
+                        if (!isActive) {
+                          setStatus("processing");
+                          const intent = detectIntent(cmd);
+                          const workoutIntents = [
+                            "start_workout",
+                            "log_meal",
+                            "check_streak",
+                            "suggest_workout",
+                          ];
+                          const clinicalIntents = [
+                            "log_medication",
+                            "log_symptom",
+                            "query_vitals",
+                            "set_reminder",
+                            "refill_request",
+                          ];
+                          const resp = workoutIntents.includes(intent)
+                            ? await handleWorkoutIntent(intent, userId)
+                            : clinicalIntents.includes(intent)
+                              ? await handleClinicalVoiceIntent(intent, cmd)
+                              : generateLocalResponse(intent, cmd);
+                          await addMessage({ sender: "user", text: cmd }).catch(() => {});
+                          await addMessage({ sender: "assistant", text: resp, intent }).catch(
+                            () => {}
+                          );
+                          if (!isMuted && resp) speakText(resp);
+                          setStatus("idle");
+                        }
+                      }}
+                      className="flex items-center gap-1.5 bg-white/70 hover:bg-white/90 backdrop-blur-md px-3.5 py-2 rounded-full text-xs font-medium text-slate-600 shadow-sm border border-white/50 transition-all hover:border-blue-200"
+                      whileHover={{ scale: 1.05, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.5 + i * 0.08 }}
                     >
-                      AI
-                    </div>
-                    <div className="bg-white/80 border border-white/60 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
-                      <div className="flex gap-1 items-center">
-                        {[0, 150, 300].map((d) => (
-                          <motion.span
-                            key={d}
-                            className="w-1.5 h-1.5 rounded-full"
-                            style={{ backgroundColor: "#3b82f6" }}
-                            animate={{ y: [0, -4, 0] }}
-                            transition={{ duration: 0.6, repeat: Infinity, delay: d / 1000 }}
-                          />
-                        ))}
+                      {label}
+                    </motion.button>
+                  ))}
+                </motion.div>
+
+                {/* Mic button */}
+                <motion.button
+                  onClick={startListening}
+                  className="mt-4 w-14 h-14 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 text-white flex items-center justify-center shadow-lg shadow-blue-200/50"
+                  whileHover={{ scale: 1.1, boxShadow: "0 20px 40px rgba(59,130,246,0.3)" }}
+                  whileTap={{ scale: 0.9 }}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.7 }}
+                >
+                  <Mic className="w-6 h-6" />
+                </motion.button>
+              </motion.div>
+            ) : (
+              <div className="space-y-4">
+                <AnimatePresence mode="popLayout">
+                  {filteredMessages.map((msg, idx) => (
+                    <motion.div
+                      key={msg.id}
+                      layout
+                      initial={{ opacity: 0, y: 12, scale: 0.97 }}
+                      animate={{ opacity: 1, y: 0, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={{ duration: 0.3, delay: Math.min(idx * 0.02, 0.3) }}
+                      className={`flex ${msg.sender === "user" ? "justify-end" : "justify-start"}`}
+                    >
+                      <div
+                        className={`flex gap-3 max-w-[85%] md:max-w-[75%] ${msg.sender === "user" ? "flex-row-reverse" : "flex-row"}`}
+                      >
+                        <motion.div
+                          className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold mt-0.5"
+                          initial={{ scale: 0 }}
+                          animate={{ scale: 1 }}
+                          transition={{ type: "spring", stiffness: 300, damping: 20 }}
+                          style={{
+                            background:
+                              msg.sender === "user"
+                                ? "linear-gradient(135deg, #3b82f6, #06b6d4)"
+                                : "linear-gradient(135deg, #3b82f6, #14b8a6)",
+                          }}
+                        >
+                          {msg.sender === "user" ? "U" : "AI"}
+                        </motion.div>
+                        <motion.div
+                          className={`text-sm leading-relaxed px-4 py-2.5 ${
+                            msg.sender === "user"
+                              ? "bg-gradient-to-r from-blue-500 to-cyan-500 text-white rounded-2xl rounded-tr-sm"
+                              : "bg-white/80 backdrop-blur-sm text-slate-700 rounded-2xl rounded-tl-sm border border-white/60 shadow-sm"
+                          }`}
+                          whileHover={{ scale: 1.01 }}
+                        >
+                          {msg.text}
+                          {msg.intent && msg.sender === "assistant" && (
+                            <motion.div
+                              className="mt-1 text-[9px] opacity-50 font-semibold uppercase flex items-center gap-1"
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ delay: 0.3 }}
+                            >
+                              <Sparkles className="w-2.5 h-2.5" /> {msg.intent.replace(/_/g, " ")}
+                            </motion.div>
+                          )}
+                          {msg.audio_url && <AudioPlayerButton audioUrl={msg.audio_url} />}
+                        </motion.div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+
+                {interimText && (
+                  <motion.div
+                    className="flex justify-end"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    <div className="flex gap-3 max-w-[85%] md:max-w-[75%] flex-row-reverse">
+                      <div
+                        className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold text-white mt-0.5"
+                        style={{ background: "linear-gradient(135deg, #3b82f6, #06b6d4)" }}
+                      >
+                        U
+                      </div>
+                      <div className="text-sm leading-relaxed px-4 py-2.5 bg-blue-100/50 text-blue-700 rounded-2xl rounded-tr-sm italic">
+                        {interimText}...
                       </div>
                     </div>
-                  </div>
-                </motion.div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-          )}
-        </div>
-      </div>
+                  </motion.div>
+                )}
 
-      {/* ===== BOTTOM INPUT ===== */}
-      <motion.div
-        className="relative z-10 border-t border-white/40 bg-white/20 backdrop-blur-xl shrink-0"
-        initial={{ y: 20, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3, duration: 0.5 }}
-      >
-        <div className="max-w-3xl mx-auto px-4 py-3">
-          {isActive && (
-            <motion.div
-              className="flex items-center gap-3 mb-2 px-1"
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-            >
-              <motion.span
-                className="text-[10px] font-bold px-2 py-0.5 rounded-full"
-                animate={{
-                  backgroundColor: [
-                    `${statusColors[status]}20`,
-                    `${statusColors[status]}40`,
-                    `${statusColors[status]}20`,
-                  ],
-                }}
-                transition={{ duration: 1.5, repeat: Infinity }}
-                style={{ color: statusColors[status] }}
-              >
-                {statusLabels[status]}
-              </motion.span>
-              <div className="flex items-end gap-[1.5px] h-5 flex-1 max-w-[120px]">
-                {waveformData.slice(0, 20).map((v, i) => (
+                {status === "processing" && (
                   <motion.div
-                    key={i}
-                    className="flex-1 rounded-full"
-                    animate={{ height: `${Math.max(3, v * 100)}%` }}
-                    transition={{ duration: 0.075 }}
-                    style={{
-                      background: `hsl(${Math.round(210 - (i / 19) * 30)}, 75%, 55%)`,
-                      opacity: 0.7,
-                    }}
-                  />
-                ))}
+                    className="flex justify-start"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    <div className="flex gap-3 max-w-[85%] md:max-w-[75%]">
+                      <div
+                        className="w-7 h-7 rounded-full shrink-0 flex items-center justify-center text-[10px] font-bold text-white mt-0.5"
+                        style={{ background: "linear-gradient(135deg, #3b82f6, #14b8a6)" }}
+                      >
+                        AI
+                      </div>
+                      <div className="bg-white/80 border border-white/60 rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm">
+                        <div className="flex gap-1 items-center">
+                          {[0, 150, 300].map((d) => (
+                            <motion.span
+                              key={d}
+                              className="w-1.5 h-1.5 rounded-full"
+                              style={{ backgroundColor: "#3b82f6" }}
+                              animate={{ y: [0, -4, 0] }}
+                              transition={{ duration: 0.6, repeat: Infinity, delay: d / 1000 }}
+                            />
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+                <div ref={messagesEndRef} />
               </div>
-              <motion.button
-                onClick={stopListening}
-                className="ml-auto text-[10px] font-bold text-red-500 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-full transition-all"
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-              >
-                Stop
-              </motion.button>
-            </motion.div>
-          )}
-
-          <motion.form
-            onSubmit={handleTextSubmit}
-            className="flex items-center gap-2 bg-white/70 backdrop-blur-2xl border border-white/60 rounded-2xl px-3 py-2 shadow-sm"
-            whileHover={{ boxShadow: "0 4px 24px rgba(59,130,246,0.1)" }}
-            transition={{ duration: 0.2 }}
-          >
-            <motion.button
-              type="button"
-              onClick={isActive ? stopListening : startListening}
-              className={`p-2 rounded-xl transition-all ${isActive ? "bg-red-500 text-white shadow-sm" : "text-slate-400 hover:text-blue-500 hover:bg-blue-50"}`}
-              whileHover={{ scale: 1.1 }}
-              whileTap={{ scale: 0.9 }}
-            >
-              {isActive ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
-            </motion.button>
-
-            <div className="w-px h-5 bg-slate-200/60" />
-
-            <Input
-              value={textInput}
-              onChange={(e) => setTextInput(e.target.value)}
-              placeholder={isActive ? "Listening..." : "Ask anything about your health..."}
-              className="flex-1 text-sm border-0 bg-transparent px-1 py-0 outline-none focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none h-8 placeholder:text-slate-400"
-              disabled={isActive}
-            />
-
-            <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
-              <Button
-                type="submit"
-                size="sm"
-                disabled={!textInput.trim() || isActive}
-                className="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-sm disabled:opacity-30 h-8 px-3"
-              >
-                <Send className="w-3.5 h-3.5" />
-              </Button>
-            </motion.div>
-          </motion.form>
-
-          {(errorMsg || micAllowed === false) && (
-            <motion.div
-              className="mt-2 flex items-start gap-1.5 text-xs text-red-600 bg-red-50/80 rounded-xl px-3 py-2 border border-red-100"
-              initial={{ opacity: 0, y: -5 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
-              <span>{errorMsg || "Microphone access blocked. Enable it in browser settings."}</span>
-            </motion.div>
-          )}
-
-          <div className="flex items-center justify-between mt-2 px-1">
-            <p className="text-[10px] text-slate-400">Deepgram Nova-3 · Clinical AI</p>
-            {filteredMessages.length > 0 && (
-              <motion.button
-                onClick={() =>
-                  document
-                    .querySelector(".overflow-y-auto")
-                    ?.scrollTo({ top: 0, behavior: "smooth" })
-                }
-                className="text-[10px] text-slate-400 hover:text-blue-500 transition-colors"
-                whileHover={{ x: -2 }}
-              >
-                Back to top ↑
-              </motion.button>
             )}
           </div>
         </div>
-      </motion.div>
+
+        {/* ===== BOTTOM INPUT ===== */}
+        <motion.div
+          className="relative z-10 border-t border-white/40 bg-white/20 backdrop-blur-xl shrink-0"
+          initial={{ y: 20, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          transition={{ delay: 0.3, duration: 0.5 }}
+        >
+          <div className="max-w-3xl mx-auto px-4 py-3">
+            {isActive && (
+              <motion.div
+                className="flex items-center gap-3 mb-2 px-1"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+              >
+                <motion.span
+                  className="text-[10px] font-bold px-2 py-0.5 rounded-full"
+                  animate={{
+                    backgroundColor: [
+                      `${statusColors[status]}20`,
+                      `${statusColors[status]}40`,
+                      `${statusColors[status]}20`,
+                    ],
+                  }}
+                  transition={{ duration: 1.5, repeat: Infinity }}
+                  style={{ color: statusColors[status] }}
+                >
+                  {statusLabels[status]}
+                </motion.span>
+                <div className="flex items-end gap-[1.5px] h-5 flex-1 max-w-[120px]">
+                  {waveformData.slice(0, 20).map((v, i) => (
+                    <motion.div
+                      key={i}
+                      className="flex-1 rounded-full"
+                      animate={{ height: `${Math.max(3, v * 100)}%` }}
+                      transition={{ duration: 0.075 }}
+                      style={{
+                        background: `hsl(${Math.round(210 - (i / 19) * 30)}, 75%, 55%)`,
+                        opacity: 0.7,
+                      }}
+                    />
+                  ))}
+                </div>
+                <motion.button
+                  onClick={stopListening}
+                  className="ml-auto text-[10px] font-bold text-red-500 bg-red-50 hover:bg-red-100 px-2.5 py-1 rounded-full transition-all"
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                >
+                  Stop
+                </motion.button>
+              </motion.div>
+            )}
+
+            <motion.form
+              onSubmit={handleTextSubmit}
+              className="flex items-center gap-2 bg-white/70 backdrop-blur-2xl border border-white/60 rounded-2xl px-3 py-2 shadow-sm"
+              whileHover={{ boxShadow: "0 4px 24px rgba(59,130,246,0.1)" }}
+              transition={{ duration: 0.2 }}
+            >
+              {status === "listening" ? (
+                <div className="flex items-center gap-1.5">
+                  <motion.button
+                    type="button"
+                    onClick={stopListening}
+                    className="p-2 rounded-xl bg-red-500 text-white shadow-sm hover:bg-red-600"
+                    title="Cancel recording"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <MicOff className="w-4 h-4" />
+                  </motion.button>
+                  <motion.button
+                    type="button"
+                    onClick={finishAndSubmit}
+                    className="p-2 rounded-xl bg-green-500 text-white shadow-sm hover:bg-green-600 animate-pulse"
+                    title="Finish and Send"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                  >
+                    <Send className="w-4 h-4" />
+                  </motion.button>
+                </div>
+              ) : (
+                <motion.button
+                  type="button"
+                  onClick={isActive ? stopListening : startListening}
+                  className={`p-2 rounded-xl transition-all ${isActive ? "bg-red-500 text-white shadow-sm" : "text-slate-400 hover:text-blue-500 hover:bg-blue-50"}`}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.9 }}
+                >
+                  {isActive ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                </motion.button>
+              )}
+
+              <div className="w-px h-5 bg-slate-200/60" />
+
+              <Input
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder={isActive ? "Listening..." : "Ask anything about your health..."}
+                className="flex-1 text-sm border-0 bg-transparent px-1 py-0 outline-none focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none h-8 placeholder:text-slate-400"
+                disabled={isActive}
+              />
+
+              <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
+                <Button
+                  type="submit"
+                  size="sm"
+                  disabled={!textInput.trim() || isActive}
+                  className="rounded-xl bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white shadow-sm disabled:opacity-30 h-8 px-3"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </Button>
+              </motion.div>
+            </motion.form>
+
+            {(errorMsg || micAllowed === false) && (
+              <motion.div
+                className="mt-2 flex items-start gap-1.5 text-xs text-red-600 bg-red-50/80 rounded-xl px-3 py-2 border border-red-100"
+                initial={{ opacity: 0, y: -5 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <AlertCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <span>
+                  {errorMsg || "Microphone access blocked. Enable it in browser settings."}
+                </span>
+              </motion.div>
+            )}
+
+            <div className="flex items-center justify-between mt-2 px-1">
+              <p className="text-[10px] text-slate-400">Deepgram Nova-3 · Clinical AI</p>
+              {filteredMessages.length > 0 && (
+                <motion.button
+                  onClick={() =>
+                    document
+                      .querySelector(".overflow-y-auto")
+                      ?.scrollTo({ top: 0, behavior: "smooth" })
+                  }
+                  className="text-[10px] text-slate-400 hover:text-blue-500 transition-colors"
+                  whileHover={{ x: -2 }}
+                >
+                  Back to top ↑
+                </motion.button>
+              )}
+            </div>
+          </div>
+        </motion.div>
+      </div>
 
       {/* ===== FLOATING GLASS TIMER HUD ===== */}
       <AnimatePresence>
@@ -1486,6 +2093,8 @@ export default function VoiceAgentPage() {
                       strokeWidth="3"
                       strokeLinecap="round"
                       strokeDasharray="97.4"
+                      strokeDashoffset={97.4}
+                      initial={{ strokeDashoffset: 97.4 }}
                       animate={{ strokeDashoffset: 97.4 - (sessionTimer / 300) * 97.4 }}
                       transition={{ duration: 1, ease: "linear" }}
                     />
@@ -1534,18 +2143,49 @@ export default function VoiceAgentPage() {
                   </div>
                 </div>
 
-                {/* Stop button */}
+                {/* Cancel/Stop button */}
                 <motion.button
                   onClick={stopListening}
-                  className="p-1.5 rounded-full bg-white/80 hover:bg-white text-red-500 shadow-sm transition-all"
+                  className="p-1.5 rounded-full bg-white/80 hover:bg-red-50 text-red-500 shadow-sm transition-all"
                   whileHover={{ scale: 1.1 }}
                   whileTap={{ scale: 0.9 }}
-                  title="Stop session"
+                  title="Cancel and stop recording"
                 >
-                  <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 24 24">
-                    <rect x="6" y="6" width="12" height="12" rx="1.5" />
+                  <svg
+                    className="w-3.5 h-3.5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                   </svg>
                 </motion.button>
+
+                {/* Done Speaking (Send) button */}
+                {status === "listening" && (
+                  <motion.button
+                    onClick={finishAndSubmit}
+                    className="p-1.5 rounded-full bg-green-500 hover:bg-green-600 text-white shadow-sm transition-all"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.9 }}
+                    title="Done speaking (Send to AI)"
+                  >
+                    <svg
+                      className="w-3.5 h-3.5"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2.5"
+                      viewBox="0 0 24 24"
+                    >
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        d="M4.5 12.75l6 6 9-13.5"
+                      />
+                    </svg>
+                  </motion.button>
+                )}
               </div>
             </motion.div>
 
@@ -1568,6 +2208,25 @@ export default function VoiceAgentPage() {
                 >
                   {isMuted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                 </motion.button>
+
+                <div className="w-px h-6 bg-white/30" />
+
+                {/* Auto-send toggle */}
+                <div className="flex items-center gap-1.5 px-1">
+                  <input
+                    type="checkbox"
+                    id="autoSubmitToggle"
+                    checked={autoSubmit}
+                    onChange={(e) => setAutoSubmit(e.target.checked)}
+                    className="w-3.5 h-3.5 text-blue-600 rounded border-slate-300 focus:ring-blue-500 focus:ring-offset-0 bg-white/60 cursor-pointer"
+                  />
+                  <label
+                    htmlFor="autoSubmitToggle"
+                    className="text-[9px] text-slate-500 font-bold select-none cursor-pointer whitespace-nowrap"
+                  >
+                    Auto-send
+                  </label>
+                </div>
 
                 <div className="w-px h-6 bg-white/30" />
 

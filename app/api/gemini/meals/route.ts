@@ -82,7 +82,7 @@ export async function POST(req: Request) {
 
     const result = await callGemini(
       `${MEAL_SYSTEM_PROMPT}\n\nSymptoms: ${JSON.stringify(symptoms)}\nActive medications: ${JSON.stringify(medications)}\n\nGenerate 2-3 meal suggestions:`,
-      { model: "gemini-1.5-flash", maxTokens: 500 }
+      { model: "gemini-2.5-flash-lite", maxTokens: 500 }
     );
 
     if (result.error || !result.text) {
