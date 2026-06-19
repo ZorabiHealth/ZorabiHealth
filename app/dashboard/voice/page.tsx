@@ -24,6 +24,21 @@ import { supabase, queueSyncItem, drainSyncQueue } from "@/lib/supabase";
 
 type AgentStatus = "idle" | "connecting" | "listening" | "processing" | "speaking" | "error";
 
+interface VoiceExtractedData {
+  medicationName?: string | null;
+  symptomName?: string | null;
+  severity?: "Mild" | "Moderate" | "Severe" | null;
+  time?: string | null;
+  label?: string | null;
+  repeatDays?: string[] | null;
+}
+
+interface VoiceResponse {
+  intent: string;
+  extractedData: VoiceExtractedData | null;
+  response: string;
+}
+
 const DEEPGRAM_WS_URL = "wss://api.deepgram.com/v1/listen";
 const STT_PARAMS = new URLSearchParams({
   model: "nova-3",
@@ -342,7 +357,11 @@ export default function VoiceAgentPage() {
     return refreshedSession?.access_token ?? null;
   }, []);
 
-  const handleClinicalVoiceIntent = async (intent: string, text: string): Promise<string> => {
+  const handleClinicalVoiceIntent = async (
+    intent: string,
+    text: string,
+    extractedData?: VoiceExtractedData
+  ): Promise<string> => {
     try {
       switch (intent) {
         case "log_medication": {
@@ -354,9 +373,10 @@ export default function VoiceAgentPage() {
 
           if (error) throw error;
 
-          const matchedMed = extractMedicationMatch(text, meds || []);
+          const queryName = extractedData?.medicationName || text;
+          const matchedMed = extractMedicationMatch(queryName, meds || []);
           if (!matchedMed) {
-            return "I couldn’t tell which medication you meant. Please say the medicine name, and I’ll log it.";
+            return `I couldn’t find an active medication matching "${queryName}". Please say the medicine name, and I’ll log it.`;
           }
 
           const { error: logErr } = await supabase.from("medication_logs").insert({
@@ -380,27 +400,33 @@ export default function VoiceAgentPage() {
         }
 
         case "log_symptom": {
-          const symptoms = [
-            "Palpitations",
-            "Chest Tightness",
-            "Fatigue",
-            "Shortness of Breath",
-            "Dizziness",
-            "Headache",
-          ];
-          let symptomName = "General Symptom";
-          for (const s of symptoms) {
-            if (new RegExp(`\\b${s}\\b`, "i").test(text)) {
-              symptomName = s;
-              break;
+          let symptomName = extractedData?.symptomName;
+          if (!symptomName) {
+            const symptoms = [
+              "Palpitations",
+              "Chest Tightness",
+              "Fatigue",
+              "Shortness of Breath",
+              "Dizziness",
+              "Headache",
+            ];
+            symptomName = "General Symptom";
+            for (const s of symptoms) {
+              if (new RegExp(`\\b${s}\\b`, "i").test(text)) {
+                symptomName = s;
+                break;
+              }
             }
           }
 
-          let severity = "Moderate";
-          if (/\\b(severe|bad|high|intense)\\b/i.test(text)) {
-            severity = "Severe";
-          } else if (/\\b(mild|light|low)\\b/i.test(text)) {
-            severity = "Mild";
+          let severity = extractedData?.severity;
+          if (!severity) {
+            severity = "Moderate";
+            if (/\\b(severe|bad|high|intense)\\b/i.test(text)) {
+              severity = "Severe";
+            } else if (/\\b(mild|light|low)\\b/i.test(text)) {
+              severity = "Mild";
+            }
           }
 
           const { error: logErr } = await supabase.from("symptom_logs").insert({
@@ -477,12 +503,12 @@ export default function VoiceAgentPage() {
         }
 
         case "set_reminder": {
-          const time = extractReminderTime(text);
+          const time = extractedData?.time || extractReminderTime(text);
           if (!time) {
             return "I can set that reminder, but I need a time. Try saying something like 8:00 am or 18:30.";
           }
-          const repeat = parseRepeatDays(text);
-          const label = extractReminderLabel(text);
+          const repeat = extractedData?.repeatDays || parseRepeatDays(text);
+          const label = extractedData?.label || extractReminderLabel(text);
 
           const { error: alarmErr } = await supabase.from("wearable_alarms").insert({
             user_id: userId,
@@ -736,16 +762,7 @@ export default function VoiceAgentPage() {
                 }
               })
               .catch(() => {});
-            const intent = detectIntent(transcript);
-            const workoutIntents = ["start_workout", "log_meal", "check_streak", "suggest_workout"];
-            const clinicalIntents = [
-              "log_medication",
-              "log_symptom",
-              "query_vitals",
-              "set_reminder",
-              "refill_request",
-            ];
-            const handleResp = (response: string) => {
+            processVoiceInput(transcript, (response, intent) => {
               if (!response) {
                 setStatus("listening");
                 return;
@@ -759,18 +776,7 @@ export default function VoiceAgentPage() {
               setStatus("speaking");
               if (!isMuted) speakText(response, () => setStatus("listening"));
               else setStatus("listening");
-            };
-            if (workoutIntents.includes(intent)) {
-              handleWorkoutIntent(intent, userId)
-                .then(handleResp)
-                .catch(() => setStatus("listening"));
-            } else if (clinicalIntents.includes(intent)) {
-              handleClinicalVoiceIntent(intent, transcript)
-                .then(handleResp)
-                .catch(() => setStatus("listening"));
-            } else {
-              setTimeout(() => handleResp(generateLocalResponse(intent, transcript)), 500);
-            }
+            });
           }
         } catch {
           console.warn("[catch] Non-critical operation failed at page.tsx");
@@ -833,13 +839,39 @@ export default function VoiceAgentPage() {
     return () => clearInterval(interval);
   }, [isActive]);
 
-  const handleTextSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!textInput.trim()) return;
-    const text = textInput.trim();
-    setTextInput("");
-    setStatus("processing");
-    const intent = detectIntent(text);
+  const processVoiceInput = async (
+    text: string,
+    onResponse: (response: string, intent: string) => void
+  ) => {
+    let activeMeds: { name: string; generic_name?: string | null; dosage: string }[] = [];
+    let voiceData: VoiceResponse | null = null;
+
+    if (navigator.onLine) {
+      try {
+        const { data } = await supabase
+          .from("medications")
+          .select("name, generic_name, dosage")
+          .eq("user_id", userId)
+          .eq("is_active", true);
+        activeMeds = data || [];
+
+        const voiceRes = await fetch("/api/gemini/voice", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ message: text, activeMedications: activeMeds }),
+        });
+        if (voiceRes.ok) {
+          voiceData = await voiceRes.json();
+        }
+      } catch (e) {
+        console.error("Gemini voice API call failed, falling back to local processing", e);
+      }
+    }
+
+    const intent = voiceData?.intent || detectIntent(text);
+    const extractedData = voiceData?.extractedData || undefined;
+    const responseText = voiceData?.response || generateLocalResponse(intent, text);
+
     const workoutIntents = ["start_workout", "log_meal", "check_streak", "suggest_workout"];
     const clinicalIntents = [
       "log_medication",
@@ -849,19 +881,33 @@ export default function VoiceAgentPage() {
       "refill_request",
     ];
 
-    let response = "";
     if (workoutIntents.includes(intent)) {
-      response = await handleWorkoutIntent(intent, userId);
+      handleWorkoutIntent(intent, userId)
+        .then((resp) => onResponse(resp || responseText, intent))
+        .catch(() => onResponse(responseText, intent));
     } else if (clinicalIntents.includes(intent)) {
-      response = await handleClinicalVoiceIntent(intent, text);
+      handleClinicalVoiceIntent(intent, text, extractedData)
+        .then((resp) => onResponse(resp || responseText, intent))
+        .catch(() => onResponse(responseText, intent));
     } else {
-      response = generateLocalResponse(intent, text);
+      onResponse(responseText, intent);
     }
+  };
+
+  const handleTextSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!textInput.trim()) return;
+    const text = textInput.trim();
+    setTextInput("");
+    setStatus("processing");
 
     await addMessage({ sender: "user", text }).catch(() => {});
-    await addMessage({ sender: "assistant", text: response, intent }).catch(() => {});
-    if (!isMuted) speakText(response, () => setStatus("idle"));
-    else setStatus("idle");
+
+    await processVoiceInput(text, (response, intent) => {
+      addMessage({ sender: "assistant", text: response, intent }).catch(() => {});
+      if (!isMuted && response) speakText(response, () => setStatus("idle"));
+      else setStatus("idle");
+    });
   };
 
   const exportSession = () => {
