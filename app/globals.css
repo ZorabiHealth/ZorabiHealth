@@ -37,6 +37,10 @@ body {
   color: #1e293b;
 }
 
+.bg-gradient-radial {
+  background-image: radial-gradient(var(--tw-gradient-stops));
+}
+
 /* Custom Styles from code.html */
 .hero-right-bg {
   background: linear-gradient(135deg, #e0f2fe 0%, #dbeafe 100%);
